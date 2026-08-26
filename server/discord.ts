@@ -2,6 +2,19 @@ import { ENV } from "./_core/env";
 
 export type DiscordMessage = { title: string; content: string };
 
+export async function getDiscordBotIdentity(): Promise<{ id: string; username: string } | null> {
+  if (!ENV.discordBotToken) return null;
+  try {
+    const response = await fetch("https://discord.com/api/v10/users/@me", { headers: { Authorization: `Bot ${ENV.discordBotToken}` }, signal: AbortSignal.timeout(8_000) });
+    if (!response.ok) return null;
+    const body = await response.json() as { id?: string; username?: string };
+    return body.id && body.username ? { id: body.id, username: body.username } : null;
+  } catch (error) {
+    console.warn("[Discord] Bot identity check failed:", error);
+    return null;
+  }
+}
+
 export async function sendDiscordChannelMessage(channelId: string | undefined, message: DiscordMessage): Promise<boolean> {
   if (!channelId || !/^\d{15,22}$/.test(channelId) || !ENV.discordBotToken) return false;
   try {

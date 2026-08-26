@@ -1,6 +1,6 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { HostedScript, InsertHostedScript, InsertProtection, InsertUser, hostedScripts, protections, users } from "../drizzle/schema";
+import { accessRules, blacklists, hostedScripts, HostedScript, InsertHostedScript, InsertLicense, InsertProtection, InsertUser, licenses, protections, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -136,5 +136,77 @@ export async function getHostedScriptBySlug(slug: string) {
   if (!db) return undefined;
   const rows = await db.select().from(hostedScripts).where(eq(hostedScripts.slug, slug)).limit(1);
   return rows[0];
+}
+
+export async function createLicense(input: InsertLicense) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const result = await db.insert(licenses).values(input);
+  const rows = await db.select().from(licenses).where(eq(licenses.id, Number(result[0].insertId))).limit(1);
+  return rows[0];
+}
+
+export async function getLicensesByOwner(ownerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(licenses).where(eq(licenses.ownerId, ownerId)).orderBy(desc(licenses.createdAt)).limit(100);
+}
+
+export async function revokeLicense(ownerId: number, id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(licenses).set({ status: "revoked" }).where(and(eq(licenses.id, id), eq(licenses.ownerId, ownerId)));
+}
+
+export async function resetLicenseHwid(ownerId: number, id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(licenses).set({ hwid: null }).where(and(eq(licenses.id, id), eq(licenses.ownerId, ownerId)));
+}
+
+export async function deleteLicense(ownerId: number, id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.delete(licenses).where(and(eq(licenses.id, id), eq(licenses.ownerId, ownerId)));
+}
+
+export async function getAccessRulesByOwner(ownerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(accessRules).where(eq(accessRules.ownerId, ownerId)).orderBy(desc(accessRules.createdAt)).limit(100);
+}
+
+export async function createAccessRule(input: typeof accessRules.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const result = await db.insert(accessRules).values(input);
+  const rows = await db.select().from(accessRules).where(eq(accessRules.id, Number(result[0].insertId))).limit(1);
+  return rows[0];
+}
+
+export async function deleteAccessRule(ownerId: number, id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.delete(accessRules).where(and(eq(accessRules.id, id), eq(accessRules.ownerId, ownerId)));
+}
+
+export async function getBlacklistsByOwner(ownerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(blacklists).where(eq(blacklists.ownerId, ownerId)).orderBy(desc(blacklists.createdAt)).limit(100);
+}
+
+export async function createBlacklist(input: typeof blacklists.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const result = await db.insert(blacklists).values(input);
+  const rows = await db.select().from(blacklists).where(eq(blacklists.id, Number(result[0].insertId))).limit(1);
+  return rows[0];
+}
+
+export async function deleteBlacklist(ownerId: number, id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.delete(blacklists).where(and(eq(blacklists.id, id), eq(blacklists.ownerId, ownerId)));
 }
 

@@ -64,3 +64,33 @@
 
 - [x] Exponer official/provider del adapter en providerStatus y mostrarlo en el panel
 - [x] Probar fallback local y adapter oficial registrado sin sugerir compatibilidad falsa con Luraph
+
+- [x] Diagnosticar por qué el bot aparece apagado y documentar el proceso de ejecución persistente
+- [x] Crear modelo de licencias con keys automáticas de 10 dígitos y tipo trial separado de key
+- [x] Implementar generación, eliminación, revocación y reset de HWID
+- [x] Implementar blacklist de usuarios con motivo y estado
+- [x] Implementar whitelist de usuarios y roles de Discord
+- [x] Implementar pantalla Setup para configurar script, permisos, trial y canal
+- [x] Añadir endpoints protegidos para administrar licencias y listas de acceso
+- [x] Rediseñar la UI del panel con navegación y estados reales para cada función
+- [x] Añadir pruebas de autorización, generación de keys, trial, blacklist, whitelist y reset HWID
+
+- [x] Verificar si el estado “apagado” corresponde a proceso no iniciado, token, intents, comandos no sincronizados o indicador del panel
+- [x] Corregir la causa comprobable sin activar Reserved Hosting por suposición
+
+- [x] Mantener sin cambios el hosting G/script loader mientras se depura Discord
+- [x] Diagnosticar exclusivamente el estado apagado del bot y sus comandos slash
+
+- [x] Documentar en el proyecto cómo se inicia y verifica el Gateway del bot Discord
+- [x] Implementar borrado real de licencias separado de revocación
+- [x] Completar Setup con script, permisos, trial y canal Discord
+- [x] Añadir pruebas de no autenticado, reset HWID, revocación y borrado
+
+- [x] Integrar en Setup los campos de script, permisos, trial y canal Discord en una sola vista
+- [x] Añadir persistencia local y validación visible del estado de configuración de Setup
+- [x] Añadir prueba verificable de la configuración integrada de Setup
+
+- [x] Mostrar en Setup un estado visible de guardado y validez del canal/configuración
+- [x] Crear prueba específica de Setup para persistencia local y updateChannel
+
+- [x] Añadir prueba frontend o helper de Setup para localStorage, estado visible y updateChannel con ID válido o null

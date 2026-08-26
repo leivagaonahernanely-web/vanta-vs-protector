@@ -43,6 +43,13 @@
       "when": 1787711771906,
       "tag": "0005_tan_venom",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1787712954506,
+      "tag": "0006_last_vertigo",
+      "breakpoints": true
     }
   ]
 }

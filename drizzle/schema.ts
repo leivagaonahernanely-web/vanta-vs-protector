@@ -62,3 +62,39 @@ export const hostedScripts = mysqlTable("hostedScripts", {
 
 export type HostedScript = typeof hostedScripts.$inferSelect;
 export type InsertHostedScript = typeof hostedScripts.$inferInsert;
+
+export const licenses = mysqlTable("licenses", {
+  id: int("id").autoincrement().primaryKey(),
+  ownerId: int("ownerId").notNull().references(() => users.id),
+  hostedScriptId: int("hostedScriptId").references(() => hostedScripts.id),
+  keyCode: varchar("keyCode", { length: 10 }).notNull().unique(),
+  type: mysqlEnum("type", ["trial", "license"]).default("license").notNull(),
+  status: mysqlEnum("status", ["active", "revoked", "expired"]).default("active").notNull(),
+  discordUserId: varchar("discordUserId", { length: 32 }),
+  hwid: varchar("hwid", { length: 128 }),
+  expiresAt: timestamp("expiresAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type License = typeof licenses.$inferSelect;
+export type InsertLicense = typeof licenses.$inferInsert;
+
+export const accessRules = mysqlTable("accessRules", {
+  id: int("id").autoincrement().primaryKey(),
+  ownerId: int("ownerId").notNull().references(() => users.id),
+  kind: mysqlEnum("kind", ["user", "role"]).notNull(),
+  discordId: varchar("discordId", { length: 32 }).notNull(),
+  label: varchar("label", { length: 128 }),
+  active: int("active").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const blacklists = mysqlTable("blacklists", {
+  id: int("id").autoincrement().primaryKey(),
+  ownerId: int("ownerId").notNull().references(() => users.id),
+  discordUserId: varchar("discordUserId", { length: 32 }).notNull(),
+  reason: varchar("reason", { length: 500 }),
+  active: int("active").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});

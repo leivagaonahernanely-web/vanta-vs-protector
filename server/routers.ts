@@ -5,9 +5,10 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { notifyOwner } from "./_core/notification";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createHostedScript, createProtection, getHostedScriptsByUser, getProtectionsByUser, updateDiscordChannelId } from "./db";
+import { createAccessRule, createBlacklist, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getHostedScriptsByUser, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, updateDiscordChannelId } from "./db";
 import { nanoid } from "nanoid";
-import { sendDiscordChannelMessage } from "./discord";
+import { randomInt } from "node:crypto";
+import { getDiscordBotIdentity, sendDiscordChannelMessage } from "./discord";
 import { getProtectionAdapterStatus, getProviderStatus, protectWithAdapter } from "./protection";
 
 const hostedScriptInput = z.object({
@@ -23,6 +24,17 @@ function buildRuntimeLoader(url: string, scriptKey?: string | null) {
   const load = `loadstring(game:HttpGet(\"${url}\"))()`;
   return scriptKey ? `script_key = \"${scriptKey}\"\n${load}` : load;
 }
+
+const licenseInput = z.object({
+  type: z.enum(["trial", "license"]).default("license"),
+  hostedScriptId: z.number().int().positive().optional(),
+  discordUserId: z.string().regex(/^\d{15,22}$/).optional(),
+  trialDays: z.number().int().min(1).max(30).default(3),
+});
+const accessRuleInput = z.object({ kind: z.enum(["user", "role"]), discordId: z.string().regex(/^\d{15,22}$/), label: z.string().trim().max(128).optional() });
+const blacklistInput = z.object({ discordUserId: z.string().regex(/^\d{15,22}$/), reason: z.string().trim().max(500).optional() });
+
+function generateKeyCode() { return String(randomInt(1_000_000_000, 10_000_000_000)); }
 
 const protectionInput = z.object({
   name: z.string().trim().min(1).max(255),
@@ -47,6 +59,13 @@ function toClientRecord(row: NonNullable<Awaited<ReturnType<typeof createProtect
 
 export const appRouter = router({
   system: systemRouter,
+  discord: router({
+    status: publicProcedure.query(async () => {
+      const identity = await getDiscordBotIdentity();
+      return identity ? { online: true, username: identity.username } : { online: false, username: null };
+    }),
+    updateChannel: protectedProcedure.input(z.object({ discordChannelId: z.string().regex(/^\d{15,22}$/).nullable() })).mutation(({ ctx, input }) => updateDiscordChannelId(ctx.user.id, input.discordChannelId)),
+  }),
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -102,6 +121,32 @@ export const appRouter = router({
         loader: buildRuntimeLoader(url, row.scriptKey),
         scriptKey: row.scriptKey,
       };
+    }),
+  }),
+
+  licenseKeys: router({
+    list: protectedProcedure.query(({ ctx }) => getLicensesByOwner(ctx.user.id)),
+    generate: protectedProcedure.input(licenseInput).mutation(async ({ ctx, input }) => {
+      const expiresAt = input.type === "trial" ? new Date(Date.now() + input.trialDays * 86_400_000) : null;
+      const row = await createLicense({ ownerId: ctx.user.id, hostedScriptId: input.hostedScriptId ?? null, keyCode: generateKeyCode(), type: input.type, status: "active", discordUserId: input.discordUserId ?? null, hwid: null, expiresAt });
+      if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No se pudo generar la licencia." });
+      return row;
+    }),
+    revoke: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => revokeLicense(ctx.user.id, input.id)),
+    remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => deleteLicense(ctx.user.id, input.id)),
+    resetHwid: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => resetLicenseHwid(ctx.user.id, input.id)),
+  }),
+
+  access: router({
+    blacklist: router({
+      list: protectedProcedure.query(({ ctx }) => getBlacklistsByOwner(ctx.user.id)),
+      add: protectedProcedure.input(blacklistInput).mutation(({ ctx, input }) => createBlacklist({ ownerId: ctx.user.id, discordUserId: input.discordUserId, reason: input.reason ?? null, active: 1 })),
+      remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => deleteBlacklist(ctx.user.id, input.id)),
+    }),
+    whitelist: router({
+      list: protectedProcedure.query(({ ctx }) => getAccessRulesByOwner(ctx.user.id)),
+      add: protectedProcedure.input(accessRuleInput).mutation(({ ctx, input }) => createAccessRule({ ownerId: ctx.user.id, kind: input.kind, discordId: input.discordId, label: input.label ?? null, active: 1 })),
+      remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => deleteAccessRule(ctx.user.id, input.id)),
     }),
   }),
 
