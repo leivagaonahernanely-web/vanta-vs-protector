@@ -27,7 +27,11 @@ function decodeState(value: string): DiscordState | null {
 }
 
 function getOrigin(req: Request) {
-  const origin = typeof req.query.origin === "string" ? req.query.origin : "";
+  const requestedOrigin = typeof req.query.origin === "string" ? req.query.origin : "";
+  const forwardedProto = String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim();
+  const protocol = forwardedProto === "https" || forwardedProto === "http" ? forwardedProto : req.protocol;
+  const host = req.get("host");
+  const origin = requestedOrigin || (host ? `${protocol}://${host}` : "");
   try {
     const url = new URL(origin);
     if (url.protocol !== "https:" && !(url.hostname === "localhost" && url.protocol === "http:")) return null;

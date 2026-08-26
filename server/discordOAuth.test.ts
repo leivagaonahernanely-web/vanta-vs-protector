@@ -33,6 +33,43 @@ function responseMock() {
 }
 
 describe("Discord OAuth callback", () => {
+  it("builds the canonical callback from the request host when origin is omitted", async () => {
+    const routes = registeredRoutes();
+    const response = responseMock();
+    await routes.get("/api/discord/start")?.({ query: {}, protocol: "https", headers: {}, get: () => "example.com" }, response);
+    expect(String(response.redirectTarget)).toContain(encodeURIComponent("https://example.com/api/discord/callback"));
+  });
+
+  it("generates the same canonical callback for preview and published hosts", async () => {
+    const start = registeredRoutes().get("/api/discord/start");
+    for (const host of ["3000-iv3as1cf859kyo1na8z69-7177b250.us3.manus.computer", "vanta-prot-hfw5hmym.manus.space"]) {
+      const response = responseMock();
+      await start?.({ query: { origin: `https://${host}` }, protocol: "https", headers: {}, get: () => host }, response);
+      expect(String(response.redirectTarget)).toContain(encodeURIComponent(`https://${host}/api/discord/callback`));
+    }
+  });
+
+  it("accepts the callback state generated for the published host", async () => {
+    const routes = registeredRoutes();
+    const startResponse = responseMock();
+    await routes.get("/api/discord/start")?.({ query: { origin: "https://vanta-prot-hfw5hmym.manus.space" }, protocol: "https", headers: {}, get: () => "vanta-prot-hfw5hmym.manus.space" }, startResponse);
+    const authorizationUrl = new URL(String(startResponse.redirectTarget));
+    const state = authorizationUrl.searchParams.get("state");
+    const nonce = startResponse.cookie.mock.calls[0]?.[1];
+    expect(state).toBeTruthy();
+    expect(nonce).toBeTruthy();
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "access-token" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "111222333444555666", username: "vanta-user", global_name: "Vanta User" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const callbackResponse = responseMock();
+    await routes.get("/api/discord/callback")?.({ query: { code: "real-code", state }, headers: { cookie: `__Host-discord_oauth_state=${nonce}` } }, callbackResponse);
+    expect(callbackResponse.statusCode).toBe(200);
+    expect(callbackResponse.redirectTarget).toBe("/?discord=connected");
+    vi.unstubAllGlobals();
+  });
+
   it("rejects malformed or mismatched state before redeeming a code", async () => {
     const routes = registeredRoutes();
     const response = responseMock();

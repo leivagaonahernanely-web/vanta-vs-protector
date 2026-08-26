@@ -152,3 +152,26 @@
 - [x] Documentar explícitamente en docs el manejo de Unknown Channel, causas posibles y pasos de corrección
 
 - [x] Crear README.md raíz con enlace y resumen del diagnóstico de canales Discord
+
+- [x] Auditar errores actuales, logs y duplicados de comandos/configuración
+- [x] Verificar y corregir sincronización de slash commands por servidor
+- [x] Verificar redirect URI y callback OAuth de Discord en preview y dominio publicado
+- [x] Corregir estado del bot y manejo de reconexión sin falsos OFFLINE
+- [x] Mejorar la presentación de estados de carga, error y conexión del bot en la interfaz
+- [x] Añadir pruebas de regresión para bot, OAuth, duplicados y errores reportados
+- [x] Ejecutar validación completa y publicar solo después de pasarla
+
+- [x] Probar que el inicio OAuth genera el callback correcto para preview y dominio publicado
+- [x] Probar el callback completo con state válido usando el host dinámico sin exponer secretos
+
+- [x] Revisar el flujo y las funciones visibles de la página de referencia de obfuscación
+- [x] Comparar obfuscación, carga de source, protección y resultados con Vanta.vs Protector
+- [x] Proponer mejoras priorizadas sin copiar secretos ni afirmar compatibilidad no verificada
+
+- [x] Verificar la redirección mostrada en el video; no era el dashboard propio, sino My Browser de Manus
+- [x] Identificar el origen observado: la carga detenida pertenece a My Browser de Manus, no a Vanta.vs Protector
+- [x] Documentar que esta incidencia no se corrige dentro de Vanta.vs Protector y debe reportarse al soporte de Manus
+- [x] Añadir comprobaciones de regresión para carga del dashboard y navegación visible de Vanta.vs Protector
+
+- [x] Añadir una prueba verificable de Home para carga básica, navegación visible, Overview sin duplicados y estado del bot
+- [x] Documentar en docs que el spinner de manus.im/my-browser?step=settings pertenece a My Browser/Manus y debe reportarse a soporte

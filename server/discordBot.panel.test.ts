@@ -65,12 +65,12 @@ describe("Discord access panel", () => {
 
   it("registers slash commands for every panel action", () => {
     const names = discordCommands.map((command: any) => command.name);
-    expect(names).toEqual(["ping", "panel", "generatekey", "deletekey", "whitelist", "unwhitelist", "blacklist", "resethwid", "addtime", "warn", "dropkey", "prices", "generatekeyrol"]);
+    expect(names).toEqual(["ping", "panel", "stats", "getscript", "getrole", "redeem", "generatekey", "deletekey", "whitelist", "unwhitelist", "blacklist", "resethwid", "addtime", "warn", "dropkey", "prices", "generatekeyrol"]);
     expect(new Set(names).size).toBe(names.length);
-    expect(names).not.toContain("getscript");
-    expect(names).not.toContain("getrole");
-    expect(names).not.toContain("stats");
-    expect(names).not.toContain("redeem");
+    expect(names).toContain("getscript");
+    expect(names).toContain("getrole");
+    expect(names).toContain("stats");
+    expect(names).toContain("redeem");
   });
 
   it("exposes the requested required and optional slash options", () => {
