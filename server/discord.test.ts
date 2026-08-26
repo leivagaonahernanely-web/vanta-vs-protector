@@ -26,6 +26,26 @@ describe("Discord bot configuration", () => {
     vi.unstubAllGlobals();
   });
 
+  it("retries a transient network failure and accepts the channel", async () => {
+    const fetchMock = vi.fn().mockRejectedValueOnce(new Error("temporary network failure")).mockResolvedValueOnce(new Response(JSON.stringify({ id: "123456789012345678", type: 0 }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(checkDiscordChannel("123456789012345678")).resolves.toEqual({ ok: true, channelId: "123456789012345678" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    vi.unstubAllGlobals();
+  });
+
+  it("classifies invalid token and timeout instead of returning one generic permission error", async () => {
+    const unauthorized = vi.fn().mockResolvedValue(new Response("{}", { status: 401 }));
+    vi.stubGlobal("fetch", unauthorized);
+    await expect(checkDiscordChannel("123456789012345678")).resolves.toMatchObject({ ok: false, status: 401, message: expect.stringContaining("token") });
+    vi.unstubAllGlobals();
+    const timeout = vi.fn().mockRejectedValue(Object.assign(new Error("timed out"), { name: "TimeoutError" }));
+    vi.stubGlobal("fetch", timeout);
+    await expect(checkDiscordChannel("123456789012345678")).resolves.toMatchObject({ ok: false, message: expect.stringContaining("tardó demasiado") });
+    expect(timeout).toHaveBeenCalledTimes(2);
+    vi.unstubAllGlobals();
+  });
+
   it("accepts an accessible channel", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "123456789012345678", type: 0 }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);

@@ -228,3 +228,7 @@
 
 - [x] Refactorizar parseDuration del bot para reutilizar shared/duration.ts
 - [x] Añadir pruebas que comparen duración web y slash para días, meses y años
+
+- [x] Diagnosticar por qué checkDiscordChannel termina en error de contacto con Discord
+- [x] Diferenciar timeout, fallo de red, token ausente y respuestas HTTP en el mensaje de Setup
+- [x] Añadir reintento controlado y pruebas del fallo de contacto sin propagar un error genérico
