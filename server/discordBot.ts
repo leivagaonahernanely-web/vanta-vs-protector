@@ -51,7 +51,7 @@ export const discordCommands = [
   new SlashCommandBuilder().setName("stats").setDescription("Muestra el estado del acceso").toJSON(),
   new SlashCommandBuilder().setName("getscript").setDescription("Obtiene el enlace de acceso al script").toJSON(),
   new SlashCommandBuilder().setName("getrole").setDescription("Solicita el rol comprador").toJSON(),
-  new SlashCommandBuilder().setName("redeem").setDescription("Canjea una key de acceso").addStringOption(o => o.setName("key").setDescription("Key de 10 dígitos").setRequired(true)).toJSON(),
+  new SlashCommandBuilder().setName("redeem").setDescription("Canjea una key de acceso").addStringOption(o => o.setName("key").setDescription("Key alfanumérica de mínimo 32 caracteres").setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("generatekey").setDescription("Genera una key aleatoria para un script hosteado").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addStringOption(o => o.setName("duration").setDescription("Duración; vacío = forever").setRequired(false)).toJSON(),
   new SlashCommandBuilder().setName("deletekey").setDescription("Elimina una key").addStringOption(o => o.setName("key").setDescription("Key a eliminar").setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario opcional").setRequired(false)).addRoleOption(o => o.setName("role").setDescription("Rol opcional").setRequired(false)).toJSON(),
   new SlashCommandBuilder().setName("whitelabel").setDescription("Añade un usuario o rol a la whitelist").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addStringOption(o => o.setName("kind").setDescription("User o Role").addChoices({ name: "User", value: "user" }, { name: "Role", value: "role" }).setRequired(true)).addStringOption(o => o.setName("target").setDescription("Selecciona el usuario o rol").setAutocomplete(true).setRequired(true)).toJSON(),
@@ -92,7 +92,8 @@ const keyActionTimestamps = new Map<string, number>();
 const KEY_ACTION_COOLDOWN_MS = 10_000;
 const respondedInteractions = new WeakSet<object>();
 
-function keyCode() { return String(randomInt(1_000_000_000, 10_000_000_000)); }
+const KEY_ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+function keyCode() { let key = ""; for (let index = 0; index < 32; index += 1) key += KEY_ALPHABET[randomInt(0, KEY_ALPHABET.length)]; return key; }
 function memberHasRole(interaction: ButtonInteraction | any, roleId: string | undefined) {
   if (!roleId) return false;
   const roles = interaction.member?.roles;
@@ -197,10 +198,15 @@ export async function publishDiscordPanel(channelId: string, config?: { name?: s
 
 export async function deletePublishedPanel(channelId: string, messageId: string) {
   if (!client || !gatewayOnline) throw new Error("El Gateway Discord no está conectado.");
-  const channel = await client.channels.fetch(channelId);
-  if (!channel?.isTextBased() || !("messages" in channel)) throw new Error("El canal Discord no permite administrar mensajes.");
-  const message = await channel.messages.fetch(messageId);
-  await message.delete();
+  try {
+    const channel = await client.channels.fetch(channelId);
+    if (!channel?.isTextBased() || !("messages" in channel)) throw new Error("El canal Discord no permite administrar mensajes.");
+    const message = await channel.messages.fetch(messageId);
+    await message.delete();
+  } catch (error: any) {
+    if (error?.code === 10008 || /unknown message/i.test(String(error?.message ?? ""))) return;
+    throw error;
+  }
 }
 
 export function startDiscordBot() {
@@ -279,7 +285,9 @@ export async function handleInteraction(interaction: any) {
 async function getUserLicenses(discordUserId: string) {
   const user = await getUserByDiscordUserId(discordUserId);
   const licenses = (await getActiveLicensesByDiscordUserId(discordUserId)).filter((license: any) => !license.expiresAt || license.expiresAt.getTime() > Date.now());
-  const scripts = user ? await getHostedScriptsByUser(user.id) : [];
+  const ownerIds = Array.from(new Set(licenses.map((license: any) => Number(license.ownerId)).filter((id) => Number.isInteger(id) && id > 0)));
+  const scriptRows = await Promise.all(ownerIds.map((ownerId) => getHostedScriptsByUser(ownerId)));
+  const scripts = scriptRows.flat();
   return { user, licenses, scripts };
 }
 
@@ -301,7 +309,7 @@ async function getRoleForUser(interaction: any) {
 async function handleButton(interaction: ButtonInteraction) {
   if (interaction.customId === "vanta:redeem") {
     const modal = new ModalBuilder().setCustomId("vanta:redeem-modal").setTitle("Redeem Key");
-    const input = new TextInputBuilder().setCustomId("key").setLabel("Key de 10 dígitos").setStyle(TextInputStyle.Short).setMinLength(10).setMaxLength(10).setRequired(true);
+    const input = new TextInputBuilder().setCustomId("key").setLabel("Key alfanumérica").setStyle(TextInputStyle.Short).setMinLength(32).setMaxLength(64).setRequired(true);
     modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
     return interaction.showModal(modal);
   }

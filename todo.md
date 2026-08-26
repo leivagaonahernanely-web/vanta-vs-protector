@@ -340,3 +340,22 @@
 - [x] Hacer que /panel reutilice uno de los paneles existentes, sin crear otro
 - [x] Eliminar Setup de la navegación visible sin borrar datos de configuración
 - [x] Añadir pruebas de selección manual, estado vacío y ausencia de Setup
+
+- [x] Tratar Unknown Message al editar o eliminar paneles Discord como estado recuperable
+- [x] Sincronizar o limpiar paneles cuyo mensaje ya no existe
+- [x] Corregir la validación de channelId para IDs numéricos válidos en Prices, Updates y paneles
+- [x] Añadir pruebas de Unknown Message y channelId válido/inválido
+
+- [x] Auditar el flujo completo de /panel, no solo respuestas aisladas
+- [x] Permitir canal automático configurable y canal manual elegido por el owner
+- [x] Asegurar que todas las acciones del panel usen la misma key activa y su script asociado
+- [x] Corregir Get Script cuando la key no tiene script definido o la relación está incompleta
+- [x] Añadir selector de script al generar keys normales
+- [x] Mostrar en cada key el script hosteado al que pertenece
+- [x] Añadir pruebas end-to-end de Redeem Key, Get Script, Get Role, Stats y Reset HWID
+
+- [x] Cambiar keys normales a identificadores alfanuméricos aleatorios de mínimo 32 caracteres
+- [x] Actualizar validadores de canje, hosting y panel Discord al nuevo formato
+- [x] Mantener Plan Keys separadas y con sus prefijos PRO/PREMIUM
+- [x] Actualizar textos y placeholders que todavía indiquen 10 dígitos
+- [x] Añadir pruebas de longitud, alfabeto, unicidad y compatibilidad del nuevo formato

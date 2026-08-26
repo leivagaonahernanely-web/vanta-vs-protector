@@ -27,11 +27,11 @@ const context = { user, req: { protocol: "https", headers: {}, get: () => "vanta
 beforeEach(() => vi.clearAllMocks());
 
 describe("access management", () => {
-  it("generates an automatic normal license key with exactly 10 digits", async () => {
-    dbMocks.createLicense.mockResolvedValue({ id: 1, ownerId: 7, keyCode: "5877736168", type: "license", status: "active", hostedScriptId: null, discordUserId: null, hwid: null, expiresAt: new Date(), createdAt: new Date(), updatedAt: new Date() });
-    const result = await appRouter.createCaller(context).licenseKeys.generate({ type: "license", trialDays: 3 });
-    expect(result.keyCode).toMatch(/^\d{10}$/);
-    expect(dbMocks.createLicense).toHaveBeenCalledWith(expect.objectContaining({ ownerId: 7, type: "license", status: "active", keyCode: expect.stringMatching(/^\d{10}$/) }));
+  it("generates an automatic normal license key with 32 alphanumeric characters for a script", async () => {
+    dbMocks.createLicense.mockResolvedValue({ id: 1, ownerId: 7, keyCode: "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6", type: "license", status: "active", hostedScriptId: 4, discordUserId: null, hwid: null, expiresAt: new Date(), createdAt: new Date(), updatedAt: new Date() });
+    const result = await appRouter.createCaller(context).licenseKeys.generate({ type: "license", hostedScriptId: 4, trialDays: 3 });
+    expect(result.keyCode).toMatch(/^[a-z0-9]{32}$/);
+    expect(dbMocks.createLicense).toHaveBeenCalledWith(expect.objectContaining({ ownerId: 7, hostedScriptId: 4, type: "license", status: "active", keyCode: expect.stringMatching(/^[a-z0-9]{32}$/) }));
   });
 
   it("generates a separate prefixed Plan Key only when requested", async () => {
@@ -43,7 +43,7 @@ describe("access management", () => {
 
   it("persists the selected plan for an automatic key", async () => {
     dbMocks.createLicense.mockResolvedValue({ id: 2, ownerId: 7, plan: "premium", keyCode: "1234567890", type: "license", status: "active", hostedScriptId: null, discordUserId: null, hwid: null, expiresAt: null, createdAt: new Date(), updatedAt: new Date() });
-    await appRouter.createCaller(context).licenseKeys.generate({ type: "license", plan: "premium", durationValue: 1, durationUnit: "years" });
+    await appRouter.createCaller(context).licenseKeys.generate({ type: "license", plan: "premium", hostedScriptId: 4, durationValue: 1, durationUnit: "years" });
     expect(dbMocks.createLicense).toHaveBeenCalledWith(expect.objectContaining({ plan: "premium" }));
   });
 
@@ -61,7 +61,7 @@ describe("access management", () => {
 
   it("enforces the free key quota server-side", async () => {
     dbMocks.getWorkspaceUsage.mockResolvedValue({ protections: 0, scripts: 0, keys: 500 });
-    await expect(appRouter.createCaller(context).licenseKeys.generate({ type: "license", plan: "free", durationValue: 1, durationUnit: "days" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(appRouter.createCaller(context).licenseKeys.generate({ type: "license", plan: "free", hostedScriptId: 4, durationValue: 1, durationUnit: "days" })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("rejects an administrator whose identity is not the configured owner", async () => {

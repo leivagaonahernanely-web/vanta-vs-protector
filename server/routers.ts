@@ -60,7 +60,7 @@ async function assertWorkspaceQuota(userId: number, plan: PlanTier | undefined, 
 
 
 const KEY_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
-function generateNormalKeyCode() { return String(randomInt(1_000_000_000, 10_000_000_000)); }
+function generateNormalKeyCode() { let key = ""; for (let index = 0; index < 32; index += 1) key += KEY_ALPHABET[randomInt(0, KEY_ALPHABET.length)]; return key; }
 function generatePlanKeyCode(plan: PlanTier) {
   const prefix = plan.toUpperCase();
   let suffix = "";
@@ -205,6 +205,7 @@ export const appRouter = router({
   licenseKeys: router({
     list: ownerProcedure.query(({ ctx }) => getLicensesByOwner(ctx.user.id)),
     generate: ownerProcedure.input(licenseInput).mutation(async ({ ctx, input }) => {
+      if (input.keyKind === "normal" && !input.hostedScriptId) throw new TRPCError({ code: "BAD_REQUEST", message: "Selecciona el script hosteado para esta key." });
       await assertWorkspaceQuota(ctx.user.id, (ctx.user as typeof ctx.user & { plan?: PlanTier }).plan, "keys");
       const durationDays = input.durationValue ? durationToDays(input.durationValue, input.durationUnit as DurationUnit) : undefined;
       const expiresAt = durationDays ? new Date(Date.now() + durationDays * 86_400_000) : null;
