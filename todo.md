@@ -266,3 +266,7 @@
 - [x] Impedir que se creen o escriban keys trial manuales
 - [ ] Hacer que el modo protegido rechace cualquier ejecución sin key automática activa, vinculada al script y validada por HWID
 - [x] Mantener el formulario de generación sin campo editable de dígitos; el servidor debe generar la key
+
+- [x] Diagnosticar el error `El Gateway Discord no está conectado` reportado al publicar o administrar desde la web
+- [x] Corregir la reconexión del Gateway y evitar que el estado connecting bloquee mutaciones recuperables
+- [x] Añadir prueba de estado Gateway desconectado y mensaje accionable en la interfaz

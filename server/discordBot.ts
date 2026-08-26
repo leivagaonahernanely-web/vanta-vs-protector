@@ -202,13 +202,16 @@ export function startDiscordBot() {
   started = true;
   client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers] });
   client.once(Events.ClientReady, async (readyClient) => {
+    gatewayOnline = true;
     try {
       const rest = new REST({ version: "10" }).setToken(ENV.discordBotToken);
       await rest.put(Routes.applicationCommands(readyClient.application.id), { body: [] });
       await Promise.all(Array.from(readyClient.guilds.cache.keys()).map((guildId) => rest.put(Routes.applicationGuildCommands(readyClient.application.id, guildId), { body: discordCommands })));
-      gatewayOnline = true;
       console.log(`[Discord Bot] Online como ${readyClient.user.tag}; comandos slash sincronizados por servidor sin duplicados.`);
-    } catch (error) { gatewayOnline = false; console.error("[Discord Bot] No se pudieron sincronizar los comandos slash:", error); }
+    } catch (error) {
+      const detail = error && typeof error === "object" && "rawError" in error ? JSON.stringify((error as { rawError?: unknown }).rawError) : error instanceof Error ? error.message : String(error);
+      console.error("[Discord Bot] No se pudieron sincronizar los comandos slash; el Gateway sigue online:", detail);
+    }
   });
   client.on(Events.InteractionCreate, handleInteraction);
   client.on(Events.Error, (error) => { console.error("[Discord Bot] Gateway error:", error); handleGatewayFailure("Gateway error"); });
