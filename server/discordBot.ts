@@ -53,6 +53,7 @@ let started = false;
 let client: Client | null = null;
 const keyActionTimestamps = new Map<string, number>();
 const KEY_ACTION_COOLDOWN_MS = 10_000;
+const respondedInteractions = new WeakSet<object>();
 
 function keyCode() { return String(randomInt(1_000_000_000, 10_000_000_000)); }
 function memberHasRole(interaction: ButtonInteraction | any, roleId: string | undefined) {
@@ -70,16 +71,20 @@ async function canManageKeys(interaction: any) {
   const managerRole = await getKeyManagerRoleId(owner.id);
   return { allowed: hasKeyManagementAccess({ actorId: interaction.user.id, ownerId: owner.discordUserId, isAdministrator: Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)), hasManagerRole: memberHasRole(interaction, managerRole) }), owner };
 }
-async function respond(interaction: any, payload: any) {
+export async function respond(interaction: any, payload: any) {
+  const target = interaction as object;
+  if (respondedInteractions.has(target)) return undefined;
+  respondedInteractions.add(target);
   if (interaction.replied || interaction.deferred) return interaction.followUp(payload);
   return interaction.reply(payload);
 }
 export function panelMessage() {
   const embed = new EmbedBuilder()
     .setColor(0x5865f2)
-    .setTitle("Vanta.vs Protector")
-    .setDescription("Este panel controla el acceso al proyecto. Si eres comprador, utiliza los botones para canjear tu key, obtener tu script autorizado o solicitar tu rol.")
-    .setFooter({ text: "Vanta.vs Protector · Panel de acceso" });
+    .setTitle("Vanta lagger")
+    .setDescription("Este panel de control es para el proyecto: **Vanta.vs Protector**\n\nSi eres comprador, utiliza los botones de abajo para canjear tu key, obtener el script autorizado o conseguir tu rol.")
+    .setFooter({ text: "Vanta.vs Protector · Panel de acceso" })
+    .setTimestamp();
   const rowOne = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId("vanta:redeem").setLabel("🔑 Redeem Key").setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId("vanta:script").setLabel("📜 Get Script").setStyle(ButtonStyle.Primary),
@@ -103,34 +108,37 @@ export function startDiscordBot() {
     try {
       const rest = new REST({ version: "10" }).setToken(ENV.discordBotToken);
       await rest.put(Routes.applicationCommands(readyClient.application.id), { body: discordCommands });
-      console.log(`[Discord Bot] Online como ${readyClient.user.tag}; comandos slash sincronizados.`);
+      await Promise.all(Array.from(readyClient.guilds.cache.keys()).map((guildId) => rest.put(Routes.applicationGuildCommands(readyClient.application.id, guildId), { body: discordCommands })));
+      console.log(`[Discord Bot] Online como ${readyClient.user.tag}; comandos slash globales y por servidor sincronizados.`);
     } catch (error) { console.error("[Discord Bot] No se pudieron sincronizar los comandos slash:", error); }
   });
-  client.on(Events.InteractionCreate, async (interaction) => {
-    try {
-      if (interaction.isModalSubmit()) return handleModal(interaction);
-      if (interaction.isButton()) return handleButton(interaction);
-      if (!interaction.isChatInputCommand()) return;
-      if (interaction.commandName === "ping") return respond(interaction, { content: `Pong · ${Math.round(client?.ws.ping ?? 0)}ms`, ephemeral: true });
-      if (interaction.commandName === "panel") return respond(interaction, panelMessage());
-      if (interaction.commandName === "stats") return respond(interaction, { content: "Vanta.vs Protector está conectado. Usa el dashboard web para consultar scripts, licencias y actividad.", ephemeral: true });
-      if (interaction.commandName === "getscript") return respond(interaction, { content: `📜 El acceso al script se gestiona desde tu panel privado: ${PANEL_URL}`, ephemeral: true });
-      if (interaction.commandName === "getrole") return respond(interaction, { content: "👤 Canjea una key válida para solicitar el rol comprador.", ephemeral: true });
-      if (interaction.commandName === "redeem") return redeem(interaction, interaction.options.getString("key", true));
-      if (interaction.commandName === "resethwid") { await resetLicenseHwidByDiscordUserId(interaction.user.id); return respond(interaction, { content: "✅ Tu HWID fue reiniciado. Vuelve a ejecutar el loader para vincular el nuevo dispositivo.", ephemeral: true }); }
-      if (interaction.commandName === "generatekeyrol") return configureKeyRole(interaction, interaction.options.getRole("role", true));
-      if (interaction.commandName === "generatekey") return generate(interaction);
-      if (interaction.commandName === "deletekey") return remove(interaction, interaction.options.getString("key", true));
-      if (interaction.commandName === "whitelist") return whitelist(interaction, interaction.options.getString("id", true), interaction.options.getString("tipo", true) as "user" | "role");
-      if (interaction.commandName === "unwhitelist") return unwhitelist(interaction, interaction.options.getString("id", true));
-    } catch (error) {
-      console.error("[Discord Bot] Interaction handler failed:", error);
-      const currentInteraction = interaction as any;
-      if (!currentInteraction.replied && !currentInteraction.deferred) await respond(currentInteraction, { content: "No se pudo completar la acción. Revisa la configuración del panel.", ephemeral: true });
-    }
-  });
+  client.on(Events.InteractionCreate, handleInteraction);
   client.on(Events.Error, (error) => console.error("[Discord Bot] Gateway error:", error));
   client.login(ENV.discordBotToken).catch((error) => { started = false; console.error("[Discord Bot] No se pudo iniciar el Gateway:", error instanceof Error ? error.message : "error desconocido"); });
+}
+
+export async function handleInteraction(interaction: any) {
+  try {
+    if (interaction.isModalSubmit()) return handleModal(interaction);
+    if (interaction.isButton()) return handleButton(interaction);
+    if (!interaction.isChatInputCommand()) return;
+    if (interaction.commandName === "ping") return respond(interaction, { content: `Pong · ${Math.round(client?.ws.ping ?? 0)}ms`, ephemeral: true });
+    if (interaction.commandName === "panel") return respond(interaction, panelMessage());
+    if (interaction.commandName === "stats") return respond(interaction, { content: "Vanta.vs Protector está conectado. Usa el dashboard web para consultar scripts, licencias y actividad.", ephemeral: true });
+    if (interaction.commandName === "getscript") return respond(interaction, { content: `📜 El acceso al script se gestiona desde tu panel privado: ${PANEL_URL}`, ephemeral: true });
+    if (interaction.commandName === "getrole") return respond(interaction, { content: "👤 Canjea una key válida para solicitar el rol comprador.", ephemeral: true });
+    if (interaction.commandName === "redeem") return redeem(interaction, interaction.options.getString("key", true));
+    if (interaction.commandName === "resethwid") { await resetLicenseHwidByDiscordUserId(interaction.user.id); return respond(interaction, { content: "✅ Tu HWID fue reiniciado. Vuelve a ejecutar el loader para vincular el nuevo dispositivo.", ephemeral: true }); }
+    if (interaction.commandName === "generatekeyrol") return configureKeyRole(interaction, interaction.options.getRole("role", true));
+    if (interaction.commandName === "generatekey") return generate(interaction);
+    if (interaction.commandName === "deletekey") return remove(interaction, interaction.options.getString("key", true));
+    if (interaction.commandName === "whitelist") return whitelist(interaction, interaction.options.getString("id", true), interaction.options.getString("tipo", true) as "user" | "role");
+    if (interaction.commandName === "unwhitelist") return unwhitelist(interaction, interaction.options.getString("id", true));
+  } catch (error) {
+    console.error("[Discord Bot] Interaction handler failed:", error);
+    const currentInteraction = interaction as any;
+    if (!currentInteraction.replied && !currentInteraction.deferred) await respond(currentInteraction, { content: "No se pudo completar la acción. Revisa la configuración del panel.", ephemeral: true });
+  }
 }
 
 async function handleButton(interaction: ButtonInteraction) {

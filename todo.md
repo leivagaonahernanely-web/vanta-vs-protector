@@ -112,3 +112,15 @@
 - [x] Añadir pruebas owner-only para hostedScripts.source, autenticación y comandos slash
 - [x] Implementar auditoría y límites reales para generación/eliminación de keys por rol delegado
 - [x] Calcular conteos reales de whitelist y manejar duplicados y fallos
+
+- [x] Ajustar /panel para que publique el embed público con título, descripción, colores, filas y textos equivalentes a la referencia
+- [x] Añadir prueba del contenido visible del embed y del orden exacto de botones del panel
+
+- [x] Probar explícitamente título, descripción, color y filas del embed final de /panel
+- [x] Probar que la publicación de /panel sea pública y responda una sola vez sin 40060
+
+- [x] Probar el handler real de /panel con una interacción simulada y respuesta pública única
+- [x] Investigar los logs recientes y eliminar el origen real de DiscordAPIError 40060 antes del checkpoint
+
+- [x] Exponer y probar el handler completo de InteractionCreate para /panel con una única respuesta pública
+- [x] Reproducir en prueba una interacción ya reconocida y confirmar que el guard anti-40060 evita una segunda respuesta
