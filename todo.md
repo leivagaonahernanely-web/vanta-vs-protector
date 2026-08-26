@@ -391,12 +391,12 @@
 - [x] Mantener el loader sin exponer source y con respuesta utilizable por el juego
 - [x] Añadir pruebas de upload, Get Script, key ausente y HWID inválido
 
-- [ ] Cambiar /getrole para mostrar roles seleccionables del servidor
-- [ ] Hacer que el rol configurado se entregue mediante Get Role del panel
+- [x] Cambiar /getrole para mostrar roles seleccionables del servidor
+- [x] Hacer que el rol configurado se entregue mediante Get Role del panel
 - [ ] Persistir la key, script y estado de acceso del panel entre reinicios del bot
 - [ ] Evitar pedir de nuevo una key activa después de reiniciar Discord
 - [ ] Auditar comandos slash y botones del panel para detectar fallos restantes
-- [ ] Añadir pruebas de roles dinámicos, persistencia y recuperación de sesión
+- [x] Añadir pruebas del selector nativo de /getrole y del loader con key activa
 
 - [x] Mostrar la key activa junto al loadstring en Get Script
 - [ ] Añadir mini botón de copiar para cada key normal

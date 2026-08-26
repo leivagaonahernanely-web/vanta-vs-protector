@@ -36,6 +36,8 @@ import {
   getHostedScriptsByUser,
   getLicensesByOwner,
   getActiveLicensesByDiscordUserId,
+  getBuyerRoleId,
+  setBuyerRoleId,
   getUserByDiscordUserId,
   getUserByOpenId,
   redeemLicense,
@@ -50,7 +52,7 @@ export const discordCommands = [
   new SlashCommandBuilder().setName("panel").setDescription("Publica el panel de Vanta.vs Protector").toJSON(),
   new SlashCommandBuilder().setName("stats").setDescription("Muestra el estado del acceso").toJSON(),
   new SlashCommandBuilder().setName("getscript").setDescription("Obtiene el enlace de acceso al script").toJSON(),
-  new SlashCommandBuilder().setName("getrole").setDescription("Solicita el rol comprador").toJSON(),
+  new SlashCommandBuilder().setName("getrole").setDescription("Configura el rol que recibirá un usuario con key activa").addRoleOption(o => o.setName("role").setDescription("Rol comprador").setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.Administrator.toString()).toJSON(),
   new SlashCommandBuilder().setName("redeem").setDescription("Canjea una key de acceso").addStringOption(o => o.setName("key").setDescription("Key alfanumérica de mínimo 32 caracteres").setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("generatekey").setDescription("Genera una key aleatoria para un script hosteado").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addStringOption(o => o.setName("duration").setDescription("Duración; vacío = forever").setRequired(false)).toJSON(),
   new SlashCommandBuilder().setName("deletekey").setDescription("Elimina una key").addStringOption(o => o.setName("key").setDescription("Key a eliminar").setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario opcional").setRequired(false)).addRoleOption(o => o.setName("role").setDescription("Rol opcional").setRequired(false)).toJSON(),
@@ -264,7 +266,7 @@ export async function handleInteraction(interaction: any) {
     if (interaction.commandName === "updates") return updates(interaction);
     if (interaction.commandName === "stats") return respond(interaction, { content: "Vanta.vs Protector está conectado. Usa el dashboard web para consultar scripts, licencias y actividad.", ephemeral: true });
     if (interaction.commandName === "getscript") return getScriptForUser(interaction);
-    if (interaction.commandName === "getrole") return getRoleForUser(interaction);
+    if (interaction.commandName === "getrole") return configureBuyerRole(interaction, interaction.options.getRole("role", true));
     if (interaction.commandName === "redeem") return redeem(interaction, interaction.options.getString("key", true));
     if (interaction.commandName === "resethwid") return resetHwidCommand(interaction);
     if (interaction.commandName === "generatekeyrol") return configureKeyRole(interaction, interaction.options.getRole("role", true));
@@ -305,10 +307,28 @@ async function getScriptForUser(interaction: any) {
   return respond(interaction, { content: `📜 **${script.name}**\n\n🔑 **Key activa:** \`${license.keyCode}\`\n\n📦 **Loadstring con la key:**\n\`\`\`lua\n${loader}\n\`\`\``, components: [copyRow], ephemeral: true });
 }
 
+async function configureBuyerRole(interaction: any, role: { id: string }) {
+  const owner = await ownerAccount();
+  if (!owner || !(await isConfiguredOwner(interaction))) return respond(interaction, { content: "⛔ Solo el owner vinculado puede configurar el rol comprador.", ephemeral: true });
+  await setBuyerRoleId(owner.id, role.id);
+  return respond(interaction, { content: `✅ Rol comprador configurado: <@&${role.id}>. Los usuarios con una key activa podrán obtenerlo desde Get Role.`, ephemeral: true });
+}
+
 async function getRoleForUser(interaction: any) {
   const access = await getUserLicenses(interaction.user.id);
   if (!access.licenses[0]) return respond(interaction, { content: "👤 No tienes una key activa. Canjea una key válida primero.", ephemeral: true });
-  return respond(interaction, { content: "👤 Key validada. El rol comprador se asignará cuando el propietario configure el rol de comprador.", ephemeral: true });
+  const owner = access.user ? await getUserByOpenId(ENV.ownerOpenId) : await ownerAccount();
+  const roleId = owner ? await getBuyerRoleId(owner.id) : undefined;
+  if (!roleId) return respond(interaction, { content: "👤 Tu key está activa, pero el owner todavía no ha configurado el rol comprador con /getrole.", ephemeral: true });
+  if (!interaction.guild?.members?.fetch) return respond(interaction, { content: "❌ Este botón solo puede usarse dentro del servidor de Discord.", ephemeral: true });
+  try {
+    const member = await interaction.guild.members.fetch(interaction.user.id);
+    await member.roles.add(roleId);
+    return respond(interaction, { content: `✅ Rol comprador asignado: <@&${roleId}>`, ephemeral: true });
+  } catch (error) {
+    console.error("[Discord Bot] Buyer role assignment failed:", error);
+    return respond(interaction, { content: "❌ No pude asignar el rol. Verifica que el bot tenga Manage Roles y que su rol esté por encima del rol comprador.", ephemeral: true });
+  }
 }
 
 async function handleButton(interaction: ButtonInteraction) {

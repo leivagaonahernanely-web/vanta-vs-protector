@@ -104,6 +104,20 @@ export async function getProtectionsByUser(userId: number) {
   return db.select().from(protections).where(eq(protections.userId, userId)).orderBy(desc(protections.createdAt)).limit(50);
 }
 
+export async function getBuyerRoleId(ownerId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select({ buyerRoleId: users.buyerRoleId }).from(users).where(eq(users.id, ownerId)).limit(1);
+  return rows[0]?.buyerRoleId ?? undefined;
+}
+
+export async function setBuyerRoleId(ownerId: number, buyerRoleId: string | null) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(users).set({ buyerRoleId }).where(eq(users.id, ownerId));
+  return buyerRoleId;
+}
+
 export async function updateDiscordChannelId(userId: number, discordChannelId: string | null) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");

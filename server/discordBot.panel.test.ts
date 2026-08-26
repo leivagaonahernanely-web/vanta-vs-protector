@@ -109,6 +109,10 @@ describe("Discord access panel", () => {
     const options = (name: string) => command(name).options;
     expect(options("generatekey").find((item: any) => item.name === "script").required).toBe(true);
     expect(options("generatekey").find((item: any) => item.name === "duration").required).toBe(false);
+    expect(options("getrole")).toHaveLength(1);
+    expect(options("getrole")[0].name).toBe("role");
+    expect(options("getrole")[0].type).toBe(8);
+    expect(options("getrole")[0].required).toBe(true);
     expect(options("deletekey").find((item: any) => item.name === "key").required).toBe(true);
     expect(options("deletekey").find((item: any) => item.name === "user").required).toBe(false);
     expect(options("whitelabel").find((item: any) => item.name === "kind").required).toBe(true);
