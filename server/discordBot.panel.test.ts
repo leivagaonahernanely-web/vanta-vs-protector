@@ -17,6 +17,13 @@ describe("Discord access panel", () => {
     expect(protectedLoader).toContain("?key=1234567890");
   });
 
+  it("uses the active license key when building a protected Get Script loader", () => {
+    const loader = scriptRuntimeLoader({ slug: "bound-script", ffaMode: false, scriptKey: "internal-script-key" }, "86vC3ZULuEQpOImpm5VBB6oLROAQmPLe");
+    expect(loader).toContain('script_key = "86vC3ZULuEQpOImpm5VBB6oLROAQmPLe"');
+    expect(loader).toContain("?key=86vC3ZULuEQpOImpm5VBB6oLROAQmPLe");
+    expect(loader).not.toContain("internal-script-key");
+  });
+
   it("builds the requested two-row action layout", () => {
     const message = panelMessage();
     const ids = message.components.flatMap((row: any) => row.components.map((button: any) => button.data.custom_id));

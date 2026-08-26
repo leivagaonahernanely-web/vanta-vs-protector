@@ -124,11 +124,12 @@ export async function respond(interaction: any, payload: any) {
   if (interaction.replied || interaction.deferred) return interaction.followUp(payload);
   return interaction.reply(payload);
 }
-export function scriptRuntimeLoader(script: any) {
+export function scriptRuntimeLoader(script: any, accessKey?: string) {
   const url = `${PANEL_URL}/scripts/hosted/${script.slug}`;
-  const accessUrl = !script.ffaMode && script.scriptKey ? `${url}?key=${encodeURIComponent(script.scriptKey)}` : url;
+  const runtimeKey = script.ffaMode ? "trial" : (accessKey || script.scriptKey);
+  const accessUrl = runtimeKey ? `${url}?key=${encodeURIComponent(runtimeKey)}` : url;
   const load = `loadstring(game:HttpGet("${accessUrl}"))()`;
-  return !script.ffaMode && script.scriptKey ? `script_key = "${script.scriptKey}"\n${load}` : load;
+  return !script.ffaMode && runtimeKey ? `script_key = "${runtimeKey}"\n${load}` : load;
 }
 
 export function panelMessage() {
@@ -297,7 +298,11 @@ async function getScriptForUser(interaction: any) {
   if (!license) return respond(interaction, { content: "❌ No tienes una key activa. Pulsa Redeem Key y canjea una key válida antes de solicitar el script.", ephemeral: true });
   const script = license.hostedScriptId ? await getHostedScriptById(license.hostedScriptId) : access.scripts[0];
   if (!script) return respond(interaction, { content: "❌ Tu key está activa, pero todavía no hay un script asignado.", ephemeral: true });
-  return respond(interaction, { content: `📜 **${script.name}**\n\`\`\`lua\n${scriptRuntimeLoader(script)}\n\`\`\``, ephemeral: true });
+  const loader = scriptRuntimeLoader(script, license.keyCode);
+  const copyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`vanta:copy-key:${license.keyCode}`).setLabel("Copiar key").setStyle(ButtonStyle.Secondary),
+  );
+  return respond(interaction, { content: `📜 **${script.name}**\n\n🔑 **Key activa:** \`${license.keyCode}\`\n\n📦 **Loadstring con la key:**\n\`\`\`lua\n${loader}\n\`\`\``, components: [copyRow], ephemeral: true });
 }
 
 async function getRoleForUser(interaction: any) {
@@ -314,6 +319,11 @@ async function handleButton(interaction: ButtonInteraction) {
     return interaction.showModal(modal);
   }
   if (interaction.customId === "vanta:script") return getScriptForUser(interaction);
+  if (interaction.customId.startsWith("vanta:copy-key:")) {
+    const key = interaction.customId.slice("vanta:copy-key:".length).trim();
+    if (!/^[A-Za-z0-9-]{1,64}$/.test(key)) return respond(interaction, { content: "❌ Esta key ya no es válida.", ephemeral: true });
+    return respond(interaction, { content: `\`${key}\``, ephemeral: true });
+  }
   if (interaction.customId === "vanta:role") return getRoleForUser(interaction);
   if (interaction.customId === "vanta:hwid") { await resetLicenseHwidByDiscordUserId(interaction.user.id); return respond(interaction, { content: "✅ HWID reiniciado correctamente.", ephemeral: true }); }
   if (interaction.customId === "vanta:stats") {
@@ -474,7 +484,11 @@ async function generate(interaction: any, scriptName: string, rawDuration?: stri
   if (rawDuration && !durationMs) return respond(interaction, { content: "❌ Usa `30d`, `12h`, `4weeks`, `3months` o `1year`, o déjala vacía para forever.", ephemeral: true });
   const row = await createLicense({ ownerId: result.owner.id, keyCode: keyCode(), type: "license", status: "active", discordUserId: null, hwid: null, expiresAt: durationMs ? new Date(Date.now() + durationMs) : null, hostedScriptId: script.id });
   if (row) await createKeyAuditLog({ ownerId: result.owner.id, actorDiscordId: interaction.user.id, action: "generate", keyCode: row.keyCode });
-  return respond(interaction, { content: row ? row.keyCode : "No se pudo generar la key.", ephemeral: true });
+  if (!row) return respond(interaction, { content: "No se pudo generar la key.", ephemeral: true });
+  const copyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`vanta:copy-key:${row.keyCode}`).setLabel("Copiar key").setStyle(ButtonStyle.Secondary),
+  );
+  return respond(interaction, { content: `✅ Key generada para **${script.name}**:\n\`${row.keyCode}\``, components: [copyRow], ephemeral: true });
 }
 async function remove(interaction: any, value: string) {
   const result = await canManageKeys(interaction);
