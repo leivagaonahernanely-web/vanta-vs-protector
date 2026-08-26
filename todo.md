@@ -270,3 +270,18 @@
 - [x] Diagnosticar el error `El Gateway Discord no está conectado` reportado al publicar o administrar desde la web
 - [x] Corregir la reconexión del Gateway y evitar que el estado connecting bloquee mutaciones recuperables
 - [x] Añadir prueba de estado Gateway desconectado y mensaje accionable en la interfaz
+
+- [ ] Mostrar la sección Owner y la administración de keys únicamente a la cuenta Discord vinculada del propietario
+- [ ] Mostrar claramente en Scripts los controles Editar, Reemplazar, Eliminar, Loader y Logs
+- [ ] Añadir una vista de logs de protección y acceso con acciones de eliminar restringidas al owner
+- [x] Hacer que la subida de source Lua procese automáticamente el artefacto protegido y actualice el loader
+- [ ] Rediseñar visualmente Planes, Prices y Generate / Manage con una experiencia compacta y profesional inspirada en herramientas de protección Lua
+- [ ] Añadir pruebas de visibilidad owner-only, gestión de logs y flujo automático de subida
+
+- [ ] Corregir el rechazo `No tienes permiso para hacer un drop` para la cuenta owner vinculada
+- [x] Permitir descarga directa de source únicamente al owner y mantener loader protegido para los demás
+- [ ] Añadir pruebas de autorización de dropkey y descarga privada de source
+
+- [x] Mostrar en cada script acciones visibles para editar source, subir nueva versión, eliminar, ver loader y consultar logs
+- [x] Mantener la misma URL del loadstring al reemplazar su source y evitar duplicados
+- [ ] Añadir pruebas de render móvil y de las acciones visibles de Scripts

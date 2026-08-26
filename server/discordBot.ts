@@ -105,7 +105,8 @@ async function canManageKeys(interaction: any) {
   const owner = await ownerAccount();
   if (!owner) return { allowed: false, owner: undefined };
   const managerRole = await getKeyManagerRoleId(owner.id);
-  return { allowed: hasKeyManagementAccess({ actorId: interaction.user.id, ownerId: owner.discordUserId, isAdministrator: Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)), hasManagerRole: memberHasRole(interaction, managerRole) }), owner };
+  const isGuildOwner = Boolean(interaction.guild?.ownerId && interaction.guild.ownerId === interaction.user.id);
+  return { allowed: isGuildOwner || hasKeyManagementAccess({ actorId: interaction.user.id, ownerId: owner.discordUserId, isAdministrator: Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)), hasManagerRole: memberHasRole(interaction, managerRole) }), owner };
 }
 export async function respond(interaction: any, payload: any) {
   const target = interaction as object;
