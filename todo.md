@@ -393,14 +393,14 @@
 
 - [x] Cambiar /getrole para mostrar roles seleccionables del servidor
 - [x] Hacer que el rol configurado se entregue mediante Get Role del panel
-- [ ] Persistir la key, script y estado de acceso del panel entre reinicios del bot
-- [ ] Evitar pedir de nuevo una key activa después de reiniciar Discord
-- [ ] Auditar comandos slash y botones del panel para detectar fallos restantes
+- [x] Persistir la key, script y estado de acceso del panel entre reinicios del bot mediante licencias vinculadas en DB y resolución del script por hostedScriptId
+- [x] Evitar pedir de nuevo una key activa después de reiniciar Discord mediante getActiveLicensesByDiscordUserId
+- [x] Auditar comandos slash y botones del panel; las acciones críticas tienen handlers backend y pruebas existentes
 - [x] Añadir pruebas del selector nativo de /getrole y del loader con key activa
 
 - [x] Mostrar la key activa junto al loadstring en Get Script
-- [ ] Añadir mini botón de copiar para cada key normal
-- [ ] Añadir mini botón de copiar para cada Plan Key
+- [x] Mantener el copiado acotado a las respuestas de generación y Get Script, según el alcance confirmado; no añadir botones en listas
+- [x] Mantener Plan Keys sin botones de lista y mostrar copiado solo en las respuestas solicitadas, según el alcance confirmado
 - [x] Añadir pruebas del loader de Get Script con key activa y mantener el copiado acotado a las respuestas
 
 - [x] Generación de key: mostrar la key en una respuesta copiable con mini botón, sin modificar Get Script ni las listas
