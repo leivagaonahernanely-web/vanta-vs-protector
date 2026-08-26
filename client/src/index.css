@@ -55,3 +55,23 @@ button { cursor: pointer; }
 .oauth-uri-note code { color: #ff8b91; font: .68rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
 .oauth-uri-note small { color: #777; font-size: .65rem; line-height: 1.45; }
 @media (max-width: 680px) { .oauth-uri-note { margin-top: 12px; } .oauth-uri-note code { white-space: normal; } }
+
+.plan-manager { position: relative; overflow: hidden; background: radial-gradient(circle at 100% 0, #20151a 0, #101010 38%); }
+.plan-manager::before { content: ""; position: absolute; inset: 0 0 auto; height: 2px; background: linear-gradient(90deg, #e93540, #5965f2, #c69232); opacity: .9; }
+.plan-manager-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
+.plan-manager-heading h2 { margin: 3px 0 0; color: #f1f1f1; font-size: 1.05rem; letter-spacing: -.03em; }
+.plan-manager-heading p { max-width: 520px; margin: 7px 0 0; color: #707070; font-size: .7rem; line-height: 1.45; }
+.plan-manager-current { padding: 6px 8px; border: 1px solid #5f292f; border-radius: 5px; background: #241113; color: #ff858b; font: 600 .6rem ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
+.plan-selector-card { position: relative; overflow: hidden; min-height: 112px; padding: 14px; border: 1px solid #2b2b2b; border-radius: 8px; background: #0d0d0d; color: #888; text-align: left; transition: border-color .18s ease, background .18s ease, transform .18s ease; }
+.plan-selector-card:hover { border-color: #565656; transform: translateY(-1px); }
+.plan-selector-card.selected { border-color: #e93540; background: linear-gradient(145deg, #281416, #111); box-shadow: inset 0 1px 0 #ff737a22, 0 10px 28px #0004; }
+.plan-selector-card.selected::after { content: "ACTIVE"; position: absolute; top: 10px; right: 10px; color: #ff858b; font: 600 .52rem ui-monospace, monospace; letter-spacing: .08em; }
+.quota-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-top: 16px; padding-top: 14px; border-top: 1px solid #292929; }
+.quota-row > div { display: grid; gap: 5px; }
+.quota-row span { color: #5d5d5d; font: 600 .56rem ui-monospace, monospace; letter-spacing: .08em; }
+.quota-row strong { color: #d9d9d9; font-size: .72rem; }
+.price-block { padding: 14px; border: 1px solid #292929; border-radius: 8px; background: linear-gradient(145deg, #151515, #0e0e0e); }
+.price-block + .price-block { margin-top: 9px; }
+.price-block-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }
+.price-block-head strong { color: #bdbdbd; font: 600 .63rem ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
+@media (max-width: 680px) { .plan-manager-heading { flex-direction: column; gap: 10px; } .plan-manager-current { align-self: flex-start; } .quota-row { grid-template-columns: 1fr; gap: 12px; } .plan-selector-card { min-height: 96px; } }

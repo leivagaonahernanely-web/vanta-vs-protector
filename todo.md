@@ -275,7 +275,7 @@
 - [x] Mostrar claramente en Scripts los controles Editar, Reemplazar, Eliminar, Loader y Logs
 - [x] Añadir una vista de logs de protección y acceso con acciones de eliminar restringidas al owner
 - [x] Hacer que la subida de source Lua procese automáticamente el artefacto protegido y actualice el loader
-- [ ] Rediseñar visualmente Planes, Prices y Generate / Manage con una experiencia compacta y profesional inspirada en herramientas de protección Lua
+- [x] Rediseñar visualmente Planes, Prices y Generate / Manage con una experiencia compacta y profesional inspirada en herramientas de protección Lua
 - [x] Añadir pruebas de autorización owner-only, gestión de logs y flujo automático de subida
 
 - [x] Corregir el rechazo `No tienes permiso para hacer un drop` para la cuenta owner vinculada
@@ -293,4 +293,4 @@
 - [x] Revisar el flujo OAuth del dominio publicado y dejar instrucciones de redirect URI exactas
 - [ ] Mantener la regla de una key protegida por un único HWID y rechazar dispositivos distintos
 - [x] Completar el owner-only explícito cuando la cuenta Discord quede vinculada
-- [ ] Pulir visualmente los paneles de planes, precios y generación de keys
+- [x] Pulir visualmente los paneles de planes, precios y generación de keys
