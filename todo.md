@@ -272,8 +272,8 @@
 - [x] Añadir prueba de estado Gateway desconectado y mensaje accionable en la interfaz
 
 - [ ] Mostrar la sección Owner y la administración de keys únicamente a la cuenta Discord vinculada del propietario
-- [ ] Mostrar claramente en Scripts los controles Editar, Reemplazar, Eliminar, Loader y Logs
-- [ ] Añadir una vista de logs de protección y acceso con acciones de eliminar restringidas al owner
+- [x] Mostrar claramente en Scripts los controles Editar, Reemplazar, Eliminar, Loader y Logs
+- [x] Añadir una vista de logs de protección y acceso con acciones de eliminar restringidas al owner
 - [x] Hacer que la subida de source Lua procese automáticamente el artefacto protegido y actualice el loader
 - [ ] Rediseñar visualmente Planes, Prices y Generate / Manage con una experiencia compacta y profesional inspirada en herramientas de protección Lua
 - [ ] Añadir pruebas de visibilidad owner-only, gestión de logs y flujo automático de subida

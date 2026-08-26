@@ -11,6 +11,7 @@ describe("dashboard navigation contract", () => {
       "Obfuscator",
       "License keys",
       "HWID bans",
+      "Logs",
       "Create New Panel",
       "Manage Panels",
       "Prices",

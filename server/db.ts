@@ -368,6 +368,19 @@ export async function createKeyAuditLog(input: { ownerId: number; actorDiscordId
   await db.insert(keyAuditLogs).values(input);
 }
 
+export async function getKeyAuditLogsByOwner(ownerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(keyAuditLogs).where(eq(keyAuditLogs.ownerId, ownerId)).orderBy(desc(keyAuditLogs.createdAt)).limit(200);
+}
+
+export async function deleteKeyAuditLogsByOwner(ownerId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.delete(keyAuditLogs).where(eq(keyAuditLogs.ownerId, ownerId));
+  return { success: true as const };
+}
+
 export async function createAccessRuleIfAbsent(input: { ownerId: number; kind: "user" | "role"; discordId: string; label?: string | null }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");

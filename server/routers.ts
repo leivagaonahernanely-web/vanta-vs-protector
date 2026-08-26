@@ -5,7 +5,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { notifyOwner } from "./_core/notification";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createAccessRule, createBlacklist, createDiscordPanel, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getDiscordPanelsByOwner, getHostedScriptSourceByUser, getHostedScriptsByUser, getHostedScriptById, updateHostedScript, deleteHostedScript, getWorkspaceUsage, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, updateDiscordChannelId } from "./db";
+import { createAccessRule, createBlacklist, createDiscordPanel, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getDiscordPanelsByOwner, getHostedScriptSourceByUser, getHostedScriptsByUser, getHostedScriptById, updateHostedScript, deleteHostedScript, getWorkspaceUsage, getKeyAuditLogsByOwner, deleteKeyAuditLogsByOwner, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, updateDiscordChannelId } from "./db";
 import { nanoid } from "nanoid";
 import { randomInt } from "node:crypto";
 import { checkDiscordChannel, getDiscordBotIdentity, sendDiscordChannelMessage } from "./discord";
@@ -196,6 +196,10 @@ export const appRouter = router({
       list: protectedProcedure.query(({ ctx }) => getAccessRulesByOwner(ctx.user.id)),
       add: protectedProcedure.input(accessRuleInput).mutation(({ ctx, input }) => createAccessRule({ ownerId: ctx.user.id, kind: input.kind, discordId: input.discordId, label: input.label ?? null, active: 1 })),
       remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => deleteAccessRule(ctx.user.id, input.id)),
+    }),
+    logs: router({
+      list: adminProcedure.query(({ ctx }) => getKeyAuditLogsByOwner(ctx.user.id)),
+      clear: adminProcedure.mutation(({ ctx }) => deleteKeyAuditLogsByOwner(ctx.user.id)),
     }),
   }),
 
