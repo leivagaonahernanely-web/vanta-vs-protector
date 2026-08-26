@@ -318,3 +318,12 @@
 - [x] Cargar usuarios al elegir User y roles al elegir Role mediante autocomplete
 - [x] Eliminar IDs o nombres manuales y mantener un máximo de tres opciones principales
 - [x] Añadir pruebas del registro, autocomplete y ejecución de whitelist/unwhitelist
+
+- [x] Quitar cualquier tarjeta, métrica o texto de planes del módulo Prices
+- [x] Mantener toda la información, canje y saldos de planes únicamente en Plans
+- [x] Dejar Generate / Manage solo para keys normales
+- [x] Dejar Plan Keys como único generador privado de keys PRO/PREMIUM del owner
+- [x] Hacer que las keys normales sean exactamente de 10 dígitos
+- [x] Hacer que el mensaje de generación normal muestre únicamente la key
+- [x] Pulir UI y sonidos sin volver a mezclar responsabilidades entre módulos
+- [x] Añadir pruebas de separación, formato y respuesta limpia

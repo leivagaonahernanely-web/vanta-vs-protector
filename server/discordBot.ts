@@ -465,7 +465,7 @@ async function generate(interaction: any, scriptName: string, rawDuration?: stri
   if (rawDuration && !durationMs) return respond(interaction, { content: "❌ Usa `30d`, `12h`, `4weeks`, `3months` o `1year`, o déjala vacía para forever.", ephemeral: true });
   const row = await createLicense({ ownerId: result.owner.id, keyCode: keyCode(), type: "license", status: "active", discordUserId: null, hwid: null, expiresAt: durationMs ? new Date(Date.now() + durationMs) : null, hostedScriptId: script.id });
   if (row) await createKeyAuditLog({ ownerId: result.owner.id, actorDiscordId: interaction.user.id, action: "generate", keyCode: row.keyCode });
-  return respond(interaction, { content: row ? `🔑 Key generada: **${row.keyCode}**` : "No se pudo generar la key.", ephemeral: true });
+  return respond(interaction, { content: row ? row.keyCode : "No se pudo generar la key.", ephemeral: true });
 }
 async function remove(interaction: any, value: string) {
   const result = await canManageKeys(interaction);

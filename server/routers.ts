@@ -44,6 +44,7 @@ const licenseInput = z.object({
   trialDays: z.number().int().min(1).max(3650).default(3),
   durationValue: z.number().int().min(1).max(3650).optional(),
   durationUnit: z.enum(["days", "months", "years"]).default("days"),
+  keyKind: z.enum(["normal", "plan"]).default("normal"),
 });
 const accessRuleInput = z.object({ kind: z.enum(["user", "role"]), discordId: z.string().regex(/^\d{15,22}$/), label: z.string().trim().max(128).optional() });
 const blacklistInput = z.object({ discordUserId: z.string().regex(/^\d{15,22}$/), reason: z.string().trim().max(500).optional() });
@@ -59,7 +60,8 @@ async function assertWorkspaceQuota(userId: number, plan: PlanTier | undefined, 
 
 
 const KEY_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
-function generateKeyCode(plan: PlanTier) {
+function generateNormalKeyCode() { return String(randomInt(1_000_000_000, 10_000_000_000)); }
+function generatePlanKeyCode(plan: PlanTier) {
   const prefix = plan.toUpperCase();
   let suffix = "";
   for (let index = 0; index < 16; index += 1) suffix += KEY_ALPHABET[randomInt(0, KEY_ALPHABET.length)];
@@ -206,7 +208,7 @@ export const appRouter = router({
       await assertWorkspaceQuota(ctx.user.id, (ctx.user as typeof ctx.user & { plan?: PlanTier }).plan, "keys");
       const durationDays = input.durationValue ? durationToDays(input.durationValue, input.durationUnit as DurationUnit) : undefined;
       const expiresAt = durationDays ? new Date(Date.now() + durationDays * 86_400_000) : null;
-      const row = await createLicense({ ownerId: ctx.user.id, plan: input.plan, hostedScriptId: input.hostedScriptId ?? null, keyCode: generateKeyCode(input.plan), type: input.type, status: "active", discordUserId: input.discordUserId ?? null, hwid: null, expiresAt });
+      const row = await createLicense({ ownerId: ctx.user.id, plan: input.plan, hostedScriptId: input.hostedScriptId ?? null, keyCode: input.keyKind === "plan" ? generatePlanKeyCode(input.plan) : generateNormalKeyCode(), type: input.type, status: "active", discordUserId: input.discordUserId ?? null, hwid: null, expiresAt });
       if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No se pudo generar la licencia." });
       return row;
     }),

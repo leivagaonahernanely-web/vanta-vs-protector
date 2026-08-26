@@ -27,11 +27,18 @@ const context = { user, req: { protocol: "https", headers: {}, get: () => "vanta
 beforeEach(() => vi.clearAllMocks());
 
 describe("access management", () => {
-  it("generates an automatic plan-prefixed license key", async () => {
-    dbMocks.createLicense.mockResolvedValue({ id: 1, ownerId: 7, keyCode: "FREE-nwe9yhwwboyssbpf", type: "license", status: "active", hostedScriptId: null, discordUserId: null, hwid: null, expiresAt: new Date(), createdAt: new Date(), updatedAt: new Date() });
+  it("generates an automatic normal license key with exactly 10 digits", async () => {
+    dbMocks.createLicense.mockResolvedValue({ id: 1, ownerId: 7, keyCode: "5877736168", type: "license", status: "active", hostedScriptId: null, discordUserId: null, hwid: null, expiresAt: new Date(), createdAt: new Date(), updatedAt: new Date() });
     const result = await appRouter.createCaller(context).licenseKeys.generate({ type: "license", trialDays: 3 });
-    expect(result.keyCode).toMatch(/^FREE-[a-z0-9]{16}$/);
-    expect(dbMocks.createLicense).toHaveBeenCalledWith(expect.objectContaining({ ownerId: 7, type: "license", status: "active", keyCode: expect.stringMatching(/^FREE-[a-z0-9]{16}$/) }));
+    expect(result.keyCode).toMatch(/^\d{10}$/);
+    expect(dbMocks.createLicense).toHaveBeenCalledWith(expect.objectContaining({ ownerId: 7, type: "license", status: "active", keyCode: expect.stringMatching(/^\d{10}$/) }));
+  });
+
+  it("generates a separate prefixed Plan Key only when requested", async () => {
+    dbMocks.createLicense.mockResolvedValue({ id: 3, ownerId: 7, keyCode: "PREMIUM-kksuy702hsb12345", type: "license", status: "active", hostedScriptId: null, discordUserId: null, hwid: null, expiresAt: null, createdAt: new Date(), updatedAt: new Date() });
+    const result = await appRouter.createCaller(context).licenseKeys.generate({ type: "license", plan: "premium", keyKind: "plan", trialDays: 3 });
+    expect(result.keyCode).toMatch(/^PREMIUM-[a-z0-9]{16}$/);
+    expect(dbMocks.createLicense).toHaveBeenCalledWith(expect.objectContaining({ keyCode: expect.stringMatching(/^PREMIUM-[a-z0-9]{16}$/) }));
   });
 
   it("persists the selected plan for an automatic key", async () => {
