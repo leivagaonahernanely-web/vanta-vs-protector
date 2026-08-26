@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/_core/hooks/useAuth", () => ({
   useAuth: () => ({
-    user: { name: "Owner", email: "owner@example.com", discordUsername: "Protectorscripts" },
+    user: { name: "Owner", email: "owner@example.com", role: "admin", discordUsername: "Protectorscripts" },
     loading: false,
     isAuthenticated: true,
     logout: vi.fn(),
