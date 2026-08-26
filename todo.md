@@ -252,7 +252,7 @@
 - [x] Añadir apartado privado Generate / Manage para crear keys Free, Pro y Premium
 - [x] Aplicar cuotas reales de obfuscaciones, scripts y keys por plan
 - [ ] Mostrar duración, cantidad, plan y resultado de las keys generadas
-- [ ] Añadir pruebas de autorización, cuotas y generación de keys por plan
+- [x] Añadir pruebas de autorización, cuotas y generación de keys por plan
 
 - [x] Permitir editar la source privada de un script alojado
 - [x] Permitir eliminar scripts y reemplazar/publicar una nueva versión

@@ -4,6 +4,7 @@ import type { TrpcContext } from "./_core/context";
 
 const dbMocks = vi.hoisted(() => ({
   createLicense: vi.fn(),
+  getWorkspaceUsage: vi.fn().mockResolvedValue({ protections: 0, scripts: 0, keys: 0 }),
   getLicensesByOwner: vi.fn().mockResolvedValue([]),
   createBlacklist: vi.fn(),
   getBlacklistsByOwner: vi.fn().mockResolvedValue([]),
@@ -30,6 +31,17 @@ describe("access management", () => {
     const result = await appRouter.createCaller(context).licenseKeys.generate({ type: "license", trialDays: 3 });
     expect(result.keyCode).toMatch(/^\d{10}$/);
     expect(dbMocks.createLicense).toHaveBeenCalledWith(expect.objectContaining({ ownerId: 7, type: "license", status: "active", keyCode: expect.stringMatching(/^\d{10}$/) }));
+  });
+
+  it("persists the selected plan for an automatic key", async () => {
+    dbMocks.createLicense.mockResolvedValue({ id: 2, ownerId: 7, plan: "premium", keyCode: "1234567890", type: "license", status: "active", hostedScriptId: null, discordUserId: null, hwid: null, expiresAt: null, createdAt: new Date(), updatedAt: new Date() });
+    await appRouter.createCaller(context).licenseKeys.generate({ type: "license", plan: "premium", durationValue: 1, durationUnit: "years" });
+    expect(dbMocks.createLicense).toHaveBeenCalledWith(expect.objectContaining({ plan: "premium" }));
+  });
+
+  it("enforces the free key quota server-side", async () => {
+    dbMocks.getWorkspaceUsage.mockResolvedValue({ protections: 0, scripts: 0, keys: 500 });
+    await expect(appRouter.createCaller(context).licenseKeys.generate({ type: "license", plan: "free", durationValue: 1, durationUnit: "days" })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("rejects non-admin key generation", async () => {
