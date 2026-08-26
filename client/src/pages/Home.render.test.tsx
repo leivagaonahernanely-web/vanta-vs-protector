@@ -1,6 +1,8 @@
+// @vitest-environment jsdom
 import React from "react";
+import { fireEvent, render, screen, cleanup } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/_core/hooks/useAuth", () => ({
   useAuth: () => ({
@@ -18,31 +20,64 @@ vi.mock("@/components/ui/input", () => ({ Input: (props: React.InputHTMLAttribut
 vi.mock("@/components/ui/textarea", () => ({ Textarea: (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea {...props} /> }));
 vi.mock("@/components/ui/switch", () => ({ Switch: ({ checked }: { checked?: boolean }) => <input type="checkbox" checked={checked} readOnly /> }));
 
-const queryResult = (data: unknown = []) => ({ data, isLoading: false, isError: false, refetch: vi.fn() });
-const mutationResult = () => ({ mutate: vi.fn(), isPending: false });
-const trpcProxy = new Proxy({}, {
-  get: () => new Proxy({}, {
-    get: () => new Proxy({}, {
-      get: (target, key) => key === "useQuery" ? (input?: unknown) => {
-        if (input && typeof input === "object" && "id" in input) return queryResult({ code: "print('private')" });
-        return queryResult();
-      } : mutationResult,
-    }),
-  }),
+const { pricesMutate, updatesMutate, trpcProxy } = vi.hoisted(() => {
+  const pricesMutate = vi.fn();
+  const updatesMutate = vi.fn();
+  const queryResult = (data: unknown = []) => ({ data, isLoading: false, isError: false, refetch: vi.fn() });
+  const mutationResult = () => ({ mutate: vi.fn(), isPending: false });
+  const makeProxy = (path: string[] = []): object => new Proxy({}, {
+    get: (_target, key: string | symbol) => {
+      const name = String(key);
+      if (name === "useQuery") return () => queryResult();
+      if (name === "useMutation") {
+        if (path.join(".") === "discord.publishPrices") return () => ({ mutate: pricesMutate, isPending: false });
+        if (path.join(".") === "discord.publishUpdates") return () => ({ mutate: updatesMutate, isPending: false });
+        return mutationResult;
+      }
+      return makeProxy([...path, name]);
+    },
+  });
+  return { pricesMutate, updatesMutate, trpcProxy: makeProxy() };
 });
 vi.mock("@/lib/trpc", () => ({ trpc: trpcProxy }));
 
 import Home from "./Home";
 
+afterEach(() => {
+  cleanup();
+  pricesMutate.mockClear();
+  updatesMutate.mockClear();
+});
+
 describe("Home authenticated dashboard render", () => {
-  it("renders the informative Overview with one navigation entry per destination and online bot status", () => {
+  it("renders the Prices editor and submits its structured payload through tRPC", () => {
+    render(<Home initialSection="Prices" />);
+    fireEvent.change(screen.getByPlaceholderText("Nombre de tu script o marca"), { target: { value: "Vanta.vs APP" } });
+    fireEvent.change(screen.getByPlaceholderText("Ej. Duels Script"), { target: { value: "Duels Script" } });
+    fireEvent.change(screen.getByPlaceholderText("Una línea por plan o método de pago..."), { target: { value: "$7 USD" } });
+    fireEvent.click(screen.getByRole("button", { name: /Publicar Prices/i }));
+    expect(pricesMutate).toHaveBeenCalledWith({ title: "Vanta.vs APP", description: "**Duels Script**\n$7 USD" });
+  });
+
+  it("renders the Updates editor and submits its title and content through tRPC", () => {
+    render(<Home initialSection="Updates" />);
+    fireEvent.change(screen.getByPlaceholderText("Ej. Nueva versión disponible"), { target: { value: "Nueva versión" } });
+    fireEvent.change(screen.getByPlaceholderText("Escribe los cambios, correcciones y avisos importantes..."), { target: { value: "Correcciones y mejoras." } });
+    fireEvent.click(screen.getByRole("button", { name: /Publicar actualización/i }));
+    expect(updatesMutate).toHaveBeenCalledWith({ title: "Nueva versión", description: "Correcciones y mejoras." });
+  });
+
+  it("renders the informative Overview with one navigation entry per destination and bot status", () => {
     const html = renderToStaticMarkup(<Home />);
     expect(html).toContain("Workspace / Overview");
     expect(html).toContain("Vanta.vs Protector");
-    expect(html).toContain("BOT ONLINE · Protectorscripts");
+    expect(html).toContain("BOT OFFLINE");
     expect((html.match(/Generate \/ Manage/g) ?? []).length).toBe(1);
     expect((html.match(/Create New Panel/g) ?? []).length).toBe(1);
     expect((html.match(/Manage Panels/g) ?? []).length).toBe(1);
     expect(html).not.toContain("Coming Soon");
+    expect(html).not.toContain("Banta lagger");
+    expect(html).not.toContain("Vanta lagger");
+    expect(html).toContain("Activar sonidos");
   });
 });

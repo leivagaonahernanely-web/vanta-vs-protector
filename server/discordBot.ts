@@ -55,6 +55,7 @@ export const discordCommands = [
   new SlashCommandBuilder().setName("warn").setDescription("Advierte a un usuario").addUserOption(o => o.setName("user").setDescription("Usuario obligatorio").setRequired(true)).addStringOption(o => o.setName("reason").setDescription("Razón obligatoria").setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("dropkey").setDescription("Genera un drop de keys").addIntegerOption(o => o.setName("amount").setDescription("Cantidad de keys").setRequired(true).setMinValue(1).setMaxValue(50)).toJSON(),
   new SlashCommandBuilder().setName("prices").setDescription("Publica la información de precios").toJSON(),
+  new SlashCommandBuilder().setName("updates").setDescription("Publica una actualización del proyecto").toJSON(),
   new SlashCommandBuilder().setName("generatekeyrol").setDescription("Configura el rol autorizado para gestionar keys").addRoleOption(o => o.setName("role").setDescription("Rol delegado").setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.Administrator.toString()).toJSON(),
 ];
 
@@ -110,7 +111,7 @@ export async function respond(interaction: any, payload: any) {
 export function panelMessage() {
   const embed = new EmbedBuilder()
     .setColor(0x5865f2)
-    .setTitle("Vanta lagger")
+    .setTitle("Vanta.vs Protector · Access Panel")
     .setDescription("Este panel de control es para el proyecto: **Vanta.vs Protector**\n\nSi eres comprador, utiliza los botones de abajo para canjear tu key, obtener el script autorizado o conseguir tu rol.")
     .setFooter({ text: "Vanta.vs Protector · Panel de acceso" })
     .setTimestamp();
@@ -126,14 +127,50 @@ export function panelMessage() {
   return { embeds: [embed], components: [rowOne, rowTwo] };
 }
 
+export async function publishUpdatesMessage(channelId: string, config: { title: string; description: string }) {
+  if (!client || !gatewayOnline) throw new Error("El Gateway Discord no está conectado.");
+  const channel = await client.channels.fetch(channelId);
+  if (!channel?.isTextBased() || !("send" in channel)) throw new Error("El canal Discord no permite mensajes.");
+  const title = config.title.trim();
+  const description = config.description.trim();
+  if (!title || !description) throw new Error("El título y el contenido de la actualización son obligatorios.");
+  const embed = new EmbedBuilder()
+    .setColor(0xe93540)
+    .setAuthor({ name: `${title} · APP` })
+    .setTitle(title)
+    .setDescription(description)
+    .setFooter({ text: `Actualización · ${new Date().getFullYear()} | Vanta.vs Protector` })
+    .setTimestamp();
+  const sent = await channel.send({ embeds: [embed] });
+  return { channelId, title, messageId: sent.id };
+}
+
+export async function publishPricesMessage(channelId: string, config: { title: string; description: string }) {
+  if (!client || !gatewayOnline) throw new Error("El Gateway Discord no está conectado.");
+  const channel = await client.channels.fetch(channelId);
+  if (!channel?.isTextBased() || !("send" in channel)) throw new Error("El canal Discord no permite mensajes.");
+  const title = config.title.trim();
+  const description = config.description.trim();
+  if (!title || !description) throw new Error("El nombre y la descripción de Prices son obligatorios.");
+  const embed = new EmbedBuilder()
+    .setColor(0x5865f2)
+    .setAuthor({ name: `${title} · APP` })
+    .setTitle(title)
+    .setDescription(description)
+    .setFooter({ text: `Copyright © ${new Date().getFullYear()} | ${title}` })
+    .setTimestamp();
+  const sent = await channel.send({ embeds: [embed] });
+  return { channelId, title, messageId: sent.id };
+}
+
 export async function publishDiscordPanel(channelId: string, config?: { name?: string; description?: string; script?: string; hwidHours?: number }) {
   if (!client || !gatewayOnline) throw new Error("El Gateway Discord no está conectado.");
   const channel = await client.channels.fetch(channelId);
   if (!channel?.isTextBased() || !("send" in channel)) throw new Error("El canal Discord no permite mensajes.");
   const base = panelMessage();
-  const embed = new EmbedBuilder().setColor(0x5865f2).setTitle(config?.name?.trim() || "Vanta lagger").setDescription(config?.description?.trim() || "Este panel permite canjear tu key, obtener el script autorizado y conseguir tu rol.").setFooter({ text: config?.script ? `Script: ${config.script}` : "Vanta.vs Protector · Panel de acceso" }).setTimestamp();
+  const embed = new EmbedBuilder().setColor(0x5865f2).setTitle(config?.name?.trim() || "Vanta.vs Protector · Access Panel").setDescription(config?.description?.trim() || "Este panel permite canjear tu key, obtener el script autorizado y conseguir tu rol.").setFooter({ text: config?.script ? `Script: ${config.script}` : "Vanta.vs Protector · Panel de acceso" }).setTimestamp();
   const sent = await channel.send({ embeds: [embed], components: base.components });
-  return { channelId, title: config?.name?.trim() || "Vanta lagger", messageId: sent.id };
+  return { channelId, title: config?.name?.trim() || "Vanta.vs Protector · Access Panel", messageId: sent.id };
 }
 
 export async function deletePublishedPanel(channelId: string, messageId: string) {
@@ -174,6 +211,7 @@ export async function handleInteraction(interaction: any) {
     if (interaction.commandName === "ping") return respond(interaction, { content: `Pong · ${Math.round(client?.ws.ping ?? 0)}ms`, ephemeral: true });
     if (interaction.commandName === "panel") return respond(interaction, panelMessage());
     if (interaction.commandName === "prices") return prices(interaction);
+    if (interaction.commandName === "updates") return updates(interaction);
     if (interaction.commandName === "stats") return respond(interaction, { content: "Vanta.vs Protector está conectado. Usa el dashboard web para consultar scripts, licencias y actividad.", ephemeral: true });
     if (interaction.commandName === "getscript") return respond(interaction, { content: `📜 El acceso al script se gestiona desde tu panel privado: ${PANEL_URL}`, ephemeral: true });
     if (interaction.commandName === "getrole") return respond(interaction, { content: "👤 Canjea una key válida para solicitar el rol comprador.", ephemeral: true });
@@ -244,6 +282,17 @@ function parseDuration(raw: string) {
 
 async function prices(interaction: any) {
   const embed = new EmbedBuilder().setColor(0x5865f2).setTitle("Vanta.vs Protector · Prices").setDescription("Planes y acceso para scripts protegidos.\n\n**Trial** · duración configurada por el propietario.\n**License** · acceso permanente cuando la key se genera sin duración.\n\nUsa `/redeem` para activar una key.");
+  return respond(interaction, { embeds: [embed] });
+}
+
+async function updates(interaction: any) {
+  const embed = new EmbedBuilder()
+    .setColor(0xe93540)
+    .setAuthor({ name: "Vanta.vs Protector · APP" })
+    .setTitle("Project Updates")
+    .setDescription("Consulta el dashboard para ver las novedades, cambios de protección y avisos importantes del proyecto.")
+    .setFooter({ text: `Actualización · ${new Date().getFullYear()} | Vanta.vs Protector` })
+    .setTimestamp();
   return respond(interaction, { embeds: [embed] });
 }
 

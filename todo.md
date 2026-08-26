@@ -179,3 +179,45 @@
 - [x] Corregir el rechazo del canal Discord guardado para distinguir ID inválido, canal inexistente y permisos insuficientes
 - [x] Añadir recuperación visible en Setup y evitar reintentos automáticos con un canal rechazado
 - [x] Añadir pruebas de regresión para los mensajes y estados 404/403 del canal Discord
+
+- [ ] Analizar el video compartido y comparar el flujo visible con el dashboard actual
+- [ ] Cambiar FFA mode para que represente trial global sin key individual
+- [ ] Hacer que el modo no FFA exija key individual antes de ejecutar el script
+- [ ] Rediseñar la duración de licencias para días, meses y años, incluyendo addtime
+- [ ] Corregir el diagnóstico de permisos del canal Discord para no afirmar falta de permisos sin prueba
+- [ ] Añadir pruebas de acceso FFA/key, duraciones y mensajes de permisos
+
+- [ ] Permitir pegar un enlace completo de Discord en Setup, conservar servidor/canal y extraer el ID del canal para validación
+- [ ] Añadir pruebas para enlaces válidos, enlaces incompletos y entradas numéricas compatibles
+
+- [x] Eliminar el nombre automático Banta lagger y usar el nombre escrito por el usuario para scripts y paneles
+- [x] Mejorar el formulario de creación y la estética visual del dashboard con estados más claros
+- [x] Añadir sonido de entrada opcional y controlado por el usuario, sin autoplay bloqueado por el navegador
+- [x] Añadir pruebas de regresión para nombre personalizado, copy visual y sonido opcional
+
+- [x] Añadir formulario de Prices con nombre y descripción personalizados
+- [x] Mostrar vista previa profesional del mensaje Prices antes de publicarlo
+- [x] Conectar el formulario con la publicación Discord y cubrirlo con pruebas
+
+- [x] Usar la referencia visual del embed compartido para organizar título, etiqueta APP, bloques de precios y pie de autor
+- [x] Permitir editar nombre y descripción del mensaje Prices con una vista previa equivalente al embed de Discord
+- [x] Publicar Prices usando el contenido configurado, sin conservar el título fijo anterior
+
+- [x] Añadir una prueba frontend de Prices que confirme la mutación con título y descripción
+- [x] Reemplazar el textarea libre por bloques de precios editables y estructurados
+- [x] Alinear la preview con el payload real del embed de Discord
+- [x] Eliminar el título fijo Accepted Payments del embed publicado o hacerlo configurable
+
+- [x] Añadir comando slash /updates para publicar actualizaciones en Discord
+- [x] Crear formulario editable de título y contenido de actualizaciones con preview profesional
+- [x] Conectar /updates con el canal configurado y cubrirlo con pruebas
+
+- [x] Añadir prueba del router publishUpdates con canal configurado, validación y llamada al bot
+- [x] Añadir prueba frontend del editor Updates con título y descripción enviados a la mutación
+
+- [x] Añadir prueba de interacción del editor Prices en Home con la mutación tRPC real mockeada
+- [x] Alinear la etiqueta APP de la preview de Prices con el embed publicado en Discord
+- [x] Añadir prueba de interacción del editor Updates en Home con la mutación tRPC real mockeada
+
+- [x] Cubrir interacción real del editor Prices en Home con tRPC mockeado
+- [x] Cubrir interacción real del editor Updates en Home con tRPC mockeado

@@ -73,7 +73,7 @@ describe("database persistence helpers", () => {
   });
 
   it("inserts a Discord panel with its owner and message metadata", async () => {
-    const panel = { id: 12, ownerId: 9, name: "Vanta lagger", description: "Buyer panel", channelId: "123456789012345678", targetScript: "main.lua", hwidHours: 24, messageId: "987654321098765432", createdAt: new Date(), updatedAt: new Date() };
+    const panel = { id: 12, ownerId: 9, name: "Custom Buyer Panel", description: "Buyer panel", channelId: "123456789012345678", targetScript: "main.lua", hwidHours: 24, messageId: "987654321098765432", createdAt: new Date(), updatedAt: new Date() };
     database.selectLimit.mockResolvedValueOnce([panel]);
     const result = await createDiscordPanel({ ...panel, id: undefined });
     expect(database.insertValues).toHaveBeenCalled();

@@ -13,6 +13,8 @@ describe("dashboard navigation contract", () => {
       "HWID bans",
       "Create New Panel",
       "Manage Panels",
+      "Prices",
+      "Updates",
       "Setup",
     ]);
   });

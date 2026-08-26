@@ -6,7 +6,7 @@ describe("Discord access panel", () => {
     const message = panelMessage();
     const ids = message.components.flatMap((row: any) => row.components.map((button: any) => button.data.custom_id));
     expect(ids).toEqual(["vanta:redeem", "vanta:script", "vanta:role", "vanta:hwid", "vanta:stats"]);
-    expect(message.embeds[0].data.title).toBe("Vanta lagger");
+    expect(message.embeds[0].data.title).toBe("Vanta.vs Protector · Access Panel");
     expect(message.embeds[0].data.color).toBe(0x5865f2);
     expect(message.embeds[0].data.description).toContain("Vanta.vs Protector");
     expect(message.embeds[0].data.description).toContain("canjear tu key");
@@ -58,19 +58,30 @@ describe("Discord access panel", () => {
     expect(reply).toHaveBeenCalledTimes(1);
     const payload = reply.mock.calls[0][0];
     expect(payload.ephemeral).not.toBe(true);
-    expect(payload.embeds[0].data.title).toBe("Vanta lagger");
+    expect(payload.embeds[0].data.title).toBe("Vanta.vs Protector · Access Panel");
     await handleInteraction(interaction);
     expect(reply).toHaveBeenCalledTimes(1);
   });
 
+  it("runs /updates as a public styled embed", async () => {
+    const reply = vi.fn();
+    const interaction = { isModalSubmit: () => false, isButton: () => false, isChatInputCommand: () => true, commandName: "updates", replied: false, deferred: false, reply };
+    await handleInteraction(interaction);
+    expect(reply).toHaveBeenCalledTimes(1);
+    const embed = reply.mock.calls[0][0].embeds[0].data;
+    expect(embed.title).toBe("Project Updates");
+    expect(embed.color).toBe(0xe93540);
+  });
+
   it("registers slash commands for every panel action", () => {
     const names = discordCommands.map((command: any) => command.name);
-    expect(names).toEqual(["ping", "panel", "stats", "getscript", "getrole", "redeem", "generatekey", "deletekey", "whitelist", "unwhitelist", "blacklist", "resethwid", "addtime", "warn", "dropkey", "prices", "generatekeyrol"]);
+    expect(names).toEqual(["ping", "panel", "stats", "getscript", "getrole", "redeem", "generatekey", "deletekey", "whitelist", "unwhitelist", "blacklist", "resethwid", "addtime", "warn", "dropkey", "prices", "updates", "generatekeyrol"]);
     expect(new Set(names).size).toBe(names.length);
     expect(names).toContain("getscript");
     expect(names).toContain("getrole");
     expect(names).toContain("stats");
     expect(names).toContain("redeem");
+    expect(names).toContain("updates");
   });
 
   it("exposes the requested required and optional slash options", () => {

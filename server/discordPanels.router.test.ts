@@ -15,7 +15,7 @@ const botMocks = vi.hoisted(() => ({
 vi.mock("./db", async () => ({ ...(await vi.importActual<typeof import("./db")>("./db")), ...dbMocks }));
 vi.mock("./discordBot", async () => ({ ...(await vi.importActual<typeof import("./discordBot")>("./discordBot")), ...botMocks }));
 
-const panel = { id: 12, ownerId: 7, name: "Vanta lagger", description: "Buyer panel", channelId: "123456789012345678", targetScript: "main.lua", hwidHours: 24, messageId: "987654321098765432", createdAt: new Date(), updatedAt: new Date() };
+const panel = { id: 12, ownerId: 7, name: "Custom Buyer Panel", description: "Buyer panel", channelId: "123456789012345678", targetScript: "main.lua", hwidHours: 24, messageId: "987654321098765432", createdAt: new Date(), updatedAt: new Date() };
 const user = { id: 7, openId: "panel-user", name: "Owner", email: "owner@example.com", loginMethod: "manus", role: "user" as const, discordChannelId: panel.channelId, discordUserId: "111222333444555666", discordUsername: "owner", discordDisplayName: "Owner", discordAvatarUrl: null, discordGlobalName: "Owner", discordNickname: null, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() };
 const context = { user, req: { protocol: "https", headers: {}, get: () => "vanta.test" } as TrpcContext["req"], res: {} as TrpcContext["res"] };
 
