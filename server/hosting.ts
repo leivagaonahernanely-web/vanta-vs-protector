@@ -1,5 +1,5 @@
 import type { Express, Request, Response } from "express";
-import { getActiveLicenseForHostedScript, getHostedScriptBySlug } from "./db";
+import { claimLicenseHwid, getHostedScriptBySlug } from "./db";
 
 function browserNotice(title: string, message: string) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} · Vanta.vs Protector</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#061a2d;color:#f3f6fa;font:15px system-ui,sans-serif}main{width:min(100%,540px);padding:42px 24px;border:1px solid #174568;border-radius:20px;background:#08213a;text-align:center;box-shadow:0 24px 70px #0007}.mark{width:42px;height:42px;display:grid;place-items:center;margin:0 auto 18px;border-radius:50%;background:#f5f7fa;color:#071a2d;font-weight:800}.eyebrow{color:#65baff;font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}h1{margin:12px 0 0;font-size:30px}p{color:#98b1c5;line-height:1.5}</style></head><body><main><div class="mark">&lt;/&gt;</div><div class="eyebrow">Vanta.vs Protector</div><h1>${title}</h1><p>${message}</p></main></body></html>`;
@@ -24,7 +24,8 @@ export function registerHostingRoutes(app: Express) {
       const query = req.query ?? {};
       const requestedKey = typeof query.key === "string" ? query.key.trim() : typeof query.script_key === "string" ? query.script_key.trim() : "";
       const trialAccess = Boolean(script.ffaMode) && requestedKey === "trial";
-      const protectedAccess = !script.ffaMode && Boolean(requestedKey && /^\d{10}$/.test(requestedKey) && await getActiveLicenseForHostedScript(script.id, requestedKey));
+      const requestedHwid = typeof req.headers["x-hwid"] === "string" ? req.headers["x-hwid"].trim() : "";
+      const protectedAccess = !script.ffaMode && Boolean(requestedKey && requestedHwid && requestedHwid.length <= 128 && /^(?:FREE|PRO|PREMIUM)-[a-z0-9]{16}$/i.test(requestedKey) && await claimLicenseHwid(script.id, requestedKey, requestedHwid));
       if (!trialAccess && !protectedAccess) {
         const message = script.ffaMode ? "Este script está en TRIAL GLOBAL. Usa el loader oficial con `script_key = \"trial\"`." : "Este script requiere una key activa. Usa el loader oficial con tu key automática.";
         if (acceptsHtml) res.status(403).type("html").send(browserNotice("Key required", message));

@@ -179,6 +179,17 @@ export async function getActiveLicenseForHostedScript(hostedScriptId: number, ke
   return license;
 }
 
+export async function claimLicenseHwid(hostedScriptId: number, keyCode: string, hwid: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(licenses).where(and(eq(licenses.keyCode, keyCode), eq(licenses.status, "active"), or(eq(licenses.hostedScriptId, hostedScriptId), isNull(licenses.hostedScriptId)))).limit(1);
+  const license = rows[0];
+  if (!license || (license.expiresAt && license.expiresAt.getTime() <= Date.now())) return undefined;
+  if (license.hwid && license.hwid !== hwid) return undefined;
+  if (!license.hwid) await db.update(licenses).set({ hwid }).where(and(eq(licenses.id, license.id), isNull(licenses.hwid), eq(licenses.status, "active")));
+  return { ...license, hwid };
+}
+
 export async function createLicense(input: InsertLicense) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");

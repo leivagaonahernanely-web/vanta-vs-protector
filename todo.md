@@ -239,32 +239,32 @@
 - [x] Corregir botones Redeem Key, Get Script, Get Role, Reset HWID y Get Stats de /panel
 - [x] Añadir pruebas de límites del catálogo y de interacciones completas de /panel
 
-- [ ] Comparar el video de /panel con el embed y botones actualmente publicados
-- [ ] Ajustar el diseño de /panel al formato visual del video, sin títulos fijos ni redirecciones a la web
-- [ ] Hacer que Get Script entregue directamente el loader y la key del usuario autorizado
-- [ ] Verificar con pruebas que las cinco acciones del panel responden una sola vez y con datos reales
+- [x] Comparar el video de /panel con el embed y botones actualmente publicados
+- [x] Ajustar el diseño de /panel al formato visual del video, sin títulos fijos ni redirecciones a la web
+- [x] Hacer que Get Script entregue directamente el loader y la key del usuario autorizado
+- [x] Verificar con pruebas que las cinco acciones del panel responden una sola vez y con datos reales
 
 - [x] Corregir /whitelabel para usar selector nativo de usuario o rol según el tipo elegido
 - [x] Quitar el ID manual y cargar opciones válidas del guild actual
 - [x] Añadir pruebas de opciones y persistencia de whitelist por usuario/rol seleccionado
 
-- [ ] Vincular de forma segura la cuenta Discord del propietario como owner, sin inventar ni hardcodear un ID
+- [x] Vincular de forma segura la cuenta Discord del propietario como owner, sin inventar ni hardcodear un ID
 - [x] Añadir apartado privado Generate / Manage para crear keys Free, Pro y Premium
 - [x] Aplicar cuotas reales de obfuscaciones, scripts y keys por plan
-- [ ] Mostrar duración, cantidad, plan y resultado de las keys generadas
+- [x] Mostrar duración, cantidad, plan y resultado de las keys generadas
 - [x] Añadir pruebas de autorización, cuotas y generación de keys por plan
 
 - [x] Permitir editar la source privada de un script alojado
 - [x] Permitir eliminar scripts y reemplazar/publicar una nueva versión
 - [x] Reparar la subida de archivos Lua desde el dashboard con validación visible
 - [x] Verificar que el loader público siempre sirva la versión actual sin exponer la source
-- [ ] Hacer que el modo protegido rechace accesos sin key automática válida
+- [x] Hacer que el modo protegido rechace accesos sin key automática válida
 - [x] Mostrar `script_key = "trial"` únicamente para el trial global cuando corresponda
-- [ ] Confirmar y documentar el formato final de keys automáticas antes de cambiarlo
+- [x] Confirmar y documentar el formato final de keys automáticas antes de cambiarlo
 
 - [x] Tratar FFA como trial global y generar automáticamente `script_key = "trial"` para el loader de scripts en modo trial
 - [x] Impedir que se creen o escriban keys trial manuales
-- [ ] Hacer que el modo protegido rechace cualquier ejecución sin key automática activa, vinculada al script y validada por HWID
+- [x] Hacer que el modo protegido rechace cualquier ejecución sin key automática activa, vinculada al script y validada por HWID
 - [x] Mantener el formulario de generación sin campo editable de dígitos; el servidor debe generar la key
 
 - [x] Diagnosticar el error `El Gateway Discord no está conectado` reportado al publicar o administrar desde la web
@@ -280,32 +280,32 @@
 
 - [x] Corregir el rechazo `No tienes permiso para hacer un drop` para la cuenta owner vinculada
 - [x] Permitir descarga directa de source únicamente al owner y mantener loader protegido para los demás
-- [ ] Añadir pruebas de autorización de dropkey y descarga privada de source
+- [x] Añadir pruebas de autorización de dropkey y descarga privada de source
 
 - [x] Mostrar en cada script acciones visibles para editar source, subir nueva versión, eliminar, ver loader y consultar logs
 - [x] Mantener la misma URL del loadstring al reemplazar su source y evitar duplicados
-- [ ] Añadir pruebas de render móvil y de las acciones visibles de Scripts
+- [x] Añadir pruebas de render móvil y de las acciones visibles de Scripts
 
-- [ ] Alinear el redirect URI de Discord OAuth con el dominio publicado `vanta-prot-hfw5hmym.manus.space`
+- [x] Alinear el redirect URI de Discord OAuth con el dominio publicado `vanta-prot-hfw5hmym.manus.space`
 - [x] Verificar el callback `/api/discord/callback` y mostrar un error accionable si Discord no tiene registrada la URL exacta
 - [x] Confirmar con pruebas que sin key el modo protegido rechaza la ejecución y FFA exige `key=trial`
 
 - [x] Revisar el flujo OAuth del dominio publicado y dejar instrucciones de redirect URI exactas
-- [ ] Mantener la regla de una key protegida por un único HWID y rechazar dispositivos distintos
+- [x] Mantener la regla de una key protegida por un único HWID y rechazar dispositivos distintos
 - [x] Completar el owner-only explícito cuando la cuenta Discord quede vinculada
 - [x] Pulir visualmente los paneles de planes, precios y generación de keys
 
-- [ ] Crear Owner Sources privado para listar y descargar bajo demanda las sources subidas, visible solo al owner
-- [ ] Informar al usuario que la source subida queda accesible al owner del servicio antes de guardarla
-- [ ] Crear Owner Key privado para generar keys automáticas asociadas a Free, Pro o Premium
-- [ ] Implementar canje de Owner Key para activar el plan y las cuotas del workspace del usuario
-- [ ] Impedir reutilización, falsificación o canje de una key por un usuario no autorizado
-- [ ] Añadir pruebas de privacidad, canje, activación de plan y límites por workspace
+- [x] Retirar Owner Sources privado del alcance por solicitud del usuario
+- [x] No informar ni implementar acceso Owner Sources, porque fue retirado del alcance
+- [x] Crear Owner Key privado para generar keys automáticas asociadas a Free, Pro o Premium
+- [x] Implementar canje de Owner Key para activar el plan y las cuotas del workspace del usuario
+- [x] Impedir reutilización, falsificación o canje de una key por un usuario no autorizado
+- [x] Añadir pruebas de privacidad, canje, activación de plan y límites por workspace
 
-- [ ] Cambiar las Owner Key al formato automático `FREE-...`, `PRO-...` y `PREMIUM-...`
-- [ ] Aumentar la longitud de almacenamiento y validación para prefijos más identificador aleatorio
-- [ ] Hacer que canje y hosting acepten el nuevo formato sin permitir edición manual
-- [ ] Añadir pruebas de prefijo, unicidad, canje y compatibilidad con keys existentes
+- [x] Cambiar las Owner Key al formato automático `FREE-...`, `PRO-...` y `PREMIUM-...`
+- [x] Aumentar la longitud de almacenamiento y validación para prefijos más identificador aleatorio
+- [x] Hacer que canje y hosting acepten el nuevo formato sin permitir edición manual
+- [x] Añadir pruebas de prefijo, unicidad, canje y compatibilidad con keys existentes
 
 - [x] Separar Plans de Prices en la navegación y el menú lateral
 - [x] Crear la vista Plans con tarjetas Free, Pro y Premium y sus beneficios

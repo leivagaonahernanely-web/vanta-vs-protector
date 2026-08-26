@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 const { findMock, licenseMock } = vi.hoisted(() => ({ findMock: vi.fn(), licenseMock: vi.fn() }));
-vi.mock("./db", () => ({ getHostedScriptBySlug: findMock, getActiveLicenseForHostedScript: licenseMock }));
+vi.mock("./db", () => ({ getHostedScriptBySlug: findMock, claimLicenseHwid: licenseMock }));
 
 import { registerHostingRoutes } from "./hosting";
 
@@ -46,7 +46,7 @@ describe("public hosted scripts", () => {
     expect(response.body).not.toContain("return true");
   });
 
-  it("requires a valid 10-digit key when FFA is disabled", async () => {
+  it("requires a valid plan key when FFA is disabled", async () => {
     findMock.mockResolvedValue({ ...script, ffaMode: 0, scriptKey: null });
     licenseMock.mockResolvedValue(undefined);
     const response = responseMock();
@@ -59,7 +59,7 @@ describe("public hosted scripts", () => {
     findMock.mockResolvedValue({ ...script, ffaMode: 0, scriptKey: null });
     licenseMock.mockResolvedValue({ id: 4, status: "active" });
     const response = responseMock();
-    await getHandler()({ params: { slug: script.slug }, query: { key: "1234567890" }, headers: { accept: "*/*" }, protocol: "https", get: () => "vanta.test" }, response);
+    await getHandler()({ params: { slug: script.slug }, query: { key: "PRO-ctxsfh9n9hodbsj0" }, headers: { accept: "*/*", "x-hwid": "device-a" }, protocol: "https", get: () => "vanta.test" }, response);
     expect(response.statusCode).toBe(200);
     expect(response.body).toBe("return true");
   });
