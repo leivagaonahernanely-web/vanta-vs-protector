@@ -180,15 +180,15 @@
 - [x] Añadir recuperación visible en Setup y evitar reintentos automáticos con un canal rechazado
 - [x] Añadir pruebas de regresión para los mensajes y estados 404/403 del canal Discord
 
-- [ ] Analizar el video compartido y comparar el flujo visible con el dashboard actual
-- [ ] Cambiar FFA mode para que represente trial global sin key individual
-- [ ] Hacer que el modo no FFA exija key individual antes de ejecutar el script
-- [ ] Rediseñar la duración de licencias para días, meses y años, incluyendo addtime
-- [ ] Corregir el diagnóstico de permisos del canal Discord para no afirmar falta de permisos sin prueba
-- [ ] Añadir pruebas de acceso FFA/key, duraciones y mensajes de permisos
+- [x] Analizar el video compartido y comparar el flujo visible con el dashboard actual
+- [x] Cambiar FFA mode para que represente trial global sin key individual
+- [x] Hacer que el modo no FFA exija key individual antes de ejecutar el script
+- [x] Rediseñar la duración de licencias para días, meses y años, incluyendo addtime
+- [x] Corregir el diagnóstico de permisos del canal Discord para no afirmar falta de permisos sin prueba
+- [x] Añadir pruebas de acceso FFA/key, duraciones y mensajes de permisos
 
-- [ ] Permitir pegar un enlace completo de Discord en Setup, conservar servidor/canal y extraer el ID del canal para validación
-- [ ] Añadir pruebas para enlaces válidos, enlaces incompletos y entradas numéricas compatibles
+- [x] Permitir pegar un enlace completo de Discord en Setup, conservar servidor/canal y extraer el ID del canal para validación
+- [x] Añadir pruebas para enlaces válidos, enlaces incompletos y entradas numéricas compatibles
 
 - [x] Eliminar el nombre automático Banta lagger y usar el nombre escrito por el usuario para scripts y paneles
 - [x] Mejorar el formulario de creación y la estética visual del dashboard con estados más claros
@@ -221,3 +221,10 @@
 
 - [x] Cubrir interacción real del editor Prices en Home con tRPC mockeado
 - [x] Cubrir interacción real del editor Updates en Home con tRPC mockeado
+
+- [x] Documentar los hallazgos concretos del video y su impacto en FFA, trial y acceso por key
+- [x] Unificar duración de licencias en web y slash commands con unidad días/meses/años
+- [x] Persistir y usar el guildId extraído del enlace Discord, o documentar explícitamente que solo se valida el canal
+
+- [x] Refactorizar parseDuration del bot para reutilizar shared/duration.ts
+- [x] Añadir pruebas que comparen duración web y slash para días, meses y años

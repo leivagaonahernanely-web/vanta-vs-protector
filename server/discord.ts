@@ -23,8 +23,8 @@ export async function checkDiscordChannel(channelId: string): Promise<DiscordCha
   try {
     const response = await fetch(`https://discord.com/api/v10/channels/${channelId}`, { headers: { Authorization: `Bot ${ENV.discordBotToken}` }, signal: AbortSignal.timeout(8_000) });
     if (response.ok) return { ok: true, channelId };
-    if (response.status === 404) return { ok: false, status: 404, message: "Discord no encuentra ese canal o el bot no tiene acceso. Activa Developer Mode y copia el ID del canal correcto; después verifica que el bot esté dentro del servidor." };
-    if (response.status === 403) return { ok: false, status: 403, message: "El bot no tiene permisos para ver ese canal. Dale View Channel y Send Messages." };
+    if (response.status === 404) return { ok: false, status: 404, message: "Discord devolvió 404 para ese canal. Comprueba que el enlace sea del servidor correcto y que el bot esté instalado allí; no se puede confirmar otra causa desde este endpoint." };
+    if (response.status === 403) return { ok: false, status: 403, message: "Discord devolvió 403 al consultar ese canal. Revisa View Channel y Send Messages para el bot, pero el panel no asumirá que esa sea la única causa." };
     return { ok: false, status: response.status, message: `Discord rechazó el canal (HTTP ${response.status}).` };
   } catch {
     return { ok: false, message: "No se pudo contactar con Discord para verificar el canal. Inténtalo de nuevo." };

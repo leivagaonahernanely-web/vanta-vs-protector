@@ -1,4 +1,4 @@
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { accessRules, blacklists, discordPanels, hostedScripts, HostedScript, InsertHostedScript, InsertLicense, InsertProtection, InsertUser, keyAuditLogs, licenses, protections, users, warnings } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -136,6 +136,15 @@ export async function getHostedScriptBySlug(slug: string) {
   if (!db) return undefined;
   const rows = await db.select().from(hostedScripts).where(eq(hostedScripts.slug, slug)).limit(1);
   return rows[0];
+}
+
+export async function getActiveLicenseForHostedScript(hostedScriptId: number, keyCode: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(licenses).where(and(eq(licenses.keyCode, keyCode), eq(licenses.status, "active"), or(eq(licenses.hostedScriptId, hostedScriptId), isNull(licenses.hostedScriptId)))).limit(1);
+  const license = rows[0];
+  if (!license || (license.expiresAt && license.expiresAt.getTime() <= Date.now())) return undefined;
+  return license;
 }
 
 export async function createLicense(input: InsertLicense) {

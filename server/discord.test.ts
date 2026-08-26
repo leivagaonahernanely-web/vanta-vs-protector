@@ -22,7 +22,7 @@ describe("Discord bot configuration", () => {
   it("returns an actionable error for an unknown channel", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 404 }));
     vi.stubGlobal("fetch", fetchMock);
-    await expect(checkDiscordChannel("1504617948482895893")).resolves.toMatchObject({ ok: false, status: 404, message: expect.stringContaining("no encuentra") });
+    await expect(checkDiscordChannel("1504617948482895893")).resolves.toMatchObject({ ok: false, status: 404, message: expect.stringContaining("devolvió 404") });
     vi.unstubAllGlobals();
   });
 

@@ -17,6 +17,7 @@ import {
   TextInputBuilder,
   TextInputStyle,
 } from "discord.js";
+import { durationToMs } from "../shared/duration";
 import { ENV } from "./_core/env";
 import {
   createAccessRuleIfAbsent,
@@ -273,11 +274,18 @@ async function unwhitelist(interaction: any, discordId: string) {
   const removed = await deleteAccessRuleByDiscordId(owner.id, discordId.trim());
   return respond(interaction, { content: removed ? `✅ Whitelist retirada para **${discordId.trim()}**.` : "No se encontró una regla activa para ese ID.", ephemeral: true });
 }
-function parseDuration(raw: string) {
-  const match = raw.trim().match(/^(\\d+)\\s*(m|min|h|d|day|days|w|week|weeks)$/i);
+export function parseDuration(raw: string) {
+  const match = raw.trim().match(/^(\d+)\s*(m|min|h|d|day|days|w|week|weeks|mo|month|months|y|year|years)$/i);
   if (!match) return undefined;
-  const multipliers: Record<string, number> = { m: 60_000, min: 60_000, h: 3_600_000, d: 86_400_000, day: 86_400_000, days: 86_400_000, w: 604_800_000, week: 604_800_000, weeks: 604_800_000 };
-  return Number(match[1]) * (multipliers[match[2].toLowerCase()] ?? 0);
+  const value = Number(match[1]);
+  const unit = match[2].toLowerCase();
+  if (unit === "m" || unit === "min") return value * 60_000;
+  if (unit === "h") return value * 3_600_000;
+  if (["d", "day", "days"].includes(unit)) return durationToMs(value, "days");
+  if (["w", "week", "weeks"].includes(unit)) return durationToMs(value * 7, "days");
+  if (["mo", "month", "months"].includes(unit)) return durationToMs(value, "months");
+  if (["y", "year", "years"].includes(unit)) return durationToMs(value, "years");
+  return undefined;
 }
 
 async function prices(interaction: any) {
@@ -308,7 +316,7 @@ async function addTime(interaction: any, key: string, rawDuration: string) {
   const result = await canManageKeys(interaction);
   if (!result.allowed || !result.owner) return respond(interaction, { content: "⛔ No tienes permiso para añadir tiempo.", ephemeral: true });
   const durationMs = parseDuration(rawDuration);
-  if (!durationMs) return respond(interaction, { content: "❌ Usa una duración como `30d`, `12h` o `4weeks`.", ephemeral: true });
+  if (!durationMs) return respond(interaction, { content: "❌ Usa una duración como `30d`, `12h`, `4weeks`, `3months` o `1year`.", ephemeral: true });
   const license = await addTimeToLicense(result.owner.id, key.trim(), durationMs);
   if (!license) return respond(interaction, { content: "❌ No se encontró esa key.", ephemeral: true });
   return respond(interaction, { content: `✅ Se añadieron **${rawDuration}** a **${key.trim()}**.\nScript objetivo: ${license.hostedScriptId ? `#${license.hostedScriptId}` : "todos los accesos de la key"}.`, ephemeral: true });
@@ -364,7 +372,7 @@ async function generate(interaction: any, scriptName: string, rawDuration?: stri
   const script = await getHostedScriptByName(result.owner.id, scriptName);
   if (!script) return respond(interaction, { content: `❌ No se encontró el script **${scriptName}** en tu workspace.`, ephemeral: true });
   const durationMs = rawDuration ? parseDuration(rawDuration) : undefined;
-  if (rawDuration && !durationMs) return respond(interaction, { content: "❌ Usa una duración como `30d`, `12h` o `4weeks`, o déjala vacía para forever.", ephemeral: true });
+  if (rawDuration && !durationMs) return respond(interaction, { content: "❌ Usa `30d`, `12h`, `4weeks`, `3months` o `1year`, o déjala vacía para forever.", ephemeral: true });
   const row = await createLicense({ ownerId: result.owner.id, keyCode: keyCode(), type: "license", status: "active", discordUserId: null, hwid: null, expiresAt: durationMs ? new Date(Date.now() + durationMs) : null, hostedScriptId: script.id });
   if (row) await createKeyAuditLog({ ownerId: result.owner.id, actorDiscordId: interaction.user.id, action: "generate", keyCode: row.keyCode });
   return respond(interaction, { content: row ? `🔑 Key generada: **${row.keyCode}**` : "No se pudo generar la key.", ephemeral: true });

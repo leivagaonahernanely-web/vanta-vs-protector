@@ -11,26 +11,30 @@ import { randomInt } from "node:crypto";
 import { checkDiscordChannel, getDiscordBotIdentity, sendDiscordChannelMessage } from "./discord";
 import { deletePublishedPanel, getDiscordGatewayStatus, publishDiscordPanel, publishPricesMessage, publishUpdatesMessage } from "./discordBot";
 import { getProtectionAdapterStatus, getProviderStatus, protectWithAdapter } from "./protection";
+import { durationToDays, type DurationUnit } from "../shared/duration";
 
 const hostedScriptInput = z.object({
   name: z.string().trim().min(1).max(255),
   description: z.string().trim().max(500).optional(),
   source: z.string().min(1).max(150_000),
   ffaMode: z.boolean().default(false),
-  scriptKey: z.string().trim().regex(/^[A-Za-z0-9_-]{8,128}$/).optional(),
+  scriptKey: z.string().trim().regex(/^\d{10}$/).optional(),
   obfuscateSource: z.boolean().default(true),
 });
 
-function buildRuntimeLoader(url: string, scriptKey?: string | null) {
-  const load = `loadstring(game:HttpGet(\"${url}\"))()`;
-  return scriptKey ? `script_key = \"${scriptKey}\"\n${load}` : load;
+function buildRuntimeLoader(url: string, scriptKey?: string | null, ffaMode = false) {
+  const accessUrl = !ffaMode && scriptKey ? `${url}?key=${encodeURIComponent(scriptKey)}` : url;
+  const load = `loadstring(game:HttpGet(\"${accessUrl}\"))()`;
+  return !ffaMode && scriptKey ? `script_key = \"${scriptKey}\"\n${load}` : load;
 }
 
 const licenseInput = z.object({
   type: z.enum(["trial", "license"]).default("license"),
   hostedScriptId: z.number().int().positive().optional(),
   discordUserId: z.string().regex(/^\d{15,22}$/).optional(),
-  trialDays: z.number().int().min(1).max(30).default(3),
+  trialDays: z.number().int().min(1).max(3650).default(3),
+  durationValue: z.number().int().min(1).max(3650).optional(),
+  durationUnit: z.enum(["days", "months", "years"]).default("days"),
 });
 const accessRuleInput = z.object({ kind: z.enum(["user", "role"]), discordId: z.string().regex(/^\d{15,22}$/), label: z.string().trim().max(128).optional() });
 const blacklistInput = z.object({ discordUserId: z.string().regex(/^\d{15,22}$/), reason: z.string().trim().max(500).optional() });
@@ -96,7 +100,7 @@ export const appRouter = router({
         ffaMode: Boolean(row.ffaMode),
         createdAt: row.createdAt.toISOString(),
         url: `${origin}/scripts/hosted/${row.slug}`,
-        loader: buildRuntimeLoader(`${origin}/scripts/hosted/${row.slug}`, row.scriptKey),
+        loader: buildRuntimeLoader(`${origin}/scripts/hosted/${row.slug}`, row.scriptKey, Boolean(row.ffaMode)),
         scriptKey: row.scriptKey,
       }));
     }),
@@ -142,7 +146,8 @@ export const appRouter = router({
   licenseKeys: router({
     list: protectedProcedure.query(({ ctx }) => getLicensesByOwner(ctx.user.id)),
     generate: protectedProcedure.input(licenseInput).mutation(async ({ ctx, input }) => {
-      const expiresAt = input.type === "trial" ? new Date(Date.now() + input.trialDays * 86_400_000) : null;
+      const durationDays = input.durationValue ? durationToDays(input.durationValue, input.durationUnit as DurationUnit) : input.trialDays;
+      const expiresAt = input.type === "trial" ? new Date(Date.now() + durationDays * 86_400_000) : null;
       const row = await createLicense({ ownerId: ctx.user.id, hostedScriptId: input.hostedScriptId ?? null, keyCode: generateKeyCode(), type: input.type, status: "active", discordUserId: input.discordUserId ?? null, hwid: null, expiresAt });
       if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No se pudo generar la licencia." });
       return row;

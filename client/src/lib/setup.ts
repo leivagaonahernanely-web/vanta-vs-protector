@@ -3,6 +3,7 @@ export type SetupSettings = {
   permissions: string;
   trialDays: string;
   channel: string;
+  guildId: string;
 };
 
 export const defaultSetup: SetupSettings = {
@@ -10,10 +11,26 @@ export const defaultSetup: SetupSettings = {
   permissions: "View Channels, Send Messages",
   trialDays: "3",
   channel: "",
+  guildId: "",
 };
 
+export function parseDiscordChannelInput(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return { channelId: "", guildId: "" };
+  if (/^\d{15,22}$/.test(trimmed)) return { channelId: trimmed, guildId: "" };
+  try {
+    const url = new URL(trimmed);
+    if (url.hostname !== "discord.com" && url.hostname !== "www.discord.com" && url.hostname !== "discordapp.com") return null;
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (parts.length !== 3 || parts[0] !== "channels" || !/^\d{15,22}$/.test(parts[1]) || !/^\d{15,22}$/.test(parts[2])) return null;
+    return { channelId: parts[2], guildId: parts[1] };
+  } catch {
+    return null;
+  }
+}
+
 export function isValidDiscordChannelId(value: string) {
-  return value.trim() === "" || /^\d{15,22}$/.test(value.trim());
+  return parseDiscordChannelInput(value) !== null;
 }
 
 export function loadSetupSettings(storage: Pick<Storage, "getItem">): SetupSettings {
@@ -22,6 +39,7 @@ export function loadSetupSettings(storage: Pick<Storage, "getItem">): SetupSetti
     permissions: storage.getItem("vanta.setup.permissions") ?? defaultSetup.permissions,
     trialDays: storage.getItem("vanta.setup.trialDays") ?? defaultSetup.trialDays,
     channel: storage.getItem("vanta.setup.channel") ?? defaultSetup.channel,
+    guildId: storage.getItem("vanta.setup.guild") ?? defaultSetup.guildId,
   };
 }
 
@@ -30,6 +48,7 @@ export function saveSetupSettings(storage: Pick<Storage, "setItem">, settings: S
   storage.setItem("vanta.setup.permissions", settings.permissions);
   storage.setItem("vanta.setup.trialDays", settings.trialDays);
   storage.setItem("vanta.setup.channel", settings.channel);
+  storage.setItem("vanta.setup.guild", settings.guildId);
 }
 
 export function getSetupStatus(channel: string, saved: boolean) {
@@ -39,7 +58,8 @@ export function getSetupStatus(channel: string, saved: boolean) {
 }
 
 export function getDiscordChannelUpdate(channel: string) {
-  return { discordChannelId: channel.trim() || null };
+  const parsed = parseDiscordChannelInput(channel);
+  return { discordChannelId: parsed?.channelId || null };
 }
 
 export function clearRejectedDiscordChannel(storage: Pick<Storage, "setItem">, settings: SetupSettings) {

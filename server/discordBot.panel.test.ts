@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { createReconnectGate, discordCommands, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, panelMessage, respond } from "./discordBot";
+import { createReconnectGate, discordCommands, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, panelMessage, parseDuration, respond } from "./discordBot";
 
 describe("Discord access panel", () => {
+  it("parses key durations in days, months and years", () => {
+    expect(parseDuration("30d")).toBe(30 * 86_400_000);
+    expect(parseDuration("3months")).toBe(3 * 2_592_000_000);
+    expect(parseDuration("1year")).toBe(31_536_000_000);
+    expect(parseDuration("forever")).toBeUndefined();
+  });
   it("builds the requested two-row action layout", () => {
     const message = panelMessage();
     const ids = message.components.flatMap((row: any) => row.components.map((button: any) => button.data.custom_id));
