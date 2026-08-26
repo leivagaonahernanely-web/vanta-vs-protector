@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultSetup, getDiscordChannelUpdate, getSetupStatus, isValidDiscordChannelId, loadSetupSettings, saveSetupSettings } from "./setup";
+import { clearRejectedDiscordChannel, defaultSetup, getDiscordChannelUpdate, getSetupStatus, isValidDiscordChannelId, loadSetupSettings, saveSetupSettings } from "./setup";
 
 function storageMock() {
   const values = new Map<string, string>();
@@ -27,6 +27,13 @@ describe("Setup settings", () => {
     expect(getSetupStatus("", false)).toEqual({ kind: "ready", label: "Lista para guardar" });
     expect(getSetupStatus("123456789012345678", true)).toEqual({ kind: "saved", label: "Configuración guardada" });
     expect(getSetupStatus("invalid", false)).toEqual({ kind: "invalid", label: "Canal inválido" });
+  });
+
+  it("clears a rejected channel while preserving the other Setup fields", () => {
+    const storage = storageMock();
+    const result = clearRejectedDiscordChannel(storage, { script: "main.lua", permissions: "View Channels", trialDays: "3", channel: "1504617948482895893" });
+    expect(result.channel).toBe("");
+    expect(loadSetupSettings(storage)).toEqual({ script: "main.lua", permissions: "View Channels", trialDays: "3", channel: "" });
   });
 
   it("maps a valid channel to its Discord mutation payload and clears it with null", () => {

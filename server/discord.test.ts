@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getDiscordBotIdentity, sendDiscordChannelMessage } from "./discord";
+import { checkDiscordChannel, getDiscordBotIdentity, sendDiscordChannelMessage } from "./discord";
 
 describe("Discord bot configuration", () => {
   it("authenticates against Discord without exposing the token", async () => {
@@ -17,6 +17,20 @@ describe("Discord bot configuration", () => {
 
   it("rejects malformed channel IDs without calling Discord", async () => {
     await expect(sendDiscordChannelMessage("not-a-channel", { title: "test", content: "test" })).resolves.toBe(false);
+  });
+
+  it("returns an actionable error for an unknown channel", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 404 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(checkDiscordChannel("1504617948482895893")).resolves.toMatchObject({ ok: false, status: 404, message: expect.stringContaining("no encuentra") });
+    vi.unstubAllGlobals();
+  });
+
+  it("accepts an accessible channel", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "123456789012345678", type: 0 }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(checkDiscordChannel("123456789012345678")).resolves.toEqual({ ok: true, channelId: "123456789012345678" });
+    vi.unstubAllGlobals();
   });
 
   it("sends a bounded notification payload to a valid channel", async () => {

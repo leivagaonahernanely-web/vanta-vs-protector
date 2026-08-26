@@ -41,3 +41,9 @@ export function getSetupStatus(channel: string, saved: boolean) {
 export function getDiscordChannelUpdate(channel: string) {
   return { discordChannelId: channel.trim() || null };
 }
+
+export function clearRejectedDiscordChannel(storage: Pick<Storage, "setItem">, settings: SetupSettings) {
+  const next = { ...settings, channel: "" };
+  saveSetupSettings(storage, next);
+  return next;
+}

@@ -140,3 +140,15 @@
 - [x] Añadir prueba Vitest explícita del gate de reconexión ante Error y ShardDisconnect, incluyendo un único reintento
 - [x] Añadir pruebas owner-only de discord.republishPanel y discord.deletePanel y manejo de panel inexistente
 - [x] Añadir edición de configuración de panel persistido o documentar y probar que Manage Panels ofrece republicar y eliminar como acciones soportadas
+
+- [x] Clasificar Unknown Channel como 404/403 y mostrar una guía accionable sin afirmar la causa exacta del canal concreto
+- [x] Validar acceso real del bot al canal antes de guardar o publicar paneles
+- [x] Mostrar un error accionable y no persistir IDs de canal inaccesibles
+- [x] Añadir pruebas para canal desconocido, canal accesible y limpieza del estado guardado
+
+- [x] Documentar que Unknown Channel se clasifica como 404/403 y no afirmar la causa exacta del canal concreto sin una comprobación real
+- [x] Añadir prueba del helper de Setup que limpia el canal rechazado y persiste channel vacío tras fallo de updateChannel
+
+- [x] Documentar explícitamente en docs el manejo de Unknown Channel, causas posibles y pasos de corrección
+
+- [x] Crear README.md raíz con enlace y resumen del diagnóstico de canales Discord

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { defaultSetup, getDiscordChannelUpdate, getSetupStatus, loadSetupSettings, saveSetupSettings } from "@/lib/setup";
+import { clearRejectedDiscordChannel, defaultSetup, getDiscordChannelUpdate, getSetupStatus, loadSetupSettings, saveSetupSettings } from "@/lib/setup";
 import { validateLuaFile } from "@/lib/lua-upload";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -82,7 +82,7 @@ export default function Home() {
   const removeBlacklist = trpc.access.blacklist.remove.useMutation({ onSuccess: () => { void blacklistQuery.refetch(); toast.success("Blacklist actualizada"); } });
   const addWhitelist = trpc.access.whitelist.add.useMutation({ onSuccess: () => { setRuleId(""); setRuleLabel(""); void whitelistQuery.refetch(); toast.success("Whitelist actualizada"); }, onError: (e) => toast.error(e.message) });
   const removeWhitelist = trpc.access.whitelist.remove.useMutation({ onSuccess: () => { void whitelistQuery.refetch(); toast.success("Whitelist actualizada"); } });
-  const updateDiscordChannel = trpc.discord.updateChannel.useMutation({ onSuccess: () => { setSetupSaved(true); toast.success("Canal Discord guardado"); }, onError: (error) => { setSetupSaved(false); toast.error(error.message); } });
+  const updateDiscordChannel = trpc.discord.updateChannel.useMutation({ onSuccess: () => { setSetupSaved(true); toast.success("Canal Discord guardado"); }, onError: (error) => { setSetupSaved(false); const cleared = clearRejectedDiscordChannel(localStorage, { script: setupScript, permissions: setupPermissions, trialDays: setupTrialDays, channel: setupChannel }); setSetupChannel(cleared.channel); toast.error(error.message); } });
   const createDiscordPanel = trpc.discord.createPanel.useMutation({ onSuccess: () => { setPanelCreated(true); void panelsQuery.refetch(); toast.success("Panel publicado en Discord"); }, onError: (error) => toast.error(error.message) });
   const deleteDiscordPanel = trpc.discord.deletePanel.useMutation({ onSuccess: () => { void panelsQuery.refetch(); toast.success("Panel eliminado"); }, onError: (error) => toast.error(error.message) });
   const republishDiscordPanel = trpc.discord.republishPanel.useMutation({ onSuccess: () => { void panelsQuery.refetch(); toast.success("Panel republicado"); }, onError: (error) => toast.error(error.message) });
