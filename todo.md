@@ -290,7 +290,7 @@
 - [x] Verificar el callback `/api/discord/callback` y mostrar un error accionable si Discord no tiene registrada la URL exacta
 - [x] Confirmar con pruebas que sin key el modo protegido rechaza la ejecución y FFA exige `key=trial`
 
-- [ ] Revisar el flujo OAuth del dominio publicado y dejar instrucciones de redirect URI exactas
+- [x] Revisar el flujo OAuth del dominio publicado y dejar instrucciones de redirect URI exactas
 - [ ] Mantener la regla de una key protegida por un único HWID y rechazar dispositivos distintos
 - [ ] Completar el owner-only explícito cuando la cuenta Discord quede vinculada
 - [ ] Pulir visualmente los paneles de planes, precios y generación de keys
