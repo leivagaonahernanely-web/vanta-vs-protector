@@ -359,3 +359,11 @@
 - [x] Mantener Plan Keys separadas y con sus prefijos PRO/PREMIUM
 - [x] Actualizar textos y placeholders que todavía indiquen 10 dígitos
 - [x] Añadir pruebas de longitud, alfabeto, unicidad y compatibilidad del nuevo formato
+
+- [x] Mantener Free como plan inicial automático sin key generable ni canjeable
+- [x] Mostrar y generar Plan Keys únicamente para Pro y Premium en su módulo privado
+- [x] Corregir Upload Lua/Source para que cargue el archivo seleccionado en el formulario
+- [x] Actualizar Redeem Key para aceptar keys alfanuméricas de mínimo 32 caracteres
+- [x] Corregir eliminación real de paneles y limpiar el registro cuando el mensaje ya no existe
+- [x] Auditar botones y formularios para eliminar funciones solo visuales o mezcladas
+- [x] Añadir pruebas de regresión para todos los flujos corregidos

@@ -203,7 +203,10 @@ export const appRouter = router({
   }),
 
   licenseKeys: router({
-    list: ownerProcedure.query(({ ctx }) => getLicensesByOwner(ctx.user.id)),
+    list: ownerProcedure.query(async ({ ctx }) => {
+      const rows = await getLicensesByOwner(ctx.user.id);
+      return rows.filter((row) => !/^(?:PRO|PREMIUM)-/i.test(row.keyCode));
+    }),
     generate: ownerProcedure.input(licenseInput).mutation(async ({ ctx, input }) => {
       if (input.keyKind === "normal" && !input.hostedScriptId) throw new TRPCError({ code: "BAD_REQUEST", message: "Selecciona el script hosteado para esta key." });
       await assertWorkspaceQuota(ctx.user.id, (ctx.user as typeof ctx.user & { plan?: PlanTier }).plan, "keys");
@@ -216,6 +219,11 @@ export const appRouter = router({
     revoke: ownerProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => revokeLicense(ctx.user.id, input.id)),
     remove: ownerProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => deleteLicense(ctx.user.id, input.id)),
     resetHwid: ownerProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => resetLicenseHwid(ctx.user.id, input.id)),
+  }),
+
+  planKeys: ownerProcedure.query(async ({ ctx }) => {
+    const rows = await getLicensesByOwner(ctx.user.id);
+    return rows.filter((row) => /^(?:PRO|PREMIUM)-/i.test(row.keyCode));
   }),
 
   access: router({

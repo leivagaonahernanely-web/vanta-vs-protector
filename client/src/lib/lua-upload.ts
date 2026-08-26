@@ -7,11 +7,15 @@ export function validateLuaFile(file: Pick<File, "name" | "size">) {
 }
 
 export function readLuaFile(file: File): Promise<string> {
+  if (typeof FileReader === "function") {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("Formato de archivo no compatible"));
+      reader.onerror = () => reject(reader.error ?? new Error("No se pudo leer el archivo Lua"));
+      reader.onabort = () => reject(new Error("Lectura cancelada"));
+      reader.readAsText(file, "utf-8");
+    });
+  }
   if (typeof file.text === "function") return file.text();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("Formato de archivo no compatible"));
-    reader.onerror = () => reject(reader.error ?? new Error("No se pudo leer el archivo Lua"));
-    reader.readAsText(file);
-  });
+  return Promise.reject(new Error("Este navegador no permite leer archivos Lua"));
 }
