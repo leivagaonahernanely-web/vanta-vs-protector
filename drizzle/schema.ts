@@ -56,6 +56,7 @@ export const hostedScripts = mysqlTable("hostedScripts", {
   ffaMode: int("ffaMode").default(0).notNull(),
   scriptKey: varchar("scriptKey", { length: 128 }),
   code: text("code").notNull(),
+  sourceCode: text("sourceCode"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -87,6 +88,15 @@ export const accessRules = mysqlTable("accessRules", {
   discordId: varchar("discordId", { length: 32 }).notNull(),
   label: varchar("label", { length: 128 }),
   active: int("active").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const keyAuditLogs = mysqlTable("keyAuditLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  ownerId: int("ownerId").notNull().references(() => users.id),
+  actorDiscordId: varchar("actorDiscordId", { length: 32 }).notNull(),
+  action: mysqlEnum("action", ["generate", "delete"]).notNull(),
+  keyCode: varchar("keyCode", { length: 10 }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

@@ -1,6 +1,6 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { accessRules, blacklists, hostedScripts, HostedScript, InsertHostedScript, InsertLicense, InsertProtection, InsertUser, licenses, protections, users } from "../drizzle/schema";
+import { accessRules, blacklists, hostedScripts, HostedScript, InsertHostedScript, InsertLicense, InsertProtection, InsertUser, keyAuditLogs, licenses, protections, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -173,7 +173,7 @@ export async function deleteLicense(ownerId: number, id: number) {
 export async function getAccessRulesByOwner(ownerId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(accessRules).where(eq(accessRules.ownerId, ownerId)).orderBy(desc(accessRules.createdAt)).limit(100);
+  return db.select().from(accessRules).where(and(eq(accessRules.ownerId, ownerId), ne(accessRules.label, "__key_manager__"))).orderBy(desc(accessRules.createdAt)).limit(100);
 }
 
 export async function createAccessRule(input: typeof accessRules.$inferInsert) {
@@ -210,3 +210,79 @@ export async function deleteBlacklist(ownerId: number, id: number) {
   await db.delete(blacklists).where(and(eq(blacklists.id, id), eq(blacklists.ownerId, ownerId)));
 }
 
+
+export async function getUserByDiscordUserId(discordUserId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(users).where(eq(users.discordUserId, discordUserId)).limit(1);
+  return rows[0];
+}
+
+export async function getKeyManagerRoleId(ownerId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(accessRules).where(and(eq(accessRules.ownerId, ownerId), eq(accessRules.kind, "role"), eq(accessRules.label, "__key_manager__"))).limit(1);
+  return rows[0]?.discordId;
+}
+
+export async function setKeyManagerRole(ownerId: number, discordRoleId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.delete(accessRules).where(and(eq(accessRules.ownerId, ownerId), eq(accessRules.kind, "role"), eq(accessRules.label, "__key_manager__")));
+  await db.insert(accessRules).values({ ownerId, kind: "role", discordId: discordRoleId, label: "__key_manager__", active: 1 });
+  return discordRoleId;
+}
+
+export async function redeemLicense(keyCode: string, discordUserId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const rows = await db.select().from(licenses).where(eq(licenses.keyCode, keyCode)).limit(1);
+  const license = rows[0];
+  if (!license || license.status !== "active" || (license.expiresAt && license.expiresAt.getTime() <= Date.now())) return undefined;
+  if (license.discordUserId && license.discordUserId !== discordUserId) return undefined;
+  await db.update(licenses).set({ discordUserId }).where(eq(licenses.id, license.id));
+  return { ...license, discordUserId };
+}
+
+export async function deleteLicenseByKeyCode(ownerId: number, keyCode: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const result = await db.delete(licenses).where(and(eq(licenses.ownerId, ownerId), eq(licenses.keyCode, keyCode)));
+  return Number(result[0]?.affectedRows ?? 0) > 0;
+}
+
+export async function resetLicenseHwidByDiscordUserId(discordUserId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(licenses).set({ hwid: null }).where(eq(licenses.discordUserId, discordUserId));
+}
+
+export async function getHostedScriptSourceByUser(userId: number, id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select({ id: hostedScripts.id, name: hostedScripts.name, code: hostedScripts.code, sourceCode: hostedScripts.sourceCode }).from(hostedScripts).where(and(eq(hostedScripts.id, id), eq(hostedScripts.userId, userId))).limit(1);
+  const row = rows[0];
+  return row ? { ...row, code: row.sourceCode ?? row.code } : undefined;
+}
+
+export async function deleteAccessRuleByDiscordId(ownerId: number, discordId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const result = await db.delete(accessRules).where(and(eq(accessRules.ownerId, ownerId), eq(accessRules.discordId, discordId), ne(accessRules.label, "__key_manager__")));
+  return Number(result[0]?.affectedRows ?? 0) > 0;
+}
+
+export async function createKeyAuditLog(input: { ownerId: number; actorDiscordId: string; action: "generate" | "delete"; keyCode: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.insert(keyAuditLogs).values(input);
+}
+
+export async function createAccessRuleIfAbsent(input: { ownerId: number; kind: "user" | "role"; discordId: string; label?: string | null }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const existing = await db.select().from(accessRules).where(and(eq(accessRules.ownerId, input.ownerId), eq(accessRules.kind, input.kind), eq(accessRules.discordId, input.discordId), eq(accessRules.active, 1))).limit(1);
+  if (existing[0]) return { added: 0, alreadyWhitelisted: 1, failed: 0 };
+  await db.insert(accessRules).values({ ownerId: input.ownerId, kind: input.kind, discordId: input.discordId, label: input.label ?? null, active: 1 });
+  return { added: 1, alreadyWhitelisted: 0, failed: 0 };
+}

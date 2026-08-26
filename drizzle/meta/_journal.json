@@ -50,6 +50,20 @@
       "when": 1787712954506,
       "tag": "0006_last_vertigo",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1787715722271,
+      "tag": "0007_brave_khan",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1787715776935,
+      "tag": "0008_white_strong_guy",
+      "breakpoints": true
     }
   ]
 }

@@ -94,3 +94,21 @@
 - [x] Crear prueba específica de Setup para persistencia local y updateChannel
 
 - [x] Añadir prueba frontend o helper de Setup para localStorage, estado visible y updateChannel con ID válido o null
+
+- [x] Replicar la división visual del /panel del video con botones View Script, Redeem Key, Stats, Get Buyer Role y Reset HWID
+- [x] Implementar todos los comandos slash del bot como acciones funcionales y autorizadas
+- [x] Permitir cargar scripts Lua desde archivos además de pegar source
+- [x] Restringir la consulta de source a la cuenta propietaria y mantener endpoints públicos sin source visible
+- [x] Añadir pruebas de permisos, acciones Discord, carga de archivos y privacidad de source
+- [x] Verificar responsive y regresiones del hosting, licencias, blacklist, whitelist y Setup
+
+- [x] Mantener la source visible solo desde la web privada del propietario; retirar cualquier propuesta de /viewscript en Discord
+- [x] Rediseñar /panel con mensaje explicativo y botones Redeem Key, Get Script, Get Role, Reset HWID y Get Stats según la referencia
+- [x] Añadir /generatekeyrol para configurar el rol autorizado a generar y eliminar keys
+- [x] Permitir que el rol configurado ejecute generación y eliminación de keys con auditoría y límites
+- [x] Responder el flujo whitelist con embed de resumen, conteos y canal de acceso como en la referencia
+
+- [x] Persistir la source original separada del artefacto protegido y exponerla solo al propietario autenticado
+- [x] Añadir pruebas owner-only para hostedScripts.source, autenticación y comandos slash
+- [x] Implementar auditoría y límites reales para generación/eliminación de keys por rol delegado
+- [x] Calcular conteos reales de whitelist y manejar duplicados y fallos

@@ -4,12 +4,14 @@ import type { TrpcContext } from "./_core/context";
 const mocks = vi.hoisted(() => ({
   createHostedScript: vi.fn(),
   getHostedScriptsByUser: vi.fn(),
+  getHostedScriptSourceByUser: vi.fn(),
   buildProtectionArtifact: vi.fn(() => ({ code: "-- protected artifact", status: "protected", checksum: "abc123", message: "OK" })),
 }));
 
 vi.mock("./db", () => ({
   createHostedScript: mocks.createHostedScript,
   getHostedScriptsByUser: mocks.getHostedScriptsByUser,
+  getHostedScriptSourceByUser: mocks.getHostedScriptSourceByUser,
   createProtection: vi.fn(),
   getProtectionsByUser: vi.fn(),
   updateDiscordChannelId: vi.fn(),
@@ -19,11 +21,11 @@ vi.mock("./protection", () => ({ getProviderStatus: vi.fn(() => ({ configured: t
 import { appRouter } from "./routers";
 
 const user = { id: 12, openId: "host-user", name: "Host User", email: "host@example.com", loginMethod: "manus", role: "user" as const, discordChannelId: null, discordUserId: null, discordUsername: null, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() };
-function context(withUser = true): TrpcContext {
-  return { user: withUser ? user : null, req: { protocol: "https", get: () => "vanta.test", headers: {} } as TrpcContext["req"], res: {} as TrpcContext["res"] };
+function context(withUser = true, currentUser = user): TrpcContext {
+  return { user: withUser ? currentUser : null, req: { protocol: "https", get: () => "vanta.test", headers: {} } as TrpcContext["req"], res: {} as TrpcContext["res"] };
 }
 
-const hostedRow = { id: 3, userId: 12, slug: "Abc123456789xyz", name: "demo.lua", description: "demo", ffaMode: 1, code: "-- protected artifact", createdAt: new Date("2026-08-26T00:00:00Z"), updatedAt: new Date("2026-08-26T00:00:00Z") };
+const hostedRow = { id: 3, userId: 12, slug: "Abc123456789xyz", name: "demo.lua", description: "demo", ffaMode: 1, code: "-- protected artifact", sourceCode: "print('ok')", createdAt: new Date("2026-08-26T00:00:00Z"), updatedAt: new Date("2026-08-26T00:00:00Z") };
 
 describe("hostedScripts router", () => {
   it("creates a hosted script and returns a stable URL and loader", async () => {
@@ -31,7 +33,7 @@ describe("hostedScripts router", () => {
     const result = await appRouter.createCaller(context()).hostedScripts.create({ name: "demo.lua", description: "demo", source: "print('ok')", ffaMode: true, obfuscateSource: true });
     expect(result.url).toBe("https://vanta.test/scripts/hosted/Abc123456789xyz");
     expect(result.loader).toContain("loadstring(game:HttpGet(\"https://vanta.test/scripts/hosted/Abc123456789xyz\"))()");
-    expect(mocks.createHostedScript).toHaveBeenCalledWith(expect.objectContaining({ userId: 12, name: "demo.lua", ffaMode: 1, code: "-- protected artifact" }));
+    expect(mocks.createHostedScript).toHaveBeenCalledWith(expect.objectContaining({ userId: 12, name: "demo.lua", ffaMode: 1, code: "-- protected artifact", sourceCode: "print('ok')" }));
   });
 
   it("lists only the authenticated user's hosted scripts", async () => {
@@ -42,9 +44,24 @@ describe("hostedScripts router", () => {
     expect(result[0]?.loader).toContain("/scripts/hosted/");
   });
 
-  it("rejects unauthenticated creation and listing", async () => {
+  it("returns original source only through the authenticated owner procedure", async () => {
+    mocks.getHostedScriptSourceByUser.mockResolvedValue({ id: 3, name: "demo.lua", code: "print('original')" });
+    const result = await appRouter.createCaller(context()).hostedScripts.source({ id: 3 });
+    expect(result.code).toBe("print('original')");
+    expect(mocks.getHostedScriptSourceByUser).toHaveBeenCalledWith(12, 3);
+  });
+
+  it("rejects an authenticated non-owner from reading source", async () => {
+    mocks.getHostedScriptSourceByUser.mockResolvedValue(undefined);
+    const otherUser = { ...user, id: 99, openId: "other-user" };
+    await expect(appRouter.createCaller(context(true, otherUser)).hostedScripts.source({ id: 3 })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(mocks.getHostedScriptSourceByUser).toHaveBeenCalledWith(99, 3);
+  });
+
+  it("rejects unauthenticated creation, listing and source access", async () => {
     const caller = appRouter.createCaller(context(false));
     await expect(caller.hostedScripts.list()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.hostedScripts.create({ name: "demo.lua", source: "return true", ffaMode: false, obfuscateSource: true })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.hostedScripts.source({ id: 3 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 });

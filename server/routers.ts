@@ -5,7 +5,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { notifyOwner } from "./_core/notification";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createAccessRule, createBlacklist, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getHostedScriptsByUser, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, updateDiscordChannelId } from "./db";
+import { createAccessRule, createBlacklist, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getHostedScriptSourceByUser, getHostedScriptsByUser, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, updateDiscordChannelId } from "./db";
 import { nanoid } from "nanoid";
 import { randomInt } from "node:crypto";
 import { getDiscordBotIdentity, sendDiscordChannelMessage } from "./discord";
@@ -91,6 +91,11 @@ export const appRouter = router({
         scriptKey: row.scriptKey,
       }));
     }),
+    source: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      const row = await getHostedScriptSourceByUser(ctx.user.id, input.id);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Script no encontrado." });
+      return row;
+    }),
     create: protectedProcedure.input(hostedScriptInput).mutation(async ({ ctx, input }) => {
       const artifact = await protectWithAdapter(input.source, {
         mode: "balanced",
@@ -106,6 +111,7 @@ export const appRouter = router({
         ffaMode: input.ffaMode ? 1 : 0,
         scriptKey: input.scriptKey || null,
         code: artifact.code,
+        sourceCode: input.source,
       });
       if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No se pudo alojar el script." });
       const origin = `${ctx.req.protocol}://${ctx.req.get("host")}`;
