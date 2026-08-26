@@ -249,7 +249,7 @@
 - [ ] Añadir pruebas de opciones y persistencia de whitelist por usuario/rol seleccionado
 
 - [ ] Vincular de forma segura la cuenta Discord del propietario como owner, sin inventar ni hardcodear un ID
-- [ ] Añadir apartado privado Generate / Manage para crear keys Free, Pro y Premium
+- [x] Añadir apartado privado Generate / Manage para crear keys Free, Pro y Premium
 - [ ] Aplicar cuotas reales de obfuscaciones, scripts y keys por plan
 - [ ] Mostrar duración, cantidad, plan y resultado de las keys generadas
 - [ ] Añadir pruebas de autorización, cuotas y generación de keys por plan

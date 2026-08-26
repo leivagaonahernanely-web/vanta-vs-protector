@@ -17,6 +17,7 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  plan: mysqlEnum("plan", ["free", "pro", "premium"]).default("free").notNull(),
   discordChannelId: varchar("discordChannelId", { length: 32 }),
   discordUserId: varchar("discordUserId", { length: 32 }),
   discordUsername: varchar("discordUsername", { length: 128 }),
@@ -69,6 +70,7 @@ export type InsertHostedScript = typeof hostedScripts.$inferInsert;
 export const licenses = mysqlTable("licenses", {
   id: int("id").autoincrement().primaryKey(),
   ownerId: int("ownerId").notNull().references(() => users.id),
+  plan: mysqlEnum("plan", ["free", "pro", "premium"]).default("free").notNull(),
   hostedScriptId: int("hostedScriptId").references(() => hostedScripts.id),
   keyCode: varchar("keyCode", { length: 10 }).notNull().unique(),
   type: mysqlEnum("type", ["trial", "license"]).default("license").notNull(),

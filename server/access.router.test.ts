@@ -19,7 +19,7 @@ vi.mock("./db", async () => {
   return { ...actual, ...dbMocks };
 });
 
-const user = { id: 7, openId: "access-user", name: "Owner", email: "owner@example.com", loginMethod: "manus", role: "user" as const, discordChannelId: null, discordUserId: null, discordUsername: null, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() };
+const user = { id: 7, openId: "access-user", name: "Owner", email: "owner@example.com", loginMethod: "manus", role: "admin" as const, discordChannelId: null, discordUserId: null, discordUsername: null, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() };
 const context = { user, req: { protocol: "https", headers: {}, get: () => "vanta.test" } as TrpcContext["req"], res: {} as TrpcContext["res"] };
 
 beforeEach(() => vi.clearAllMocks());
@@ -32,9 +32,14 @@ describe("access management", () => {
     expect(dbMocks.createLicense).toHaveBeenCalledWith(expect.objectContaining({ ownerId: 7, type: "license", status: "active", keyCode: expect.stringMatching(/^\d{10}$/) }));
   });
 
+  it("rejects non-admin key generation", async () => {
+    const regularUser = { ...user, role: "user" as const };
+    await expect(appRouter.createCaller({ ...context, user: regularUser }).licenseKeys.generate({ type: "license", plan: "free", trialDays: 3 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
   it("requires authentication for license management", async () => {
     const unauthenticated = { ...context, user: null } as unknown as TrpcContext;
-    await expect(appRouter.createCaller(unauthenticated).licenseKeys.generate({ type: "license", trialDays: 3 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(appRouter.createCaller(unauthenticated).licenseKeys.generate({ type: "license", plan: "free", trialDays: 3 })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("resets HWID, revokes, and deletes only through owner-scoped mutations", async () => {

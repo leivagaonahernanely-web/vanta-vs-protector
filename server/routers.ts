@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { notifyOwner } from "./_core/notification";
 import { systemRouter } from "./_core/systemRouter";
-import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { createAccessRule, createBlacklist, createDiscordPanel, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getDiscordPanelsByOwner, getHostedScriptSourceByUser, getHostedScriptsByUser, getHostedScriptById, updateHostedScript, deleteHostedScript, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, updateDiscordChannelId } from "./db";
 import { nanoid } from "nanoid";
 import { randomInt } from "node:crypto";
@@ -31,6 +31,7 @@ function buildRuntimeLoader(url: string, scriptKey?: string | null, ffaMode = fa
 
 const licenseInput = z.object({
   type: z.literal("license").default("license"),
+  plan: z.enum(["free", "pro", "premium"]).default("free"),
   hostedScriptId: z.number().int().positive().optional(),
   discordUserId: z.string().regex(/^\d{15,22}$/).optional(),
   trialDays: z.number().int().min(1).max(3650).default(3),
@@ -160,10 +161,10 @@ export const appRouter = router({
 
   licenseKeys: router({
     list: protectedProcedure.query(({ ctx }) => getLicensesByOwner(ctx.user.id)),
-    generate: protectedProcedure.input(licenseInput).mutation(async ({ ctx, input }) => {
+    generate: adminProcedure.input(licenseInput).mutation(async ({ ctx, input }) => {
       const durationDays = input.durationValue ? durationToDays(input.durationValue, input.durationUnit as DurationUnit) : undefined;
       const expiresAt = durationDays ? new Date(Date.now() + durationDays * 86_400_000) : null;
-      const row = await createLicense({ ownerId: ctx.user.id, hostedScriptId: input.hostedScriptId ?? null, keyCode: generateKeyCode(), type: input.type, status: "active", discordUserId: input.discordUserId ?? null, hwid: null, expiresAt });
+      const row = await createLicense({ ownerId: ctx.user.id, plan: input.plan, hostedScriptId: input.hostedScriptId ?? null, keyCode: generateKeyCode(), type: input.type, status: "active", discordUserId: input.discordUserId ?? null, hwid: null, expiresAt });
       if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No se pudo generar la licencia." });
       return row;
     }),
