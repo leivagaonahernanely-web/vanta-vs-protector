@@ -100,13 +100,16 @@ function memberHasRole(interaction: ButtonInteraction | any, roleId: string | un
 export function hasKeyManagementAccess(input: { actorId: string; ownerId?: string | null; isAdministrator: boolean; hasManagerRole: boolean }) {
   return Boolean(input.ownerId && (input.actorId === input.ownerId || input.isAdministrator || input.hasManagerRole));
 }
+export function isGuildOwner(input: { actorId: string; guildOwnerId?: string | null }) {
+  return Boolean(input.guildOwnerId && input.actorId === input.guildOwnerId);
+}
 async function ownerAccount() { return ENV.ownerOpenId ? getUserByOpenId(ENV.ownerOpenId) : undefined; }
 async function canManageKeys(interaction: any) {
   const owner = await ownerAccount();
   if (!owner) return { allowed: false, owner: undefined };
   const managerRole = await getKeyManagerRoleId(owner.id);
-  const isGuildOwner = Boolean(interaction.guild?.ownerId && interaction.guild.ownerId === interaction.user.id);
-  return { allowed: isGuildOwner || hasKeyManagementAccess({ actorId: interaction.user.id, ownerId: owner.discordUserId, isAdministrator: Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)), hasManagerRole: memberHasRole(interaction, managerRole) }), owner };
+  const actorIsGuildOwner = isGuildOwner({ actorId: interaction.user.id, guildOwnerId: interaction.guild?.ownerId });
+  return { allowed: actorIsGuildOwner || hasKeyManagementAccess({ actorId: interaction.user.id, ownerId: owner.discordUserId, isAdministrator: Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)), hasManagerRole: memberHasRole(interaction, managerRole) }), owner };
 }
 export async function respond(interaction: any, payload: any) {
   const target = interaction as object;

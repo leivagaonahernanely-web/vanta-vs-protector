@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createReconnectGate, discordCommands, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, panelMessage, parseDuration, respond, scriptRuntimeLoader, targetChoices } from "./discordBot";
+import { createReconnectGate, discordCommands, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, isGuildOwner, panelMessage, parseDuration, respond, scriptRuntimeLoader, targetChoices } from "./discordBot";
 
 describe("Discord access panel", () => {
   it("parses key durations in days, months and years", () => {
@@ -135,6 +135,12 @@ describe("Discord access panel", () => {
     const make = (kind: string, focused: string) => ({ guildId: "guild", options: { getString: () => kind, getFocused: () => focused }, guild: { members: { cache: members }, roles: { cache: roles } } });
     expect(targetChoices(make("user", "hern"))).toEqual([{ name: "Usuario · Hernán", value: "user:u1" }]);
     expect(targetChoices(make("role", "prem"))).toEqual([{ name: "Rol · Premium", value: "role:r1" }]);
+  });
+
+  it("recognizes the Discord guild owner independently from the linked database identity", () => {
+    expect(isGuildOwner({ actorId: "guild-owner", guildOwnerId: "guild-owner" })).toBe(true);
+    expect(isGuildOwner({ actorId: "other-user", guildOwnerId: "guild-owner" })).toBe(false);
+    expect(isGuildOwner({ actorId: "guild-owner", guildOwnerId: null })).toBe(false);
   });
 
   it("allows key management only to the owner, an administrator or the configured role", () => {

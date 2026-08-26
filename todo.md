@@ -278,7 +278,7 @@
 - [ ] Rediseñar visualmente Planes, Prices y Generate / Manage con una experiencia compacta y profesional inspirada en herramientas de protección Lua
 - [ ] Añadir pruebas de visibilidad owner-only, gestión de logs y flujo automático de subida
 
-- [ ] Corregir el rechazo `No tienes permiso para hacer un drop` para la cuenta owner vinculada
+- [x] Corregir el rechazo `No tienes permiso para hacer un drop` para la cuenta owner vinculada
 - [x] Permitir descarga directa de source únicamente al owner y mantener loader protegido para los demás
 - [ ] Añadir pruebas de autorización de dropkey y descarga privada de source
 
