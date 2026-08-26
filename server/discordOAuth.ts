@@ -78,7 +78,14 @@ export function registerDiscordOAuthRoutes(app: Express) {
         body: new URLSearchParams({ client_id: ENV.vantaClientId, client_secret: ENV.vantaClientSecret, grant_type: "authorization_code", code, redirect_uri: state.redirectUri }),
         signal: AbortSignal.timeout(8_000),
       });
-      if (!tokenResponse.ok) throw new Error("Discord token exchange failed");
+      if (!tokenResponse.ok) {
+        const errorBody = await tokenResponse.text().catch(() => "");
+        console.error("[Discord OAuth] Token exchange rejected", { status: tokenResponse.status, redirectUri: state.redirectUri, body: errorBody.slice(0, 500) });
+        if (tokenResponse.status === 400 && /redirect_uri|redirect uri|invalid_request/i.test(errorBody)) {
+          throw new Error(`Discord rechazó el redirect URI. Registra exactamente: ${state.redirectUri}`);
+        }
+        throw new Error("Discord token exchange failed");
+      }
       const token = await tokenResponse.json() as DiscordTokenResponse;
       if (!token.access_token) throw new Error("Discord access token missing");
 
@@ -101,7 +108,8 @@ export function registerDiscordOAuthRoutes(app: Express) {
       res.redirect("/?discord=connected");
     } catch (error) {
       console.error("[Discord OAuth] Callback failed", error);
-      res.status(502).json({ error: "No se pudo conectar Discord." });
+      const message = error instanceof Error ? error.message : "No se pudo conectar Discord.";
+      res.status(502).json({ error: message });
     }
   });
 }

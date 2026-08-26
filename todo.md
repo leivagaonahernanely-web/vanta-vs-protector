@@ -285,3 +285,12 @@
 - [x] Mostrar en cada script acciones visibles para editar source, subir nueva versión, eliminar, ver loader y consultar logs
 - [x] Mantener la misma URL del loadstring al reemplazar su source y evitar duplicados
 - [ ] Añadir pruebas de render móvil y de las acciones visibles de Scripts
+
+- [ ] Alinear el redirect URI de Discord OAuth con el dominio publicado `vanta-prot-hfw5hmym.manus.space`
+- [x] Verificar el callback `/api/discord/callback` y mostrar un error accionable si Discord no tiene registrada la URL exacta
+- [x] Confirmar con pruebas que sin key el modo protegido rechaza la ejecución y FFA exige `key=trial`
+
+- [ ] Revisar el flujo OAuth del dominio publicado y dejar instrucciones de redirect URI exactas
+- [ ] Mantener la regla de una key protegida por un único HWID y rechazar dispositivos distintos
+- [ ] Completar el owner-only explícito cuando la cuenta Discord quede vinculada
+- [ ] Pulir visualmente los paneles de planes, precios y generación de keys
