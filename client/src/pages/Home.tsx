@@ -187,7 +187,7 @@ export default function Home(props: any = {}) {
       <nav className="side-nav">
         {(["Workspace", "Protection", "Panels", "Settings"] as const).map((group) => <div key={group}>
           <p className="nav-label">{group}</p>
-          {dashboardNavItems.filter((item) => item.group === group && (user?.role === "admin" || (item.label !== "License keys" && item.label !== "Logs"))).map((item) => <button key={item.label} className={active === item.label ? "active" : ""} onClick={() => selectNav(item.label)}>{navIcon(item.icon)} {item.label === "License keys" ? "Generate / Manage" : item.label}{item.badge === "scripts" && <span className="nav-badge">{scripts.length}</span>}</button>)}
+          {dashboardNavItems.filter((item) => item.group === group && (user?.isOwner === true || (item.label !== "License keys" && item.label !== "Logs"))).map((item) => <button key={item.label} className={active === item.label ? "active" : ""} onClick={() => selectNav(item.label)}>{navIcon(item.icon)} {item.label === "License keys" ? "Generate / Manage" : item.label}{item.badge === "scripts" && <span className="nav-badge">{scripts.length}</span>}</button>)}
         </div>)}
         <button onClick={connectDiscord}><Link2 size={16} /> {user?.discordUsername ? "Discord conectado" : "Conectar Discord"}</button>
       </nav>

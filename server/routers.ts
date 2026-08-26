@@ -99,7 +99,10 @@ export const appRouter = router({
     publishUpdates: protectedProcedure.input(z.object({ title: z.string().trim().min(1).max(120), description: z.string().trim().min(1).max(4000), channelId: z.string().regex(/^\\d{15,22}$/).optional() })).mutation(async ({ ctx, input }) => { const channelId = input.channelId ?? ctx.user.discordChannelId; if (!channelId) throw new TRPCError({ code: "BAD_REQUEST", message: "Configura primero un canal Discord en Setup." }); const check = await checkDiscordChannel(channelId); if (!check.ok) throw new TRPCError({ code: "BAD_REQUEST", message: check.message }); return publishUpdatesMessage(channelId, { title: input.title, description: input.description }); }),
   }),
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query(opts => {
+      const user = opts.ctx.user;
+      return user ? { ...user, isOwner: Boolean(ENV.ownerOpenId && user.openId === ENV.ownerOpenId && user.role === "admin") } : user;
+    }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
