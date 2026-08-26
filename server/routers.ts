@@ -23,9 +23,10 @@ const hostedScriptInput = z.object({
 });
 
 function buildRuntimeLoader(url: string, scriptKey?: string | null, ffaMode = false) {
-  const accessUrl = !ffaMode && scriptKey ? `${url}?key=${encodeURIComponent(scriptKey)}` : url;
+  const runtimeKey = ffaMode ? "trial" : scriptKey;
+  const accessUrl = runtimeKey ? `${url}?key=${encodeURIComponent(runtimeKey)}` : url;
   const load = `loadstring(game:HttpGet(\"${accessUrl}\"))()`;
-  return !ffaMode && scriptKey ? `script_key = \"${scriptKey}\"\n${load}` : load;
+  return runtimeKey ? `script_key = \"${runtimeKey}\"\n${load}` : `${load} -- requiere key automática`;
 }
 
 const licenseInput = z.object({
