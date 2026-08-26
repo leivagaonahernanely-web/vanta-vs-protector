@@ -53,10 +53,12 @@ describe("Home authenticated dashboard render", () => {
   it("renders the Prices editor and submits its structured payload through tRPC", () => {
     render(<Home initialSection="Prices" />);
     fireEvent.change(screen.getByPlaceholderText("Nombre de tu script o marca"), { target: { value: "Vanta.vs APP" } });
-    fireEvent.change(screen.getByPlaceholderText("Ej. Duels Script"), { target: { value: "Duels Script" } });
-    fireEvent.change(screen.getByPlaceholderText("Una línea por plan o método de pago..."), { target: { value: "$7 USD" } });
+    fireEvent.change(screen.getAllByPlaceholderText("Ej. Duels Script")[0], { target: { value: "Duels Script" } });
+    fireEvent.change(screen.getAllByPlaceholderText("Una línea por plan o método de pago...")[0], { target: { value: "$7 USD" } });
     fireEvent.click(screen.getByRole("button", { name: /Publicar Prices/i }));
-    expect(pricesMutate).toHaveBeenCalledWith({ title: "Vanta.vs APP", description: "**Duels Script**\n$7 USD" });
+    expect(pricesMutate).toHaveBeenCalledWith(expect.objectContaining({ title: "Vanta.vs APP" }));
+    expect(pricesMutate.mock.calls[0][0].description).toContain("**Duels Script**\n$7 USD");
+    expect(pricesMutate.mock.calls[0][0].description).toContain("**Premium Plan**");
   });
 
   it("renders the Updates editor and submits its title and content through tRPC", () => {

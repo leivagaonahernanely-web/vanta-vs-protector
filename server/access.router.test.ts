@@ -25,16 +25,16 @@ const context = { user, req: { protocol: "https", headers: {}, get: () => "vanta
 beforeEach(() => vi.clearAllMocks());
 
 describe("access management", () => {
-  it("generates a ten digit trial key", async () => {
-    dbMocks.createLicense.mockResolvedValue({ id: 1, ownerId: 7, keyCode: "1234567890", type: "trial", status: "active", hostedScriptId: null, discordUserId: null, hwid: null, expiresAt: new Date(), createdAt: new Date(), updatedAt: new Date() });
-    const result = await appRouter.createCaller(context).licenseKeys.generate({ type: "trial", trialDays: 3 });
+  it("generates a ten digit automatic license key", async () => {
+    dbMocks.createLicense.mockResolvedValue({ id: 1, ownerId: 7, keyCode: "1234567890", type: "license", status: "active", hostedScriptId: null, discordUserId: null, hwid: null, expiresAt: new Date(), createdAt: new Date(), updatedAt: new Date() });
+    const result = await appRouter.createCaller(context).licenseKeys.generate({ type: "license", trialDays: 3 });
     expect(result.keyCode).toMatch(/^\d{10}$/);
-    expect(dbMocks.createLicense).toHaveBeenCalledWith(expect.objectContaining({ ownerId: 7, type: "trial", status: "active", keyCode: expect.stringMatching(/^\d{10}$/) }));
+    expect(dbMocks.createLicense).toHaveBeenCalledWith(expect.objectContaining({ ownerId: 7, type: "license", status: "active", keyCode: expect.stringMatching(/^\d{10}$/) }));
   });
 
   it("requires authentication for license management", async () => {
     const unauthenticated = { ...context, user: null } as unknown as TrpcContext;
-    await expect(appRouter.createCaller(unauthenticated).licenseKeys.generate({ type: "trial", trialDays: 3 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(appRouter.createCaller(unauthenticated).licenseKeys.generate({ type: "license", trialDays: 3 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 
   it("resets HWID, revokes, and deletes only through owner-scoped mutations", async () => {

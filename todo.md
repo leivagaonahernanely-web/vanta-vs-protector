@@ -232,3 +232,37 @@
 - [x] Diagnosticar por qué checkDiscordChannel termina en error de contacto con Discord
 - [x] Diferenciar timeout, fallo de red, token ausente y respuestas HTTP en el mensaje de Setup
 - [x] Añadir reintento controlado y pruebas del fallo de contacto sin propagar un error genérico
+
+- [x] Crear catálogo Prices con planes Free, Pro y Premium y límites de obfuscaciones, scripts y keys
+- [x] Mostrar los planes en un embed/panel visual claro y configurable
+- [x] Auditar por qué /panel no funciona como el flujo del video
+- [x] Corregir botones Redeem Key, Get Script, Get Role, Reset HWID y Get Stats de /panel
+- [x] Añadir pruebas de límites del catálogo y de interacciones completas de /panel
+
+- [ ] Comparar el video de /panel con el embed y botones actualmente publicados
+- [ ] Ajustar el diseño de /panel al formato visual del video, sin títulos fijos ni redirecciones a la web
+- [ ] Hacer que Get Script entregue directamente el loader y la key del usuario autorizado
+- [ ] Verificar con pruebas que las cinco acciones del panel responden una sola vez y con datos reales
+
+- [ ] Corregir /whitelabel para usar selector nativo de usuario o rol según el tipo elegido
+- [ ] Quitar el ID manual y cargar opciones válidas del guild actual
+- [ ] Añadir pruebas de opciones y persistencia de whitelist por usuario/rol seleccionado
+
+- [ ] Vincular de forma segura la cuenta Discord del propietario como owner, sin inventar ni hardcodear un ID
+- [ ] Añadir apartado privado Generate / Manage para crear keys Free, Pro y Premium
+- [ ] Aplicar cuotas reales de obfuscaciones, scripts y keys por plan
+- [ ] Mostrar duración, cantidad, plan y resultado de las keys generadas
+- [ ] Añadir pruebas de autorización, cuotas y generación de keys por plan
+
+- [x] Permitir editar la source privada de un script alojado
+- [x] Permitir eliminar scripts y reemplazar/publicar una nueva versión
+- [x] Reparar la subida de archivos Lua desde el dashboard con validación visible
+- [x] Verificar que el loader público siempre sirva la versión actual sin exponer la source
+- [ ] Hacer que el modo protegido rechace accesos sin key automática válida
+- [x] Mostrar `script_key = "trial"` únicamente para el trial global cuando corresponda
+- [ ] Confirmar y documentar el formato final de keys automáticas antes de cambiarlo
+
+- [x] Tratar FFA como trial global y generar automáticamente `script_key = "trial"` para el loader de scripts en modo trial
+- [x] Impedir que se creen o escriban keys trial manuales
+- [ ] Hacer que el modo protegido rechace cualquier ejecución sin key automática activa, vinculada al script y validada por HWID
+- [x] Mantener el formulario de generación sin campo editable de dígitos; el servidor debe generar la key

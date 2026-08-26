@@ -27,12 +27,21 @@ function responseMock() {
 const script = { id: 1, slug: "scriptSlug123456789", name: "demo.lua", code: "return true", ffaMode: 1, scriptKey: null };
 
 describe("public hosted scripts", () => {
-  it("renders a branded loader page without source for browsers", async () => {
+  it("requires the global trial token for FFA scripts", async () => {
     findMock.mockResolvedValue(script);
     const response = responseMock();
-    await getHandler()({ params: { slug: script.slug }, headers: { accept: "text/html" }, protocol: "https", get: () => "vanta.test" }, response);
+    await getHandler()({ params: { slug: script.slug }, query: {}, headers: { accept: "*/*" }, protocol: "https", get: () => "vanta.test" }, response);
+    expect(response.statusCode).toBe(403);
+    expect(response.body).toContain("TRIAL GLOBAL");
+  });
+
+  it("renders the FFA loader with the global trial key without source", async () => {
+    findMock.mockResolvedValue(script);
+    const response = responseMock();
+    await getHandler()({ params: { slug: script.slug }, query: { key: "trial" }, headers: { accept: "text/html" }, protocol: "https", get: () => "vanta.test" }, response);
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("This script can't be viewed in a browser");
+    expect(response.body).toContain("script_key = &quot;trial&quot;");
     expect(response.body).toContain("loadstring(game:HttpGet");
     expect(response.body).not.toContain("return true");
   });
@@ -55,10 +64,10 @@ describe("public hosted scripts", () => {
     expect(response.body).toBe("return true");
   });
 
-  it("serves only the protected artifact to non-browser runtime clients", async () => {
+  it("serves only the FFA artifact to non-browser runtime clients with trial", async () => {
     findMock.mockResolvedValue(script);
     const response = responseMock();
-    await getHandler()({ params: { slug: script.slug }, headers: { accept: "*/*" }, protocol: "https", get: () => "vanta.test" }, response);
+    await getHandler()({ params: { slug: script.slug }, query: { key: "trial" }, headers: { accept: "*/*" }, protocol: "https", get: () => "vanta.test" }, response);
     expect(response.body).toBe("return true");
     expect(response.body).not.toContain("loadstring(game:HttpGet");
   });

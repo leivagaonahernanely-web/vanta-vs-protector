@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createReconnectGate, discordCommands, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, panelMessage, parseDuration, respond } from "./discordBot";
+import { createReconnectGate, discordCommands, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, panelMessage, parseDuration, respond, scriptRuntimeLoader, targetChoices } from "./discordBot";
 
 describe("Discord access panel", () => {
   it("parses key durations in days, months and years", () => {
@@ -8,6 +8,15 @@ describe("Discord access panel", () => {
     expect(parseDuration("1year")).toBe(31_536_000_000);
     expect(parseDuration("forever")).toBeUndefined();
   });
+  it("builds FFA and protected runtime loaders according to the panel access rule", () => {
+    const ffa = scriptRuntimeLoader({ slug: "ffa-script", ffaMode: true, scriptKey: "1234567890" });
+    const protectedLoader = scriptRuntimeLoader({ slug: "protected-script", ffaMode: false, scriptKey: "1234567890" });
+    expect(ffa).not.toContain("script_key");
+    expect(ffa).toContain("/scripts/hosted/ffa-script");
+    expect(protectedLoader).toContain('script_key = "1234567890"');
+    expect(protectedLoader).toContain("?key=1234567890");
+  });
+
   it("builds the requested two-row action layout", () => {
     const message = panelMessage();
     const ids = message.components.flatMap((row: any) => row.components.map((button: any) => button.data.custom_id));
@@ -81,7 +90,7 @@ describe("Discord access panel", () => {
 
   it("registers slash commands for every panel action", () => {
     const names = discordCommands.map((command: any) => command.name);
-    expect(names).toEqual(["ping", "panel", "stats", "getscript", "getrole", "redeem", "generatekey", "deletekey", "whitelist", "unwhitelist", "blacklist", "resethwid", "addtime", "warn", "dropkey", "prices", "updates", "generatekeyrol"]);
+    expect(names).toEqual(["ping", "panel", "stats", "getscript", "getrole", "redeem", "generatekey", "deletekey", "whitelabel", "unwhitelist", "blacklist", "resethwid", "addtime", "warn", "dropkey", "prices", "updates", "generatekeyrol"]);
     expect(new Set(names).size).toBe(names.length);
     expect(names).toContain("getscript");
     expect(names).toContain("getrole");
@@ -97,6 +106,10 @@ describe("Discord access panel", () => {
     expect(options("generatekey").find((item: any) => item.name === "duration").required).toBe(false);
     expect(options("deletekey").find((item: any) => item.name === "key").required).toBe(true);
     expect(options("deletekey").find((item: any) => item.name === "user").required).toBe(false);
+    expect(options("whitelabel").find((item: any) => item.name === "kind").required).toBe(true);
+    expect(options("whitelabel").find((item: any) => item.name === "target").required).toBe(true);
+    expect(options("whitelabel").find((item: any) => item.name === "target").autocomplete).toBe(true);
+    expect(options("unwhitelist").find((item: any) => item.name === "target").autocomplete).toBe(true);
     expect(options("blacklist").find((item: any) => item.name === "script").required).toBe(true);
     expect(options("blacklist").find((item: any) => item.name === "user").required).toBe(true);
     expect(options("resethwid").find((item: any) => item.name === "script").required).toBe(true);
@@ -104,6 +117,20 @@ describe("Discord access panel", () => {
     expect(options("addtime").every((item: any) => item.required)).toBe(true);
     expect(options("warn").every((item: any) => item.required)).toBe(true);
     expect(options("dropkey").find((item: any) => item.name === "amount").required).toBe(true);
+  });
+
+  it("autocompletes guild users and roles based on the selected kind", () => {
+    const members = new Map([
+      ["u1", { user: { id: "u1", username: "hernan" }, displayName: "Hernán" }],
+      ["u2", { user: { id: "u2", username: "other" }, displayName: "Other" }],
+    ]);
+    const roles = new Map([
+      ["r1", { id: "r1", name: "Premium" }],
+      ["r2", { id: "r2", name: "Staff" }],
+    ]);
+    const make = (kind: string, focused: string) => ({ guildId: "guild", options: { getString: () => kind, getFocused: () => focused }, guild: { members: { cache: members }, roles: { cache: roles } } });
+    expect(targetChoices(make("user", "hern"))).toEqual([{ name: "Usuario · Hernán", value: "user:u1" }]);
+    expect(targetChoices(make("role", "prem"))).toEqual([{ name: "Rol · Premium", value: "role:r1" }]);
   });
 
   it("allows key management only to the owner, an administrator or the configured role", () => {

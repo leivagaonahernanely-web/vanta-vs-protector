@@ -131,6 +131,27 @@ export async function getHostedScriptsByUser(userId: number) {
   return db.select().from(hostedScripts).where(eq(hostedScripts.userId, userId)).orderBy(desc(hostedScripts.createdAt)).limit(50);
 }
 
+export async function getHostedScriptById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(hostedScripts).where(eq(hostedScripts.id, id)).limit(1);
+  return rows[0];
+}
+
+export async function updateHostedScript(ownerId: number, id: number, input: Partial<InsertHostedScript>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(hostedScripts).set(input).where(and(eq(hostedScripts.id, id), eq(hostedScripts.userId, ownerId)));
+  const rows = await db.select().from(hostedScripts).where(and(eq(hostedScripts.id, id), eq(hostedScripts.userId, ownerId))).limit(1);
+  return rows[0];
+}
+
+export async function deleteHostedScript(ownerId: number, id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.delete(hostedScripts).where(and(eq(hostedScripts.id, id), eq(hostedScripts.userId, ownerId)));
+}
+
 export async function getHostedScriptBySlug(slug: string) {
   const db = await getDb();
   if (!db) return undefined;

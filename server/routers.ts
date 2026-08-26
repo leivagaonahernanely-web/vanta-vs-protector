@@ -5,7 +5,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { notifyOwner } from "./_core/notification";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createAccessRule, createBlacklist, createDiscordPanel, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getDiscordPanelsByOwner, getHostedScriptSourceByUser, getHostedScriptsByUser, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, updateDiscordChannelId } from "./db";
+import { createAccessRule, createBlacklist, createDiscordPanel, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getDiscordPanelsByOwner, getHostedScriptSourceByUser, getHostedScriptsByUser, getHostedScriptById, updateHostedScript, deleteHostedScript, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, updateDiscordChannelId } from "./db";
 import { nanoid } from "nanoid";
 import { randomInt } from "node:crypto";
 import { checkDiscordChannel, getDiscordBotIdentity, sendDiscordChannelMessage } from "./discord";
@@ -29,7 +29,7 @@ function buildRuntimeLoader(url: string, scriptKey?: string | null, ffaMode = fa
 }
 
 const licenseInput = z.object({
-  type: z.enum(["trial", "license"]).default("license"),
+  type: z.literal("license").default("license"),
   hostedScriptId: z.number().int().positive().optional(),
   discordUserId: z.string().regex(/^\d{15,22}$/).optional(),
   trialDays: z.number().int().min(1).max(3650).default(3),
@@ -109,6 +109,20 @@ export const appRouter = router({
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Script no encontrado." });
       return row;
     }),
+    update: protectedProcedure.input(hostedScriptInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const existing = await getHostedScriptById(input.id);
+      if (!existing || existing.userId !== ctx.user.id) throw new TRPCError({ code: "NOT_FOUND", message: "Script no encontrado." });
+      const artifact = await protectWithAdapter(input.source, { mode: "balanced", obfuscateStrings: input.obfuscateSource, addLoaderGuard: true });
+      const row = await updateHostedScript(ctx.user.id, input.id, { name: input.name, description: input.description || null, ffaMode: input.ffaMode ? 1 : 0, scriptKey: input.scriptKey || null, code: artifact.code, sourceCode: input.source });
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Script no encontrado." });
+      return { id: row.id, slug: row.slug, name: row.name, description: row.description ?? "", ffaMode: Boolean(row.ffaMode), createdAt: row.createdAt.toISOString(), url: `${ctx.req.protocol}://${ctx.req.get("host")}/scripts/hosted/${row.slug}`, loader: buildRuntimeLoader(`${ctx.req.protocol}://${ctx.req.get("host")}/scripts/hosted/${row.slug}`, row.scriptKey, Boolean(row.ffaMode)), scriptKey: row.scriptKey };
+    }),
+    remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const existing = await getHostedScriptById(input.id);
+      if (!existing || existing.userId !== ctx.user.id) throw new TRPCError({ code: "NOT_FOUND", message: "Script no encontrado." });
+      await deleteHostedScript(ctx.user.id, input.id);
+      return { success: true as const };
+    }),
     create: protectedProcedure.input(hostedScriptInput).mutation(async ({ ctx, input }) => {
       const artifact = await protectWithAdapter(input.source, {
         mode: "balanced",
@@ -146,8 +160,8 @@ export const appRouter = router({
   licenseKeys: router({
     list: protectedProcedure.query(({ ctx }) => getLicensesByOwner(ctx.user.id)),
     generate: protectedProcedure.input(licenseInput).mutation(async ({ ctx, input }) => {
-      const durationDays = input.durationValue ? durationToDays(input.durationValue, input.durationUnit as DurationUnit) : input.trialDays;
-      const expiresAt = input.type === "trial" ? new Date(Date.now() + durationDays * 86_400_000) : null;
+      const durationDays = input.durationValue ? durationToDays(input.durationValue, input.durationUnit as DurationUnit) : undefined;
+      const expiresAt = durationDays ? new Date(Date.now() + durationDays * 86_400_000) : null;
       const row = await createLicense({ ownerId: ctx.user.id, hostedScriptId: input.hostedScriptId ?? null, keyCode: generateKeyCode(), type: input.type, status: "active", discordUserId: input.discordUserId ?? null, hwid: null, expiresAt });
       if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No se pudo generar la licencia." });
       return row;

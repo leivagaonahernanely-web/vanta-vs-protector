@@ -23,17 +23,20 @@ export function registerHostingRoutes(app: Express) {
       }
       const query = req.query ?? {};
       const requestedKey = typeof query.key === "string" ? query.key.trim() : typeof query.script_key === "string" ? query.script_key.trim() : "";
-      if (!script.ffaMode && !(requestedKey && /^\d{10}$/.test(requestedKey) && await getActiveLicenseForHostedScript(script.id, requestedKey))) {
-        const message = "Este script requiere una key activa. Usa el loader con ?key=TU_KEY o activa FFA / TRIAL GLOBAL.";
+      const trialAccess = Boolean(script.ffaMode) && requestedKey === "trial";
+      const protectedAccess = !script.ffaMode && Boolean(requestedKey && /^\d{10}$/.test(requestedKey) && await getActiveLicenseForHostedScript(script.id, requestedKey));
+      if (!trialAccess && !protectedAccess) {
+        const message = script.ffaMode ? "Este script está en TRIAL GLOBAL. Usa el loader oficial con `script_key = \"trial\"`." : "Este script requiere una key activa. Usa el loader oficial con tu key automática.";
         if (acceptsHtml) res.status(403).type("html").send(browserNotice("Key required", message));
         else res.status(403).type("text/plain").send(message);
         return;
       }
       res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300");
       const loaderUrl = `${req.protocol}://${req.get("host")}/scripts/hosted/${script.slug}`;
-      const accessUrl = !script.ffaMode && script.scriptKey ? `${loaderUrl}?key=${encodeURIComponent(script.scriptKey)}` : loaderUrl;
+      const runtimeKey = script.ffaMode ? "trial" : script.scriptKey;
+      const accessUrl = runtimeKey ? `${loaderUrl}?key=${encodeURIComponent(runtimeKey)}` : loaderUrl;
       const load = `loadstring(game:HttpGet("${accessUrl}"))()`;
-      const loader = script.ffaMode ? load : (script.scriptKey ? `script_key = "${script.scriptKey}"\n${load}` : `${load} -- requiere key en la URL`);
+      const loader = runtimeKey ? `script_key = "${runtimeKey}"\n${load}` : `${load} -- requiere key automática`;
       if (acceptsHtml) {
         const safeName = script.name.replace(/[<>&\"]/g, "");
         const safeLoader = loader.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;");
