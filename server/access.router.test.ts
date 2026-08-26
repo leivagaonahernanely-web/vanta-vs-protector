@@ -20,7 +20,7 @@ vi.mock("./db", async () => {
   return { ...actual, ...dbMocks };
 });
 
-const user = { id: 7, openId: "access-user", name: "Owner", email: "owner@example.com", loginMethod: "manus", role: "admin" as const, discordChannelId: null, discordUserId: null, discordUsername: null, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() };
+const user = { id: 7, openId: process.env.OWNER_OPEN_ID || "access-user", name: "Owner", email: "owner@example.com", loginMethod: "manus", role: "admin" as const, discordChannelId: null, discordUserId: null, discordUsername: null, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() };
 const context = { user, req: { protocol: "https", headers: {}, get: () => "vanta.test" } as TrpcContext["req"], res: {} as TrpcContext["res"] };
 
 beforeEach(() => vi.clearAllMocks());
@@ -44,6 +44,11 @@ describe("access management", () => {
     await expect(appRouter.createCaller(context).licenseKeys.generate({ type: "license", plan: "free", durationValue: 1, durationUnit: "days" })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
+  it("rejects an administrator whose identity is not the configured owner", async () => {
+    const otherAdmin = { ...user, openId: "another-admin" };
+    await expect(appRouter.createCaller({ ...context, user: otherAdmin }).licenseKeys.generate({ type: "license", plan: "free", trialDays: 3 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
   it("rejects non-admin key generation", async () => {
     const regularUser = { ...user, role: "user" as const };
     await expect(appRouter.createCaller({ ...context, user: regularUser }).licenseKeys.generate({ type: "license", plan: "free", trialDays: 3 })).rejects.toMatchObject({ code: "FORBIDDEN" });
@@ -51,7 +56,7 @@ describe("access management", () => {
 
   it("requires authentication for license management", async () => {
     const unauthenticated = { ...context, user: null } as unknown as TrpcContext;
-    await expect(appRouter.createCaller(unauthenticated).licenseKeys.generate({ type: "license", plan: "free", trialDays: 3 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(appRouter.createCaller(unauthenticated).licenseKeys.generate({ type: "license", plan: "free", trialDays: 3 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 
   it("resets HWID, revokes, and deletes only through owner-scoped mutations", async () => {

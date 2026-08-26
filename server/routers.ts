@@ -13,6 +13,12 @@ import { deletePublishedPanel, getDiscordGatewayStatus, publishDiscordPanel, pub
 import { getProtectionAdapterStatus, getProviderStatus, protectWithAdapter } from "./protection";
 import { durationToDays, type DurationUnit } from "../shared/duration";
 import { PLAN_DEFINITIONS, type PlanTier } from "../shared/plans";
+import { ENV } from "./_core/env";
+
+const ownerProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (!ENV.ownerOpenId || ctx.user.openId !== ENV.ownerOpenId || ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Solo el owner puede administrar este workspace." });
+  return next({ ctx });
+});
 
 const hostedScriptInput = z.object({
   name: z.string().trim().min(1).max(255),
@@ -172,8 +178,8 @@ export const appRouter = router({
   }),
 
   licenseKeys: router({
-    list: protectedProcedure.query(({ ctx }) => getLicensesByOwner(ctx.user.id)),
-    generate: adminProcedure.input(licenseInput).mutation(async ({ ctx, input }) => {
+    list: ownerProcedure.query(({ ctx }) => getLicensesByOwner(ctx.user.id)),
+    generate: ownerProcedure.input(licenseInput).mutation(async ({ ctx, input }) => {
       await assertWorkspaceQuota(ctx.user.id, (ctx.user as typeof ctx.user & { plan?: PlanTier }).plan, "keys");
       const durationDays = input.durationValue ? durationToDays(input.durationValue, input.durationUnit as DurationUnit) : undefined;
       const expiresAt = durationDays ? new Date(Date.now() + durationDays * 86_400_000) : null;
@@ -181,9 +187,9 @@ export const appRouter = router({
       if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No se pudo generar la licencia." });
       return row;
     }),
-    revoke: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => revokeLicense(ctx.user.id, input.id)),
-    remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => deleteLicense(ctx.user.id, input.id)),
-    resetHwid: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => resetLicenseHwid(ctx.user.id, input.id)),
+    revoke: ownerProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => revokeLicense(ctx.user.id, input.id)),
+    remove: ownerProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => deleteLicense(ctx.user.id, input.id)),
+    resetHwid: ownerProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => resetLicenseHwid(ctx.user.id, input.id)),
   }),
 
   access: router({
@@ -198,8 +204,8 @@ export const appRouter = router({
       remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => deleteAccessRule(ctx.user.id, input.id)),
     }),
     logs: router({
-      list: adminProcedure.query(({ ctx }) => getKeyAuditLogsByOwner(ctx.user.id)),
-      clear: adminProcedure.mutation(({ ctx }) => deleteKeyAuditLogsByOwner(ctx.user.id)),
+      list: ownerProcedure.query(({ ctx }) => getKeyAuditLogsByOwner(ctx.user.id)),
+      clear: ownerProcedure.mutation(({ ctx }) => deleteKeyAuditLogsByOwner(ctx.user.id)),
     }),
   }),
 
