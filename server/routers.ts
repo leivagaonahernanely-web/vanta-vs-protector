@@ -5,7 +5,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { notifyOwner } from "./_core/notification";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createAccessRule, createBlacklist, createDiscordPanel, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getDiscordPanelsByOwner, getHostedScriptSourceByUser, getHostedScriptsByUser, getHostedScriptById, updateHostedScript, deleteHostedScript, getWorkspaceUsage, getKeyAuditLogsByOwner, deleteKeyAuditLogsByOwner, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, redeemPlanKey, updateDiscordChannelId } from "./db";
+import { createAccessRule, createBlacklist, createDiscordPanel, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getDiscordPanelsByOwner, getHostedScriptSourceByUser, getHostedScriptsByUser, getHostedScriptById, updateHostedScript, deleteHostedScript, getWorkspaceUsage, getKeyAuditLogsByOwner, deleteKeyAuditLogsByOwner, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, redeemPlanKey, updateDiscordChannelId, ensureUserApiKey } from "./db";
 import { nanoid } from "nanoid";
 import { randomInt } from "node:crypto";
 import { checkDiscordChannel, getDiscordBotIdentity, sendDiscordChannelMessage } from "./discord";
@@ -32,8 +32,10 @@ const hostedScriptInput = z.object({
 function buildRuntimeLoader(url: string, scriptKey?: string | null, ffaMode = false) {
   const runtimeKey = ffaMode ? "trial" : scriptKey;
   const accessUrl = runtimeKey ? `${url}?key=${encodeURIComponent(runtimeKey)}` : url;
-  const load = `loadstring(game:HttpGet(\"${accessUrl}\"))()`;
-  return runtimeKey ? `script_key = \"${runtimeKey}\"\n${load}` : `${load} -- requiere key automática`;
+  const load = ffaMode || !runtimeKey
+    ? `loadstring(game:HttpGet(\"${accessUrl}\"))()`
+    : `local hwid = game:GetService(\"RbxAnalyticsService\"):GetClientId()\nloadstring(game:HttpGet(\"${accessUrl}&hwid=\" .. hwid))()`;
+  return runtimeKey ? `script_key = \"${runtimeKey}\"\n${load}` : load;
 }
 
 const licenseInput = z.object({
@@ -121,9 +123,11 @@ export const appRouter = router({
     }),
   }),
   auth: router({
-    me: publicProcedure.query(opts => {
+    me: publicProcedure.query(async opts => {
       const user = opts.ctx.user;
-      return user ? { ...user, isOwner: Boolean(ENV.ownerOpenId && user.openId === ENV.ownerOpenId && user.role === "admin") } : user;
+      if (!user) return user;
+      const apiKey = await ensureUserApiKey(user.id);
+      return { ...user, apiKey, isOwner: Boolean(ENV.ownerOpenId && user.openId === ENV.ownerOpenId && user.role === "admin") };
     }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);

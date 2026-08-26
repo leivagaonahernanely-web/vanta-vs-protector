@@ -34,7 +34,7 @@ vi.mock("drizzle-orm/mysql2", () => ({
   })),
 }));
 
-import { createDiscordPanel, createProtection, getDiscordPanelsByOwner, getProtectionsByUser, updateDiscordChannelId } from "./db";
+import { createDiscordPanel, createProtection, ensureUserApiKey, getDiscordPanelsByOwner, getProtectionsByUser, updateDiscordChannelId } from "./db";
 
 const saved = {
   id: 4,
@@ -58,6 +58,15 @@ describe("database persistence helpers", () => {
     database.insertValues.mockResolvedValue([{ insertId: 4 }]);
     database.updateWhere.mockResolvedValue(undefined);
     database.selectLimit.mockResolvedValue([saved]);
+  });
+
+  it("creates and persists an API key when the user does not have one", async () => {
+    database.selectLimit.mockResolvedValueOnce([{ id: 9, apiKey: null }]).mockResolvedValueOnce([{ apiKey: "VANTA_persisted_key_value" }]);
+    const result = await ensureUserApiKey(9);
+    expect(result).toBe("VANTA_persisted_key_value");
+    const update = database.updateSet.mock.calls.at(-1)?.[0] as { apiKey?: string };
+    expect(update.apiKey).toMatch(/^VANTA-[A-Za-z0-9_-]{32,40}$/);
+    expect(database.updateWhere).toHaveBeenCalled();
   });
 
   it("updates the channel preference for one user", async () => {

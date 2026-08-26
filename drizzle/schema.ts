@@ -24,6 +24,7 @@ export const users = mysqlTable("users", {
   discordNickname: varchar("discordNickname", { length: 128 }),
   discordAvatarUrl: varchar("discordAvatarUrl", { length: 500 }),
   buyerRoleId: varchar("buyerRoleId", { length: 32 }),
+  apiKey: varchar("apiKey", { length: 80 }).unique(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),

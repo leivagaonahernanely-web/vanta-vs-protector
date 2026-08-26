@@ -2,6 +2,7 @@ import { and, count, desc, eq, isNull, ne, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { accessRules, blacklists, discordPanels, hostedScripts, HostedScript, InsertHostedScript, InsertLicense, InsertProtection, InsertUser, keyAuditLogs, licenses, protections, users, warnings } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import { randomBytes } from "node:crypto";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -102,6 +103,32 @@ export async function getProtectionsByUser(userId: number) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(protections).where(eq(protections.userId, userId)).orderBy(desc(protections.createdAt)).limit(50);
+}
+
+function createApiKey() {
+  return `VANTA-${randomBytes(24).toString("base64url")}`;
+}
+
+export async function ensureUserApiKey(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const rows = await db.select({ id: users.id, apiKey: users.apiKey }).from(users).where(eq(users.id, userId)).limit(1);
+  const current = rows[0];
+  if (!current) return undefined;
+  if (current.apiKey) return current.apiKey;
+  const apiKey = createApiKey();
+  await db.update(users).set({ apiKey }).where(and(eq(users.id, userId), isNull(users.apiKey)));
+  const updated = await db.select({ apiKey: users.apiKey }).from(users).where(eq(users.id, userId)).limit(1);
+  return updated[0]?.apiKey ?? apiKey;
+}
+
+export async function getApiKeyByDiscordUserId(discordUserId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select({ id: users.id, apiKey: users.apiKey }).from(users).where(eq(users.discordUserId, discordUserId)).limit(1);
+  const user = rows[0];
+  if (!user) return undefined;
+  return { userId: user.id, apiKey: user.apiKey ?? await ensureUserApiKey(user.id) };
 }
 
 export async function getBuyerRoleId(ownerId: number) {

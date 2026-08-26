@@ -55,6 +55,15 @@ describe("public hosted scripts", () => {
     expect(response.body).toContain("No key was provided");
   });
 
+  it("serves a protected artifact when the loader sends HWID as a query parameter", async () => {
+    findMock.mockResolvedValue({ ...script, ffaMode: 0, scriptKey: null });
+    licenseMock.mockResolvedValue({ id: 4, status: "active" });
+    const response = responseMock();
+    await getHandler()({ params: { slug: script.slug }, query: { key: "86vC3ZULuEQpOImpm5VBB6oLROAQmPLe", hwid: "device-query" }, headers: { accept: "*/*" }, protocol: "https", get: () => "vanta.test" }, response);
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toBe("return true");
+  });
+
   it("serves a protected artifact when the key is active", async () => {
     findMock.mockResolvedValue({ ...script, ffaMode: 0, scriptKey: null });
     licenseMock.mockResolvedValue({ id: 4, status: "active" });

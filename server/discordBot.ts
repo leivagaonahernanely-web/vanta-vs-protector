@@ -36,6 +36,7 @@ import {
   getHostedScriptsByUser,
   getLicensesByOwner,
   getActiveLicensesByDiscordUserId,
+  getApiKeyByDiscordUserId,
   getBuyerRoleId,
   setBuyerRoleId,
   getUserByDiscordUserId,
@@ -51,6 +52,7 @@ export const discordCommands = [
   new SlashCommandBuilder().setName("ping").setDescription("Verifica la latencia del bot").toJSON(),
   new SlashCommandBuilder().setName("panel").setDescription("Publica el panel de Vanta.vs Protector").toJSON(),
   new SlashCommandBuilder().setName("stats").setDescription("Muestra el estado del acceso").toJSON(),
+  new SlashCommandBuilder().setName("apikey").setDescription("Muestra la API key de tu cuenta vinculada").toJSON(),
   new SlashCommandBuilder().setName("getscript").setDescription("Obtiene el enlace de acceso al script").toJSON(),
   new SlashCommandBuilder().setName("getrole").setDescription("Configura el rol que recibirá un usuario con key activa").addRoleOption(o => o.setName("role").setDescription("Rol comprador").setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.Administrator.toString()).toJSON(),
   new SlashCommandBuilder().setName("redeem").setDescription("Canjea una key de acceso").addStringOption(o => o.setName("key").setDescription("Key alfanumérica de mínimo 32 caracteres").setRequired(true)).toJSON(),
@@ -265,6 +267,7 @@ export async function handleInteraction(interaction: any) {
     if (interaction.commandName === "prices") return prices(interaction);
     if (interaction.commandName === "updates") return updates(interaction);
     if (interaction.commandName === "stats") return respond(interaction, { content: "Vanta.vs Protector está conectado. Usa el dashboard web para consultar scripts, licencias y actividad.", ephemeral: true });
+    if (interaction.commandName === "apikey") return apiKeyForUser(interaction);
     if (interaction.commandName === "getscript") return getScriptForUser(interaction);
     if (interaction.commandName === "getrole") return configureBuyerRole(interaction, interaction.options.getRole("role", true));
     if (interaction.commandName === "redeem") return redeem(interaction, interaction.options.getString("key", true));
@@ -283,6 +286,15 @@ export async function handleInteraction(interaction: any) {
     const currentInteraction = interaction as any;
     if (!currentInteraction.replied && !currentInteraction.deferred) await respond(currentInteraction, { content: "No se pudo completar la acción. Revisa la configuración del panel.", ephemeral: true });
   }
+}
+
+async function apiKeyForUser(interaction: any) {
+  const result = await getApiKeyByDiscordUserId(interaction.user.id);
+  if (!result?.apiKey) return respond(interaction, { content: "❌ No hay una cuenta web vinculada a este usuario de Discord. Vincula Discord desde Vanta.vs Protector e inténtalo otra vez.", ephemeral: true });
+  const copyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`vanta:copy-api-key:${result.apiKey}`).setLabel("Copiar API key").setStyle(ButtonStyle.Secondary),
+  );
+  return respond(interaction, { content: `🔐 **Tu API key de Vanta.vs Protector**\n\`${result.apiKey}\`\n\nEsta key identifica tu cuenta vinculada.`, components: [copyRow], ephemeral: true });
 }
 
 async function getUserLicenses(discordUserId: string) {
@@ -342,6 +354,11 @@ async function handleButton(interaction: ButtonInteraction) {
   if (interaction.customId.startsWith("vanta:copy-key:")) {
     const key = interaction.customId.slice("vanta:copy-key:".length).trim();
     if (!/^[A-Za-z0-9-]{1,64}$/.test(key)) return respond(interaction, { content: "❌ Esta key ya no es válida.", ephemeral: true });
+    return respond(interaction, { content: `\`${key}\``, ephemeral: true });
+  }
+  if (interaction.customId.startsWith("vanta:copy-api-key:")) {
+    const key = interaction.customId.slice("vanta:copy-api-key:".length).trim();
+    if (!/^VANTA-[A-Za-z0-9_-]{20,64}$/.test(key)) return respond(interaction, { content: "❌ Esta API key ya no es válida.", ephemeral: true });
     return respond(interaction, { content: `\`${key}\``, ephemeral: true });
   }
   if (interaction.customId === "vanta:role") return getRoleForUser(interaction);

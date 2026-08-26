@@ -407,3 +407,9 @@
 
 - [x] Get Script: mostrar key activa junto al loadstring y permitir copiar la key
 - [x] Generate Key: conservar key visible con mini botón de copia
+
+- [x] Crear API key persistente por cuenta al iniciar sesión
+- [x] Añadir /apikey para mostrar la API key de la cuenta vinculada
+- [x] Mostrar la API key en Overview con botón de copiar
+- [x] Diagnosticar y corregir HTTP 403 del loader Lua en la línea 2 aceptando HWID por query desde Roblox
+- [x] Añadir pruebas para API key, /apikey, Overview y acceso del loader

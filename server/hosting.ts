@@ -24,7 +24,7 @@ export function registerHostingRoutes(app: Express) {
       const query = req.query ?? {};
       const requestedKey = typeof query.key === "string" ? query.key.trim() : typeof query.script_key === "string" ? query.script_key.trim() : "";
       const trialAccess = Boolean(script.ffaMode) && requestedKey === "trial";
-      const requestedHwid = typeof req.headers["x-hwid"] === "string" ? req.headers["x-hwid"].trim() : "";
+      const requestedHwid = typeof req.headers["x-hwid"] === "string" ? req.headers["x-hwid"].trim() : typeof query.hwid === "string" ? query.hwid.trim() : "";
       const normalKeyPattern = /^(?:[a-z0-9]{32,64}|(?:FREE|PRO|PREMIUM)-[a-z0-9]{16})$/i;
       const hasValidKeyShape = Boolean(requestedKey && normalKeyPattern.test(requestedKey));
       const protectedAccess = !script.ffaMode && Boolean(requestedKey && requestedHwid && requestedHwid.length <= 128 && hasValidKeyShape && await claimLicenseHwid(script.id, requestedKey, requestedHwid));
@@ -42,8 +42,10 @@ export function registerHostingRoutes(app: Express) {
       const loaderUrl = `${req.protocol}://${req.get("host")}/scripts/hosted/${script.slug}`;
       const runtimeKey = script.ffaMode ? "trial" : script.scriptKey;
       const accessUrl = runtimeKey ? `${loaderUrl}?key=${encodeURIComponent(runtimeKey)}` : loaderUrl;
-      const load = `loadstring(game:HttpGet("${accessUrl}"))()`;
-      const loader = runtimeKey ? `script_key = "${runtimeKey}"\n${load}` : `${load} -- requiere key automática`;
+      const load = script.ffaMode || !runtimeKey
+        ? `loadstring(game:HttpGet("${accessUrl}"))()`
+        : `local hwid = game:GetService("RbxAnalyticsService"):GetClientId()\nloadstring(game:HttpGet("${accessUrl}&hwid=" .. hwid))()`;
+      const loader = runtimeKey ? `script_key = "${runtimeKey}"\n${load}` : load;
       if (acceptsHtml) {
         const safeName = script.name.replace(/[<>&\"]/g, "");
         const safeLoader = loader.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;");

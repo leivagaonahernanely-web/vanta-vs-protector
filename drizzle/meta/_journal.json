@@ -113,6 +113,13 @@
       "when": 1787787443243,
       "tag": "0015_exotic_zarda",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "5",
+      "when": 1787788341501,
+      "tag": "0016_tiny_vulture",
+      "breakpoints": true
     }
   ]
 }
