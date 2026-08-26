@@ -13,6 +13,7 @@ const dbMocks = vi.hoisted(() => ({
   resetLicenseHwid: vi.fn(),
   revokeLicense: vi.fn(),
   deleteLicense: vi.fn(),
+  redeemPlanKey: vi.fn(),
 }));
 
 vi.mock("./db", async () => {
@@ -26,17 +27,29 @@ const context = { user, req: { protocol: "https", headers: {}, get: () => "vanta
 beforeEach(() => vi.clearAllMocks());
 
 describe("access management", () => {
-  it("generates a ten digit automatic license key", async () => {
-    dbMocks.createLicense.mockResolvedValue({ id: 1, ownerId: 7, keyCode: "1234567890", type: "license", status: "active", hostedScriptId: null, discordUserId: null, hwid: null, expiresAt: new Date(), createdAt: new Date(), updatedAt: new Date() });
+  it("generates an automatic plan-prefixed license key", async () => {
+    dbMocks.createLicense.mockResolvedValue({ id: 1, ownerId: 7, keyCode: "FREE-nwe9yhwwboyssbpf", type: "license", status: "active", hostedScriptId: null, discordUserId: null, hwid: null, expiresAt: new Date(), createdAt: new Date(), updatedAt: new Date() });
     const result = await appRouter.createCaller(context).licenseKeys.generate({ type: "license", trialDays: 3 });
-    expect(result.keyCode).toMatch(/^\d{10}$/);
-    expect(dbMocks.createLicense).toHaveBeenCalledWith(expect.objectContaining({ ownerId: 7, type: "license", status: "active", keyCode: expect.stringMatching(/^\d{10}$/) }));
+    expect(result.keyCode).toMatch(/^FREE-[a-z0-9]{16}$/);
+    expect(dbMocks.createLicense).toHaveBeenCalledWith(expect.objectContaining({ ownerId: 7, type: "license", status: "active", keyCode: expect.stringMatching(/^FREE-[a-z0-9]{16}$/) }));
   });
 
   it("persists the selected plan for an automatic key", async () => {
     dbMocks.createLicense.mockResolvedValue({ id: 2, ownerId: 7, plan: "premium", keyCode: "1234567890", type: "license", status: "active", hostedScriptId: null, discordUserId: null, hwid: null, expiresAt: null, createdAt: new Date(), updatedAt: new Date() });
     await appRouter.createCaller(context).licenseKeys.generate({ type: "license", plan: "premium", durationValue: 1, durationUnit: "years" });
     expect(dbMocks.createLicense).toHaveBeenCalledWith(expect.objectContaining({ plan: "premium" }));
+  });
+
+  it("redeems a plan key and returns the activated plan", async () => {
+    dbMocks.redeemPlanKey.mockResolvedValue({ plan: "premium", keyCode: "PREMIUM-kksuy702hsb12345" });
+    const result = await appRouter.createCaller(context).plans.redeem({ keyCode: "premium-kksuy702hsb12345" });
+    expect(result).toEqual({ plan: "premium", keyCode: "PREMIUM-kksuy702hsb12345" });
+    expect(dbMocks.redeemPlanKey).toHaveBeenCalledWith(7, "PREMIUM-KKSUY702HSB12345");
+  });
+
+  it("rejects an invalid owner key format before redemption", async () => {
+    await expect(appRouter.createCaller(context).plans.redeem({ keyCode: "1234567890" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(dbMocks.redeemPlanKey).not.toHaveBeenCalled();
   });
 
   it("enforces the free key quota server-side", async () => {

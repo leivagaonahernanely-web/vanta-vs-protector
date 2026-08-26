@@ -72,7 +72,7 @@ export const licenses = mysqlTable("licenses", {
   ownerId: int("ownerId").notNull().references(() => users.id),
   plan: mysqlEnum("plan", ["free", "pro", "premium"]).default("free").notNull(),
   hostedScriptId: int("hostedScriptId").references(() => hostedScripts.id),
-  keyCode: varchar("keyCode", { length: 10 }).notNull().unique(),
+  keyCode: varchar("keyCode", { length: 64 }).notNull().unique(),
   type: mysqlEnum("type", ["trial", "license"]).default("license").notNull(),
   status: mysqlEnum("status", ["active", "revoked", "expired"]).default("active").notNull(),
   discordUserId: varchar("discordUserId", { length: 32 }),
@@ -100,7 +100,7 @@ export const keyAuditLogs = mysqlTable("keyAuditLogs", {
   ownerId: int("ownerId").notNull().references(() => users.id),
   actorDiscordId: varchar("actorDiscordId", { length: 32 }).notNull(),
   action: mysqlEnum("action", ["generate", "delete"]).notNull(),
-  keyCode: varchar("keyCode", { length: 10 }).notNull(),
+  keyCode: varchar("keyCode", { length: 64 }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

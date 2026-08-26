@@ -294,3 +294,21 @@
 - [ ] Mantener la regla de una key protegida por un único HWID y rechazar dispositivos distintos
 - [x] Completar el owner-only explícito cuando la cuenta Discord quede vinculada
 - [x] Pulir visualmente los paneles de planes, precios y generación de keys
+
+- [ ] Crear Owner Sources privado para listar y descargar bajo demanda las sources subidas, visible solo al owner
+- [ ] Informar al usuario que la source subida queda accesible al owner del servicio antes de guardarla
+- [ ] Crear Owner Key privado para generar keys automáticas asociadas a Free, Pro o Premium
+- [ ] Implementar canje de Owner Key para activar el plan y las cuotas del workspace del usuario
+- [ ] Impedir reutilización, falsificación o canje de una key por un usuario no autorizado
+- [ ] Añadir pruebas de privacidad, canje, activación de plan y límites por workspace
+
+- [ ] Cambiar las Owner Key al formato automático `FREE-...`, `PRO-...` y `PREMIUM-...`
+- [ ] Aumentar la longitud de almacenamiento y validación para prefijos más identificador aleatorio
+- [ ] Hacer que canje y hosting acepten el nuevo formato sin permitir edición manual
+- [ ] Añadir pruebas de prefijo, unicidad, canje y compatibilidad con keys existentes
+
+- [x] Separar Plans de Prices en la navegación y el menú lateral
+- [x] Crear la vista Plans con tarjetas Free, Pro y Premium y sus beneficios
+- [x] Añadir formulario para canjear la key y refrescar automáticamente el workspace
+- [x] Mostrar uso y saldo restante de ofuscaciones, scripts y keys por plan
+- [x] Validar la sección Plans en móvil y añadir pruebas del canje y los saldos

@@ -5,7 +5,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { notifyOwner } from "./_core/notification";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createAccessRule, createBlacklist, createDiscordPanel, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getDiscordPanelsByOwner, getHostedScriptSourceByUser, getHostedScriptsByUser, getHostedScriptById, updateHostedScript, deleteHostedScript, getWorkspaceUsage, getKeyAuditLogsByOwner, deleteKeyAuditLogsByOwner, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, updateDiscordChannelId } from "./db";
+import { createAccessRule, createBlacklist, createDiscordPanel, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getDiscordPanelsByOwner, getHostedScriptSourceByUser, getHostedScriptsByUser, getHostedScriptById, updateHostedScript, deleteHostedScript, getWorkspaceUsage, getKeyAuditLogsByOwner, deleteKeyAuditLogsByOwner, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, redeemPlanKey, updateDiscordChannelId } from "./db";
 import { nanoid } from "nanoid";
 import { randomInt } from "node:crypto";
 import { checkDiscordChannel, getDiscordBotIdentity, sendDiscordChannelMessage } from "./discord";
@@ -25,7 +25,7 @@ const hostedScriptInput = z.object({
   description: z.string().trim().max(500).optional(),
   source: z.string().min(1).max(150_000),
   ffaMode: z.boolean().default(false),
-  scriptKey: z.string().trim().regex(/^\d{10}$/).optional(),
+  scriptKey: z.string().trim().regex(/^(?:FREE|PRO|PREMIUM)-[a-z0-9]{16}$/i).optional(),
   obfuscateSource: z.boolean().default(true),
 });
 
@@ -58,7 +58,13 @@ async function assertWorkspaceQuota(userId: number, plan: PlanTier | undefined, 
 }
 
 
-function generateKeyCode() { return String(randomInt(1_000_000_000, 10_000_000_000)); }
+const KEY_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
+function generateKeyCode(plan: PlanTier) {
+  const prefix = plan.toUpperCase();
+  let suffix = "";
+  for (let index = 0; index < 16; index += 1) suffix += KEY_ALPHABET[randomInt(0, KEY_ALPHABET.length)];
+  return `${prefix}-${suffix}`;
+}
 
 const protectionInput = z.object({
   name: z.string().trim().min(1).max(255),
@@ -97,6 +103,20 @@ export const appRouter = router({
     republishPanel: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const rows = await getDiscordPanelsByOwner(ctx.user.id); const panel = rows.find((item) => item.id === input.id); if (!panel) throw new TRPCError({ code: "NOT_FOUND", message: "Panel no encontrado." }); const result = await publishDiscordPanel(panel.channelId, { name: panel.name, description: panel.description ?? undefined, script: panel.targetScript, hwidHours: panel.hwidHours }); return result; }),
     publishPrices: protectedProcedure.input(z.object({ title: z.string().trim().min(1).max(120), description: z.string().trim().min(1).max(4000), channelId: z.string().regex(/^\\d{15,22}$/).optional() })).mutation(async ({ ctx, input }) => { const channelId = input.channelId ?? ctx.user.discordChannelId; if (!channelId) throw new TRPCError({ code: "BAD_REQUEST", message: "Configura primero un canal Discord en Setup." }); const check = await checkDiscordChannel(channelId); if (!check.ok) throw new TRPCError({ code: "BAD_REQUEST", message: check.message }); return publishPricesMessage(channelId, { title: input.title, description: input.description }); }),
     publishUpdates: protectedProcedure.input(z.object({ title: z.string().trim().min(1).max(120), description: z.string().trim().min(1).max(4000), channelId: z.string().regex(/^\\d{15,22}$/).optional() })).mutation(async ({ ctx, input }) => { const channelId = input.channelId ?? ctx.user.discordChannelId; if (!channelId) throw new TRPCError({ code: "BAD_REQUEST", message: "Configura primero un canal Discord en Setup." }); const check = await checkDiscordChannel(channelId); if (!check.ok) throw new TRPCError({ code: "BAD_REQUEST", message: check.message }); return publishUpdatesMessage(channelId, { title: input.title, description: input.description }); }),
+  }),
+  workspace: router({
+    usage: protectedProcedure.query(async ({ ctx }) => {
+      const usage = await getWorkspaceUsage(ctx.user.id);
+      const plan = ((ctx.user as typeof ctx.user & { plan?: PlanTier }).plan ?? "free") as PlanTier;
+      return { plan, ...usage };
+    }),
+  }),
+  plans: router({
+    redeem: protectedProcedure.input(z.object({ keyCode: z.string().trim().toUpperCase().regex(/^(?:PRO|PREMIUM)-[a-z0-9]{16}$/i) })).mutation(async ({ ctx, input }) => {
+      const result = await redeemPlanKey(ctx.user.id, input.keyCode);
+      if (!result) throw new TRPCError({ code: "BAD_REQUEST", message: "Owner Key inválida, expirada, ya utilizada o no disponible." });
+      return result;
+    }),
   }),
   auth: router({
     me: publicProcedure.query(opts => {
@@ -186,7 +206,7 @@ export const appRouter = router({
       await assertWorkspaceQuota(ctx.user.id, (ctx.user as typeof ctx.user & { plan?: PlanTier }).plan, "keys");
       const durationDays = input.durationValue ? durationToDays(input.durationValue, input.durationUnit as DurationUnit) : undefined;
       const expiresAt = durationDays ? new Date(Date.now() + durationDays * 86_400_000) : null;
-      const row = await createLicense({ ownerId: ctx.user.id, plan: input.plan, hostedScriptId: input.hostedScriptId ?? null, keyCode: generateKeyCode(), type: input.type, status: "active", discordUserId: input.discordUserId ?? null, hwid: null, expiresAt });
+      const row = await createLicense({ ownerId: ctx.user.id, plan: input.plan, hostedScriptId: input.hostedScriptId ?? null, keyCode: generateKeyCode(input.plan), type: input.type, status: "active", discordUserId: input.discordUserId ?? null, hwid: null, expiresAt });
       if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No se pudo generar la licencia." });
       return row;
     }),

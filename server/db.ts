@@ -285,6 +285,18 @@ export async function redeemLicense(keyCode: string, discordUserId: string) {
   return { ...license, discordUserId };
 }
 
+export async function redeemPlanKey(userId: number, keyCode: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const rows = await db.select().from(licenses).where(and(eq(licenses.keyCode, keyCode), eq(licenses.status, "active"), isNull(licenses.hostedScriptId))).limit(1);
+  const license = rows[0];
+  if (!license || license.type !== "license" || !["pro", "premium"].includes(license.plan)) return undefined;
+  if (license.expiresAt && license.expiresAt.getTime() <= Date.now()) return undefined;
+  await db.update(users).set({ plan: license.plan, updatedAt: new Date() }).where(eq(users.id, userId));
+  await db.update(licenses).set({ status: "revoked", discordUserId: String(userId) }).where(and(eq(licenses.id, license.id), eq(licenses.status, "active")));
+  return { plan: license.plan, keyCode: license.keyCode };
+}
+
 export async function deleteLicenseByKeyCode(ownerId: number, keyCode: string) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
