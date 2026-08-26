@@ -372,3 +372,14 @@
 - [x] Verificar servidor, endpoint tRPC, logs de red y consultas iniciales
 - [x] Corregir la causa de conexión o estabilizar el manejo de errores de API
 - [x] Añadir prueba de regresión para la carga inicial del dashboard
+
+- [x] Actualizar todas las etiquetas y mensajes que todavía indiquen keys de 10 números
+- [x] Mostrar claramente que las keys normales tienen 32 caracteres alfanuméricos
+- [x] Añadir autocopiado de keys normales con confirmación visual
+- [x] Añadir autocopiado de Plan Keys sin mezclar listas ni módulos
+- [x] Añadir pruebas de formato visual y copiado al portapapeles
+
+- [x] Cambiar Block Builder para admitir bloques de Lua y bloques de texto
+- [x] Mantener el orden de los bloques al construir la source final
+- [x] Validar y previsualizar la salida Lua resultante
+- [x] Añadir pruebas de composición Lua/texto y separación del módulo
