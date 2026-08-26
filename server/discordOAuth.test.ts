@@ -60,7 +60,7 @@ describe("Discord OAuth callback", () => {
       response,
     );
 
-    expect(mocks.linkDiscordIdentity).toHaveBeenCalledWith(7, "111222333444555666", "Vanta User");
+    expect(mocks.linkDiscordIdentity).toHaveBeenCalledWith(7, "111222333444555666", "Vanta User", "Vanta User", null);
     expect(response.redirectTarget).toBe("/?discord=connected");
     expect(response.clearCookie).toHaveBeenCalled();
     vi.unstubAllGlobals();

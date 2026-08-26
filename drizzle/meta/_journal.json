@@ -64,6 +64,20 @@
       "when": 1787715776935,
       "tag": "0008_white_strong_guy",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1787758411918,
+      "tag": "0009_freezing_menace",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1787758922865,
+      "tag": "0010_free_lockheed",
+      "breakpoints": true
     }
   ]
 }

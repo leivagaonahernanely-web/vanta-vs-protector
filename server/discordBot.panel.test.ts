@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { discordCommands, handleInteraction, hasKeyManagementAccess, panelMessage, respond } from "./discordBot";
+import { createReconnectGate, discordCommands, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, panelMessage, respond } from "./discordBot";
 
 describe("Discord access panel", () => {
   it("builds the requested two-row action layout", () => {
@@ -11,6 +11,30 @@ describe("Discord access panel", () => {
     expect(message.embeds[0].data.description).toContain("Vanta.vs Protector");
     expect(message.embeds[0].data.description).toContain("canjear tu key");
     expect((message as any).ephemeral).not.toBe(true);
+  });
+
+  it("schedules only one post-disconnect reconnect and clears its pending state", () => {
+    vi.useFakeTimers();
+    const reconnect = vi.fn();
+    const gate = createReconnectGate(reconnect, 5000);
+    expect(gate.schedule()).toBe(true);
+    expect(gate.schedule()).toBe(false);
+    expect(gate.pending()).toBe(true);
+    vi.advanceTimersByTime(4999);
+    expect(reconnect).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(reconnect).toHaveBeenCalledTimes(1);
+    expect(gate.pending()).toBe(false);
+    expect(gate.schedule()).toBe(true);
+    gate.cancel();
+    vi.useRealTimers();
+  });
+
+  it("routes both Gateway error and shard disconnect through one recovery callback", () => {
+    const reconnect = vi.fn(() => true);
+    expect(handleGatewayFailure("Gateway error", reconnect)).toBe(true);
+    expect(handleGatewayFailure("Gateway desconectado", reconnect)).toBe(true);
+    expect(reconnect).toHaveBeenCalledTimes(2);
   });
 
   it("uses followUp after acknowledgement and reply only once when public", async () => {
@@ -41,7 +65,28 @@ describe("Discord access panel", () => {
 
   it("registers slash commands for every panel action", () => {
     const names = discordCommands.map((command: any) => command.name);
-    expect(names).toEqual(expect.arrayContaining(["panel", "getscript", "getrole", "redeem", "stats", "resethwid", "generatekeyrol", "generatekey", "deletekey", "whitelist", "unwhitelist"]));
+    expect(names).toEqual(["ping", "panel", "generatekey", "deletekey", "whitelist", "unwhitelist", "blacklist", "resethwid", "addtime", "warn", "dropkey", "prices", "generatekeyrol"]);
+    expect(new Set(names).size).toBe(names.length);
+    expect(names).not.toContain("getscript");
+    expect(names).not.toContain("getrole");
+    expect(names).not.toContain("stats");
+    expect(names).not.toContain("redeem");
+  });
+
+  it("exposes the requested required and optional slash options", () => {
+    const command = (name: string) => discordCommands.find((item: any) => item.name === name) as any;
+    const options = (name: string) => command(name).options;
+    expect(options("generatekey").find((item: any) => item.name === "script").required).toBe(true);
+    expect(options("generatekey").find((item: any) => item.name === "duration").required).toBe(false);
+    expect(options("deletekey").find((item: any) => item.name === "key").required).toBe(true);
+    expect(options("deletekey").find((item: any) => item.name === "user").required).toBe(false);
+    expect(options("blacklist").find((item: any) => item.name === "script").required).toBe(true);
+    expect(options("blacklist").find((item: any) => item.name === "user").required).toBe(true);
+    expect(options("resethwid").find((item: any) => item.name === "script").required).toBe(true);
+    expect(options("resethwid").find((item: any) => item.name === "user").required).toBe(true);
+    expect(options("addtime").every((item: any) => item.required)).toBe(true);
+    expect(options("warn").every((item: any) => item.required)).toBe(true);
+    expect(options("dropkey").find((item: any) => item.name === "amount").required).toBe(true);
   });
 
   it("allows key management only to the owner, an administrator or the configured role", () => {

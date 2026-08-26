@@ -1,6 +1,6 @@
 import { and, desc, eq, ne } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { accessRules, blacklists, hostedScripts, HostedScript, InsertHostedScript, InsertLicense, InsertProtection, InsertUser, keyAuditLogs, licenses, protections, users } from "../drizzle/schema";
+import { accessRules, blacklists, discordPanels, hostedScripts, HostedScript, InsertHostedScript, InsertLicense, InsertProtection, InsertUser, keyAuditLogs, licenses, protections, users, warnings } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -35,7 +35,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     };
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod", "discordChannelId", "discordUserId", "discordUsername"] as const;
+    const textFields = ["name", "email", "loginMethod", "discordChannelId", "discordUserId", "discordUsername", "discordNickname", "discordAvatarUrl"] as const;
     type TextField = (typeof textFields)[number];
 
     const assignNullable = (field: TextField) => {
@@ -110,10 +110,10 @@ export async function updateDiscordChannelId(userId: number, discordChannelId: s
   await db.update(users).set({ discordChannelId }).where(eq(users.id, userId));
 }
 
-export async function linkDiscordIdentity(userId: number, discordUserId: string, discordUsername: string) {
+export async function linkDiscordIdentity(userId: number, discordUserId: string, discordUsername: string, discordNickname?: string | null, discordAvatarUrl?: string | null) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  await db.update(users).set({ discordUserId, discordUsername }).where(eq(users.id, userId));
+  await db.update(users).set({ discordUserId, discordUsername, discordNickname: discordNickname ?? null, discordAvatarUrl: discordAvatarUrl ?? null }).where(eq(users.id, userId));
 }
 
 export async function createHostedScript(input: InsertHostedScript): Promise<HostedScript | undefined> {
@@ -270,6 +270,55 @@ export async function deleteAccessRuleByDiscordId(ownerId: number, discordId: st
   if (!db) throw new Error("Database unavailable");
   const result = await db.delete(accessRules).where(and(eq(accessRules.ownerId, ownerId), eq(accessRules.discordId, discordId), ne(accessRules.label, "__key_manager__")));
   return Number(result[0]?.affectedRows ?? 0) > 0;
+}
+
+export async function createDiscordPanel(input: typeof discordPanels.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const result = await db.insert(discordPanels).values(input);
+  const rows = await db.select().from(discordPanels).where(eq(discordPanels.id, Number(result[0].insertId))).limit(1);
+  return rows[0];
+}
+
+export async function getDiscordPanelsByOwner(ownerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(discordPanels).where(eq(discordPanels.ownerId, ownerId)).orderBy(desc(discordPanels.createdAt)).limit(50);
+}
+
+export async function deleteDiscordPanel(ownerId: number, id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const rows = await db.select().from(discordPanels).where(and(eq(discordPanels.ownerId, ownerId), eq(discordPanels.id, id))).limit(1);
+  if (!rows[0]) return undefined;
+  await db.delete(discordPanels).where(and(eq(discordPanels.ownerId, ownerId), eq(discordPanels.id, id)));
+  return rows[0];
+}
+
+export async function getHostedScriptByName(ownerId: number, name: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(hostedScripts).where(and(eq(hostedScripts.userId, ownerId), eq(hostedScripts.name, name))).limit(1);
+  return rows[0];
+}
+
+export async function addTimeToLicense(ownerId: number, keyCode: string, durationMs: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const rows = await db.select().from(licenses).where(and(eq(licenses.ownerId, ownerId), eq(licenses.keyCode, keyCode))).limit(1);
+  const license = rows[0];
+  if (!license) return undefined;
+  const base = license.expiresAt && license.expiresAt.getTime() > Date.now() ? license.expiresAt.getTime() : Date.now();
+  const expiresAt = new Date(base + durationMs);
+  await db.update(licenses).set({ expiresAt, status: "active" }).where(eq(licenses.id, license.id));
+  return { ...license, expiresAt };
+}
+
+export async function createWarning(input: typeof warnings.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const result = await db.insert(warnings).values(input);
+  return { id: Number(result[0].insertId), ...input };
 }
 
 export async function createKeyAuditLog(input: { ownerId: number; actorDiscordId: string; action: "generate" | "delete"; keyCode: string }) {

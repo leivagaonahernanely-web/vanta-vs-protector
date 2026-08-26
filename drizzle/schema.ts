@@ -20,6 +20,8 @@ export const users = mysqlTable("users", {
   discordChannelId: varchar("discordChannelId", { length: 32 }),
   discordUserId: varchar("discordUserId", { length: 32 }),
   discordUsername: varchar("discordUsername", { length: 128 }),
+  discordNickname: varchar("discordNickname", { length: 128 }),
+  discordAvatarUrl: varchar("discordAvatarUrl", { length: 500 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -97,6 +99,28 @@ export const keyAuditLogs = mysqlTable("keyAuditLogs", {
   actorDiscordId: varchar("actorDiscordId", { length: 32 }).notNull(),
   action: mysqlEnum("action", ["generate", "delete"]).notNull(),
   keyCode: varchar("keyCode", { length: 10 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const discordPanels = mysqlTable("discordPanels", {
+  id: int("id").autoincrement().primaryKey(),
+  ownerId: int("ownerId").notNull().references(() => users.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: varchar("description", { length: 1000 }),
+  channelId: varchar("channelId", { length: 32 }).notNull(),
+  targetScript: varchar("targetScript", { length: 255 }).notNull(),
+  hwidHours: int("hwidHours").default(24).notNull(),
+  messageId: varchar("messageId", { length: 32 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const warnings = mysqlTable("warnings", {
+  id: int("id").autoincrement().primaryKey(),
+  ownerId: int("ownerId").notNull().references(() => users.id),
+  hostedScriptId: int("hostedScriptId").references(() => hostedScripts.id),
+  discordUserId: varchar("discordUserId", { length: 32 }).notNull(),
+  reason: varchar("reason", { length: 500 }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

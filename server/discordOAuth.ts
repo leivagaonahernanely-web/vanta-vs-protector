@@ -10,7 +10,7 @@ const CALLBACK_PATH = "/api/discord/callback";
 
 type DiscordState = { nonce: string; redirectUri: string };
 type DiscordTokenResponse = { access_token?: string };
-type DiscordUser = { id?: string; username?: string; global_name?: string };
+type DiscordUser = { id?: string; username?: string; global_name?: string; avatar?: string | null };
 
 function encodeState(state: DiscordState) {
   return Buffer.from(JSON.stringify(state), "utf8").toString("base64url");
@@ -91,7 +91,9 @@ export function registerDiscordOAuthRoutes(app: Express) {
         res.redirect("/?discord=login-required");
         return;
       }
-      await linkDiscordIdentity(currentUser.id, discordUser.id, discordUser.global_name || discordUser.username);
+      const displayName = discordUser.global_name || discordUser.username;
+      const avatarUrl = discordUser.avatar ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png?size=128` : null;
+      await linkDiscordIdentity(currentUser.id, discordUser.id, displayName, discordUser.global_name || null, avatarUrl);
       res.redirect("/?discord=connected");
     } catch (error) {
       console.error("[Discord OAuth] Callback failed", error);

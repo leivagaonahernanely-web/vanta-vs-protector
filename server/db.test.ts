@@ -34,7 +34,7 @@ vi.mock("drizzle-orm/mysql2", () => ({
   })),
 }));
 
-import { createProtection, getProtectionsByUser, updateDiscordChannelId } from "./db";
+import { createDiscordPanel, createProtection, getDiscordPanelsByOwner, getProtectionsByUser, updateDiscordChannelId } from "./db";
 
 const saved = {
   id: 4,
@@ -70,6 +70,21 @@ describe("database persistence helpers", () => {
     const result = await createProtection({ ...saved, id: undefined });
     expect(database.insertValues).toHaveBeenCalled();
     expect(result).toEqual(saved);
+  });
+
+  it("inserts a Discord panel with its owner and message metadata", async () => {
+    const panel = { id: 12, ownerId: 9, name: "Vanta lagger", description: "Buyer panel", channelId: "123456789012345678", targetScript: "main.lua", hwidHours: 24, messageId: "987654321098765432", createdAt: new Date(), updatedAt: new Date() };
+    database.selectLimit.mockResolvedValueOnce([panel]);
+    const result = await createDiscordPanel({ ...panel, id: undefined });
+    expect(database.insertValues).toHaveBeenCalled();
+    expect(result).toEqual(panel);
+  });
+
+  it("filters and orders Discord panels by owner", async () => {
+    const result = await getDiscordPanelsByOwner(9);
+    expect(database.selectWhere).toHaveBeenCalled();
+    expect(database.selectOrderBy).toHaveBeenCalled();
+    expect(result).toEqual([saved]);
   });
 
   it("filters and orders protection history by user", async () => {

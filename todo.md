@@ -124,3 +124,19 @@
 
 - [x] Exponer y probar el handler completo de InteractionCreate para /panel con una única respuesta pública
 - [x] Reproducir en prueba una interacción ya reconocida y confirmar que el guard anti-40060 evita una segunda respuesta
+
+- [x] Separar Overview como vista informativa sin acciones de administración
+- [x] Reorganizar el menú lateral en Workspace, Protection, Panels, Keys y Settings
+- [x] Eliminar comandos slash globales antiguos y sincronizar solo el conjunto nuevo por servidor
+- [x] Implementar /addtime, /warn, /dropkey y /prices con acciones reales
+- [x] Mostrar estado Gateway online/connecting/offline con reintentos automáticos
+- [x] Guardar y mostrar avatar, nombre, apodo e ID de Discord
+- [x] Implementar Create New Panel y Manage Panels con persistencia y publicación real
+- [x] Añadir pruebas de contratos de opciones obligatorias/opcionales y paneles persistidos
+
+- [x] Añadir reconexión automática del bot para errores y desconexiones posteriores al arranque y probarla
+- [x] Completar Manage Panels con republicar, actualizar o eliminar paneles persistidos y probar las acciones
+
+- [x] Añadir prueba Vitest explícita del gate de reconexión ante Error y ShardDisconnect, incluyendo un único reintento
+- [x] Añadir pruebas owner-only de discord.republishPanel y discord.deletePanel y manejo de panel inexistente
+- [x] Añadir edición de configuración de panel persistido o documentar y probar que Manage Panels ofrece republicar y eliminar como acciones soportadas
