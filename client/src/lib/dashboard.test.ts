@@ -10,6 +10,7 @@ describe("dashboard navigation contract", () => {
       "Scripts",
       "Obfuscator",
       "License keys",
+      "Plan keys",
       "HWID bans",
       "Logs",
       "Plans",

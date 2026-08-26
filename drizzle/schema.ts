@@ -88,6 +88,7 @@ export type InsertLicense = typeof licenses.$inferInsert;
 export const accessRules = mysqlTable("accessRules", {
   id: int("id").autoincrement().primaryKey(),
   ownerId: int("ownerId").notNull().references(() => users.id),
+  hostedScriptId: int("hostedScriptId").references(() => hostedScripts.id),
   kind: mysqlEnum("kind", ["user", "role"]).notNull(),
   discordId: varchar("discordId", { length: 32 }).notNull(),
   label: varchar("label", { length: 128 }),

@@ -66,16 +66,14 @@ describe("Discord access panel", () => {
     expect(concurrent.followUp).not.toHaveBeenCalled();
   });
 
-  it("runs the real /panel interaction flow as one public reply", async () => {
+  it("rejects /panel when the Discord owner is not linked", async () => {
     const reply = vi.fn();
-    const interaction = { isModalSubmit: () => false, isButton: () => false, isChatInputCommand: () => true, commandName: "panel", replied: false, deferred: false, reply };
+    const interaction = { isModalSubmit: () => false, isButton: () => false, isChatInputCommand: () => true, commandName: "panel", user: { id: "not-linked" }, replied: false, deferred: false, reply };
     await handleInteraction(interaction);
     expect(reply).toHaveBeenCalledTimes(1);
     const payload = reply.mock.calls[0][0];
-    expect(payload.ephemeral).not.toBe(true);
-    expect(payload.embeds[0].data.title).toBe("Vanta.vs Protector · Access Panel");
-    await handleInteraction(interaction);
-    expect(reply).toHaveBeenCalledTimes(1);
+    expect(payload.ephemeral).toBe(true);
+    expect(payload.content).toContain("owner vinculado");
   });
 
   it("runs /updates as a public styled embed", async () => {
@@ -107,13 +105,14 @@ describe("Discord access panel", () => {
     expect(options("deletekey").find((item: any) => item.name === "key").required).toBe(true);
     expect(options("deletekey").find((item: any) => item.name === "user").required).toBe(false);
     expect(options("whitelabel").find((item: any) => item.name === "kind").required).toBe(true);
-    expect(options("whitelabel").find((item: any) => item.name === "target").required).toBe(false);
+    expect(options("whitelabel")).toHaveLength(3);
+    expect(options("whitelabel").find((item: any) => item.name === "script").autocomplete).toBe(true);
+    expect(options("whitelabel").find((item: any) => item.name === "script").required).toBe(true);
+    expect(options("whitelabel").find((item: any) => item.name === "target").required).toBe(true);
     expect(options("whitelabel").find((item: any) => item.name === "target").autocomplete).toBe(true);
-    expect(options("whitelabel").find((item: any) => item.name === "user").type).toBe(6);
-    expect(options("whitelabel").find((item: any) => item.name === "role").type).toBe(8);
-    expect(options("unwhitelist").find((item: any) => item.name === "target").autocomplete).toBe(true);
-    expect(options("unwhitelist").find((item: any) => item.name === "user").type).toBe(6);
-    expect(options("unwhitelist").find((item: any) => item.name === "role").type).toBe(8);
+    expect(options("unwhitelist")).toHaveLength(3);
+    expect(options("unwhitelist").find((item: any) => item.name === "script").autocomplete).toBe(true);
+    expect(options("unwhitelist").find((item: any) => item.name === "target").required).toBe(true);
     expect(options("blacklist").find((item: any) => item.name === "script").required).toBe(true);
     expect(options("blacklist").find((item: any) => item.name === "user").required).toBe(true);
     expect(options("resethwid").find((item: any) => item.name === "script").required).toBe(true);
@@ -123,7 +122,7 @@ describe("Discord access panel", () => {
     expect(options("dropkey").find((item: any) => item.name === "amount").required).toBe(true);
   });
 
-  it("autocompletes guild users and roles based on the selected kind", () => {
+  it("autocompletes guild users and roles based on the selected kind", async () => {
     const members = new Map([
       ["u1", { user: { id: "u1", username: "hernan" }, displayName: "Hernán" }],
       ["u2", { user: { id: "u2", username: "other" }, displayName: "Other" }],
@@ -132,9 +131,9 @@ describe("Discord access panel", () => {
       ["r1", { id: "r1", name: "Premium" }],
       ["r2", { id: "r2", name: "Staff" }],
     ]);
-    const make = (kind: string, focused: string) => ({ guildId: "guild", options: { getString: () => kind, getFocused: () => focused }, guild: { members: { cache: members }, roles: { cache: roles } } });
-    expect(targetChoices(make("user", "hern"))).toEqual([{ name: "Usuario · Hernán", value: "user:u1" }]);
-    expect(targetChoices(make("role", "prem"))).toEqual([{ name: "Rol · Premium", value: "role:r1" }]);
+    const make = (kind: string, focused: string) => ({ guildId: "guild", options: { getString: () => kind, getFocused: () => ({ name: "target", value: focused }) }, guild: { members: { cache: members }, roles: { cache: roles } } });
+    expect(await targetChoices(make("user", "hern"))).toEqual([{ name: "User · Hernán", value: "user:u1" }]);
+    expect(await targetChoices(make("role", "prem"))).toEqual([{ name: "Role · Premium", value: "role:r1" }]);
   });
 
   it("recognizes the Discord guild owner independently from the linked database identity", () => {

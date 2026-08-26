@@ -329,10 +329,12 @@ export async function getHostedScriptSourceByUser(userId: number, id: number) {
   return row ? { ...row, code: row.sourceCode ?? row.code } : undefined;
 }
 
-export async function deleteAccessRuleByDiscordId(ownerId: number, discordId: string) {
+export async function deleteAccessRuleByDiscordId(ownerId: number, discordId: string, hostedScriptId?: number) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const result = await db.delete(accessRules).where(and(eq(accessRules.ownerId, ownerId), eq(accessRules.discordId, discordId), ne(accessRules.label, "__key_manager__")));
+  const filters = [eq(accessRules.ownerId, ownerId), eq(accessRules.discordId, discordId), ne(accessRules.label, "__key_manager__")];
+  if (hostedScriptId) filters.push(eq(accessRules.hostedScriptId, hostedScriptId));
+  const result = await db.delete(accessRules).where(and(...filters));
   return Number(result[0]?.affectedRows ?? 0) > 0;
 }
 
@@ -404,11 +406,12 @@ export async function deleteKeyAuditLogsByOwner(ownerId: number) {
   return { success: true as const };
 }
 
-export async function createAccessRuleIfAbsent(input: { ownerId: number; kind: "user" | "role"; discordId: string; label?: string | null }) {
+export async function createAccessRuleIfAbsent(input: { ownerId: number; hostedScriptId?: number | null; kind: "user" | "role"; discordId: string; label?: string | null }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const existing = await db.select().from(accessRules).where(and(eq(accessRules.ownerId, input.ownerId), eq(accessRules.kind, input.kind), eq(accessRules.discordId, input.discordId), eq(accessRules.active, 1))).limit(1);
+  const scriptFilter = input.hostedScriptId ? eq(accessRules.hostedScriptId, input.hostedScriptId) : isNull(accessRules.hostedScriptId);
+  const existing = await db.select().from(accessRules).where(and(eq(accessRules.ownerId, input.ownerId), scriptFilter, eq(accessRules.kind, input.kind), eq(accessRules.discordId, input.discordId), eq(accessRules.active, 1))).limit(1);
   if (existing[0]) return { added: 0, alreadyWhitelisted: 1, failed: 0 };
-  await db.insert(accessRules).values({ ownerId: input.ownerId, kind: input.kind, discordId: input.discordId, label: input.label ?? null, active: 1 });
+  await db.insert(accessRules).values({ ownerId: input.ownerId, hostedScriptId: input.hostedScriptId ?? null, kind: input.kind, discordId: input.discordId, label: input.label ?? null, active: 1 });
   return { added: 1, alreadyWhitelisted: 0, failed: 0 };
 }

@@ -51,10 +51,10 @@ export const discordCommands = [
   new SlashCommandBuilder().setName("getscript").setDescription("Obtiene el enlace de acceso al script").toJSON(),
   new SlashCommandBuilder().setName("getrole").setDescription("Solicita el rol comprador").toJSON(),
   new SlashCommandBuilder().setName("redeem").setDescription("Canjea una key de acceso").addStringOption(o => o.setName("key").setDescription("Key de 10 dígitos").setRequired(true)).toJSON(),
-  new SlashCommandBuilder().setName("generatekey").setDescription("Genera una key aleatoria para un script").addStringOption(o => o.setName("script").setDescription("Script objetivo").setRequired(true)).addStringOption(o => o.setName("duration").setDescription("Duración; vacío = forever").setRequired(false)).toJSON(),
+  new SlashCommandBuilder().setName("generatekey").setDescription("Genera una key aleatoria para un script hosteado").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addStringOption(o => o.setName("duration").setDescription("Duración; vacío = forever").setRequired(false)).toJSON(),
   new SlashCommandBuilder().setName("deletekey").setDescription("Elimina una key").addStringOption(o => o.setName("key").setDescription("Key a eliminar").setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario opcional").setRequired(false)).addRoleOption(o => o.setName("role").setDescription("Rol opcional").setRequired(false)).toJSON(),
-  new SlashCommandBuilder().setName("whitelabel").setDescription("Añade un usuario o rol a la whitelist").addStringOption(o => o.setName("kind").setDescription("Tipo de objetivo").addChoices({ name: "Usuario", value: "user" }, { name: "Rol", value: "role" }).setRequired(true)).addStringOption(o => o.setName("script").setDescription("Script objetivo").setRequired(true)).addStringOption(o => o.setName("duration").setDescription("Duración opcional").setRequired(false)).addUserOption(o => o.setName("user").setDescription("Selecciona el usuario del servidor").setRequired(false)).addRoleOption(o => o.setName("role").setDescription("Selecciona el rol del servidor").setRequired(false)).addStringOption(o => o.setName("target").setDescription("Selector alternativo").setAutocomplete(true).setRequired(false)).toJSON(),
-  new SlashCommandBuilder().setName("unwhitelist").setDescription("Retira un usuario o rol de la whitelist").addStringOption(o => o.setName("kind").setDescription("Tipo de objetivo").addChoices({ name: "Usuario", value: "user" }, { name: "Rol", value: "role" }).setRequired(true)).addStringOption(o => o.setName("script").setDescription("Script objetivo").setRequired(true)).addUserOption(o => o.setName("user").setDescription("Selecciona el usuario del servidor").setRequired(false)).addRoleOption(o => o.setName("role").setDescription("Selecciona el rol del servidor").setRequired(false)).addStringOption(o => o.setName("target").setDescription("Selector alternativo").setAutocomplete(true).setRequired(false)).toJSON(),
+  new SlashCommandBuilder().setName("whitelabel").setDescription("Añade un usuario o rol a la whitelist").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addStringOption(o => o.setName("kind").setDescription("User o Role").addChoices({ name: "User", value: "user" }, { name: "Role", value: "role" }).setRequired(true)).addStringOption(o => o.setName("target").setDescription("Selecciona el usuario o rol").setAutocomplete(true).setRequired(true)).toJSON(),
+  new SlashCommandBuilder().setName("unwhitelist").setDescription("Retira un usuario o rol de la whitelist").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addStringOption(o => o.setName("kind").setDescription("User o Role").addChoices({ name: "User", value: "user" }, { name: "Role", value: "role" }).setRequired(true)).addStringOption(o => o.setName("target").setDescription("Selecciona el usuario o rol").setAutocomplete(true).setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("blacklist").setDescription("Bloquea un usuario para un script").addStringOption(o => o.setName("script").setDescription("Script objetivo").setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario obligatorio").setRequired(true)).addStringOption(o => o.setName("reason").setDescription("Razón").setRequired(false)).toJSON(),
   new SlashCommandBuilder().setName("resethwid").setDescription("Reinicia el HWID de un usuario").addStringOption(o => o.setName("script").setDescription("Script objetivo").setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario obligatorio").setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("addtime").setDescription("Añade tiempo a una key").addStringOption(o => o.setName("key").setDescription("Key obligatoria").setRequired(true)).addStringOption(o => o.setName("duration").setDescription("Tiempo a añadir").setRequired(true)).toJSON(),
@@ -104,6 +104,10 @@ export function isGuildOwner(input: { actorId: string; guildOwnerId?: string | n
   return Boolean(input.guildOwnerId && input.actorId === input.guildOwnerId);
 }
 async function ownerAccount() { return ENV.ownerOpenId ? getUserByOpenId(ENV.ownerOpenId) : undefined; }
+async function isConfiguredOwner(interaction: any) {
+  const owner = await ownerAccount();
+  return Boolean(owner?.discordUserId && interaction.user?.id === owner.discordUserId);
+}
 async function canManageKeys(interaction: any) {
   const owner = await ownerAccount();
   if (!owner) return { allowed: false, owner: undefined };
@@ -223,23 +227,31 @@ export function startDiscordBot() {
   client.login(ENV.discordBotToken).catch((error) => { started = false; gatewayOnline = false; console.error("[Discord Bot] No se pudo iniciar el Gateway:", error instanceof Error ? error.message : "error desconocido"); scheduleReconnect(); });
 }
 
-export function targetChoices(interaction: any) {
+export async function targetChoices(interaction: any) {
+  const focused = interaction.options.getFocused?.(true);
+  const query = String(focused?.value ?? "").toLowerCase();
+  if (focused?.name === "script") {
+    const owner = await ownerAccount();
+    const scripts = owner ? await getHostedScriptsByUser(owner.id) : [];
+    return scripts.filter((script: any) => !query || script.name.toLowerCase().includes(query)).slice(0, 25).map((script: any) => ({ name: script.name.slice(0, 100), value: script.name }));
+  }
   const kind = interaction.options.getString("kind") ?? "user";
-  const query = String(interaction.options.getFocused?.() ?? "").toLowerCase();
-  const values = kind === "role"
-    ? [...(interaction.guild?.roles?.cache?.values?.() ?? [])].filter((role: Role) => role.id !== interaction.guildId && (!query || role.name.toLowerCase().includes(query))).slice(0, 25).map((role: Role) => ({ name: `Rol · ${role.name}`.slice(0, 100), value: `role:${role.id}` }))
-    : [...(interaction.guild?.members?.cache?.values?.() ?? [])].filter((member: any) => !member.user?.bot && (!query || `${member.displayName} ${member.user?.username}`.toLowerCase().includes(query))).slice(0, 25).map((member: any) => ({ name: `Usuario · ${member.displayName || member.user.username}`.slice(0, 100), value: `user:${member.user.id}` }));
-  return values;
+  return kind === "role"
+    ? [...(interaction.guild?.roles?.cache?.values?.() ?? [])].filter((role: Role) => role.id !== interaction.guildId && (!query || role.name.toLowerCase().includes(query))).slice(0, 25).map((role: Role) => ({ name: `Role · ${role.name}`.slice(0, 100), value: `role:${role.id}` }))
+    : [...(interaction.guild?.members?.cache?.values?.() ?? [])].filter((member: any) => !member.user?.bot && (!query || `${member.displayName} ${member.user?.username}`.toLowerCase().includes(query))).slice(0, 25).map((member: any) => ({ name: `User · ${member.displayName || member.user.username}`.slice(0, 100), value: `user:${member.user.id}` }));
 }
 
 export async function handleInteraction(interaction: any) {
   try {
-    if (interaction.isAutocomplete?.()) return interaction.respond(targetChoices(interaction));
+    if (interaction.isAutocomplete?.()) return interaction.respond(await targetChoices(interaction));
     if (interaction.isModalSubmit()) return handleModal(interaction);
     if (interaction.isButton()) return handleButton(interaction);
     if (!interaction.isChatInputCommand()) return;
     if (interaction.commandName === "ping") return respond(interaction, { content: `Pong · ${Math.round(client?.ws.ping ?? 0)}ms`, ephemeral: true });
-    if (interaction.commandName === "panel") return respond(interaction, panelMessage());
+    if (interaction.commandName === "panel") {
+      if (!(await isConfiguredOwner(interaction))) return respond(interaction, { content: "⛔ Solo el owner vinculado desde la web puede publicar el panel.", ephemeral: true });
+      return respond(interaction, panelMessage());
+    }
     if (interaction.commandName === "prices") return prices(interaction);
     if (interaction.commandName === "updates") return updates(interaction);
     if (interaction.commandName === "stats") return respond(interaction, { content: "Vanta.vs Protector está conectado. Usa el dashboard web para consultar scripts, licencias y actividad.", ephemeral: true });
@@ -312,24 +324,28 @@ async function redeem(interaction: any, rawKey: string) {
 }
 async function configureKeyRole(interaction: any, role: { id: string }) {
   const owner = await ownerAccount();
-  if (!owner || !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) return respond(interaction, { content: "⛔ Solo un administrador puede configurar este rol.", ephemeral: true });
+  if (!owner || !(await isConfiguredOwner(interaction))) return respond(interaction, { content: "⛔ Solo el owner vinculado desde la web puede configurar Generate Key Role.", ephemeral: true });
   await setKeyManagerRole(owner.id, role.id);
   return respond(interaction, { content: `✅ El rol <@&${role.id}> ahora puede usar "/generatekey" y "/deletekey".`, ephemeral: true });
 }
-async function whitelist(interaction: any, discordId: string, kind: "user" | "role") {
+async function whitelist(interaction: any, discordId: string, kind: "user" | "role", scriptName: string) {
   const owner = await ownerAccount();
-  if (!owner || (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) && interaction.user.id !== owner.discordUserId)) return respond(interaction, { content: "⛔ Solo el propietario o un administrador puede modificar la whitelist.", ephemeral: true });
-  const counts = await createAccessRuleIfAbsent({ ownerId: owner.id, kind, discordId: discordId.trim(), label: kind === "role" ? "Buyer role" : "Buyer user" });
+  if (!owner || interaction.user.id !== owner.discordUserId) return respond(interaction, { content: "⛔ Solo el owner vinculado puede modificar la whitelist.", ephemeral: true });
+  const script = await getHostedScriptByName(owner.id, scriptName);
+  if (!script) return respond(interaction, { content: "❌ Selecciona un script hosteado válido de tu workspace.", ephemeral: true });
+  const counts = await createAccessRuleIfAbsent({ ownerId: owner.id, hostedScriptId: script.id, kind, discordId: discordId.trim(), label: kind === "role" ? "Buyer role" : "Buyer user" });
   const rules = await getAccessRulesByOwner(owner.id);
   const channel = interaction.channelId ? `<#${interaction.channelId}>` : "canal actual";
-  const embed = new EmbedBuilder().setColor(0x57f287).setTitle("✅ Whitelisted").setDescription(`Acceso concedido a **${kind === "role" ? `<@&${discordId}>` : `<@${discordId}>`}** para Vanta.vs Protector (forever).\n\n**Added:** ${counts.added} · **Already whitelisted:** ${counts.alreadyWhitelisted} · **Failed:** ${counts.failed}\n\nAccess the script via → ${channel}`).setFooter({ text: `Reglas activas: ${rules.length}` });
+  const embed = new EmbedBuilder().setColor(0x57f287).setTitle("✅ Whitelisted").setDescription(`Acceso concedido a **${kind === "role" ? `<@&${discordId}>` : `<@${discordId}>`}** en **${script.name}**.\n\n**Added:** ${counts.added} · **Already whitelisted:** ${counts.alreadyWhitelisted} · **Failed:** ${counts.failed}\n\nAccess the script via → ${channel}`).setFooter({ text: `Reglas activas: ${rules.length}` });
   return respond(interaction, { embeds: [embed] });
 }
-async function unwhitelist(interaction: any, discordId: string) {
+async function unwhitelist(interaction: any, discordId: string, scriptName: string) {
   const owner = await ownerAccount();
-  if (!owner || (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) && interaction.user.id !== owner.discordUserId)) return respond(interaction, { content: "⛔ Solo el propietario o un administrador puede modificar la whitelist.", ephemeral: true });
-  const removed = await deleteAccessRuleByDiscordId(owner.id, discordId.trim());
-  return respond(interaction, { content: removed ? `✅ Whitelist retirada para **${discordId.trim()}**.` : "No se encontró una regla activa para ese ID.", ephemeral: true });
+  if (!owner || interaction.user.id !== owner.discordUserId) return respond(interaction, { content: "⛔ Solo el owner vinculado puede modificar la whitelist.", ephemeral: true });
+  const script = await getHostedScriptByName(owner.id, scriptName);
+  if (!script) return respond(interaction, { content: "❌ Selecciona un script hosteado válido de tu workspace.", ephemeral: true });
+  const removed = await deleteAccessRuleByDiscordId(owner.id, discordId.trim(), script.id);
+  return respond(interaction, { content: removed ? `✅ Whitelist retirada para **${discordId.trim()}** en **${script.name}**.` : "No se encontró una regla activa para ese script y destino.", ephemeral: true });
 }
 export function parseDuration(raw: string) {
   const match = raw.trim().match(/^(\d+)\s*(m|min|h|d|day|days|w|week|weeks|mo|month|months|y|year|years)$/i);
@@ -425,16 +441,18 @@ function selectedTarget(interaction: any) {
 async function whitelistCommand(interaction: any) {
   const target = selectedTarget(interaction);
   const selectedKind = interaction.options.getString("kind");
+  const scriptName = interaction.options.getString("script", true);
   if (!target) return respond(interaction, { content: "❌ Selecciona un usuario o rol en el desplegable de target.", ephemeral: true });
   if (selectedKind && target.kind !== selectedKind) return respond(interaction, { content: "❌ El target no coincide con el tipo seleccionado. Vuelve a elegirlo en el desplegable.", ephemeral: true });
-  return whitelist(interaction, target.id, target.kind);
+  return whitelist(interaction, target.id, target.kind, scriptName);
 }
 async function unwhitelistCommand(interaction: any) {
   const target = selectedTarget(interaction);
   const selectedKind = interaction.options.getString("kind");
+  const scriptName = interaction.options.getString("script", true);
   if (!target) return respond(interaction, { content: "❌ Selecciona un usuario o rol en el desplegable de target.", ephemeral: true });
   if (selectedKind && target.kind !== selectedKind) return respond(interaction, { content: "❌ El target no coincide con el tipo seleccionado. Vuelve a elegirlo en el desplegable.", ephemeral: true });
-  return unwhitelist(interaction, target.id);
+  return unwhitelist(interaction, target.id, scriptName);
 }
 
 async function generate(interaction: any, scriptName: string, rawDuration?: string | null) {

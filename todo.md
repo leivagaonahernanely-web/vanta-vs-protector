@@ -312,3 +312,9 @@
 - [x] Añadir formulario para canjear la key y refrescar automáticamente el workspace
 - [x] Mostrar uso y saldo restante de ofuscaciones, scripts y keys por plan
 - [x] Validar la sección Plans en móvil y añadir pruebas del canje y los saldos
+
+- [x] Simplificar /whitelist a selector de script hosteado, tipo User/Role y destino dinámico
+- [x] Mostrar únicamente scripts hosteados por la web como opciones del comando
+- [x] Cargar usuarios al elegir User y roles al elegir Role mediante autocomplete
+- [x] Eliminar IDs o nombres manuales y mantener un máximo de tres opciones principales
+- [x] Añadir pruebas del registro, autocomplete y ejecución de whitelist/unwhitelist
