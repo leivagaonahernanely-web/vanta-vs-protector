@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertProtection, InsertUser, protections, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -35,7 +35,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     };
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod"] as const;
+    const textFields = ["name", "email", "loginMethod", "discordChannelId"] as const;
     type TextField = (typeof textFields)[number];
 
     const assignNullable = (field: TextField) => {
@@ -89,4 +89,24 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+export async function createProtection(protection: InsertProtection) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const result = await db.insert(protections).values(protection);
+  const insertedId = Number(result[0].insertId);
+  const rows = await db.select().from(protections).where(eq(protections.id, insertedId)).limit(1);
+  return rows[0];
+}
+
+export async function getProtectionsByUser(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(protections).where(eq(protections.userId, userId)).orderBy(desc(protections.createdAt)).limit(50);
+}
+
+export async function updateDiscordChannelId(userId: number, discordChannelId: string | null) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(users).set({ discordChannelId }).where(eq(users.id, userId));
+}
+

@@ -17,6 +17,7 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  discordChannelId: varchar("discordChannelId", { length: 32 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -25,4 +26,21 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+export const protections = mysqlTable("protections", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  sourceSize: int("sourceSize").notNull(),
+  status: mysqlEnum("status", ["protected", "review", "failed"]).default("protected").notNull(),
+  mode: mysqlEnum("mode", ["fast", "balanced", "fortified"]).default("balanced").notNull(),
+  obfuscateStrings: int("obfuscateStrings").default(1).notNull(),
+  addLoaderGuard: int("addLoaderGuard").default(1).notNull(),
+  checksum: varchar("checksum", { length: 16 }).notNull(),
+  resultCode: text("resultCode"),
+  message: text("message"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Protection = typeof protections.$inferSelect;
+export type InsertProtection = typeof protections.$inferInsert;
