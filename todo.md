@@ -383,3 +383,10 @@
 - [x] Mantener el orden de los bloques al construir la source final
 - [x] Validar y previsualizar la salida Lua resultante
 - [x] Añadir pruebas de composición Lua/texto y separación del módulo
+
+- [x] Eliminar Block Builder del menú y del proyecto visible
+- [x] Corregir la carga real de archivos Lua hacia el editor y hosting
+- [x] Hacer que Get Script entregue script y key activa juntos
+- [x] Rechazar key ausente, revocada, expirada o con HWID incompatible con mensajes claros
+- [x] Mantener el loader sin exponer source y con respuesta utilizable por el juego
+- [x] Añadir pruebas de upload, Get Script, key ausente y HWID inválido

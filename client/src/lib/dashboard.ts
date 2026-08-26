@@ -1,7 +1,7 @@
 export type DashboardNavItem = {
   group: "Workspace" | "Protection" | "Panels";
-  label: "Overview" | "Scripts" | "Obfuscator" | "Block Builder" | "License keys" | "Plan keys" | "HWID bans" | "Logs" | "Plans" | "Create New Panel" | "Manage Panels" | "Prices" | "Updates";
-  icon: "overview" | "scripts" | "obfuscator" | "builder" | "keys" | "hwid" | "logs" | "plans" | "panel" | "prices" | "updates" | "settings";
+  label: "Overview" | "Scripts" | "Obfuscator" | "License keys" | "Plan keys" | "HWID bans" | "Logs" | "Plans" | "Create New Panel" | "Manage Panels" | "Prices" | "Updates";
+  icon: "overview" | "scripts" | "obfuscator" | "keys" | "hwid" | "logs" | "plans" | "panel" | "prices" | "updates" | "settings";
   badge?: "scripts";
 };
 
@@ -9,7 +9,6 @@ export const dashboardNavItems: DashboardNavItem[] = [
   { group: "Workspace", label: "Overview", icon: "overview" },
   { group: "Workspace", label: "Scripts", icon: "scripts", badge: "scripts" },
   { group: "Workspace", label: "Obfuscator", icon: "obfuscator" },
-  { group: "Workspace", label: "Block Builder", icon: "builder" },
   { group: "Protection", label: "License keys", icon: "keys" },
   { group: "Protection", label: "Plan keys", icon: "keys" },
   { group: "Protection", label: "HWID bans", icon: "hwid" },

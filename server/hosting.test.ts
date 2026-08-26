@@ -32,7 +32,7 @@ describe("public hosted scripts", () => {
     const response = responseMock();
     await getHandler()({ params: { slug: script.slug }, query: {}, headers: { accept: "*/*" }, protocol: "https", get: () => "vanta.test" }, response);
     expect(response.statusCode).toBe(403);
-    expect(response.body).toContain("TRIAL GLOBAL");
+    expect(response.body).toContain("No key was provided");
   });
 
   it("renders the FFA loader with the global trial key without source", async () => {
@@ -52,14 +52,14 @@ describe("public hosted scripts", () => {
     const response = responseMock();
     await getHandler()({ params: { slug: script.slug }, query: {}, headers: { accept: "*/*" }, protocol: "https", get: () => "vanta.test" }, response);
     expect(response.statusCode).toBe(403);
-    expect(response.body).toContain("requiere una key activa");
+    expect(response.body).toContain("No key was provided");
   });
 
   it("serves a protected artifact when the key is active", async () => {
     findMock.mockResolvedValue({ ...script, ffaMode: 0, scriptKey: null });
     licenseMock.mockResolvedValue({ id: 4, status: "active" });
     const response = responseMock();
-    await getHandler()({ params: { slug: script.slug }, query: { key: "PRO-ctxsfh9n9hodbsj0" }, headers: { accept: "*/*", "x-hwid": "device-a" }, protocol: "https", get: () => "vanta.test" }, response);
+    await getHandler()({ params: { slug: script.slug }, query: { key: "86vC3ZULuEQpOImpm5VBB6oLROAQmPLe" }, headers: { accept: "*/*", "x-hwid": "device-a" }, protocol: "https", get: () => "vanta.test" }, response);
     expect(response.statusCode).toBe(200);
     expect(response.body).toBe("return true");
   });

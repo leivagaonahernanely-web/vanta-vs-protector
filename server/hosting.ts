@@ -25,11 +25,17 @@ export function registerHostingRoutes(app: Express) {
       const requestedKey = typeof query.key === "string" ? query.key.trim() : typeof query.script_key === "string" ? query.script_key.trim() : "";
       const trialAccess = Boolean(script.ffaMode) && requestedKey === "trial";
       const requestedHwid = typeof req.headers["x-hwid"] === "string" ? req.headers["x-hwid"].trim() : "";
-      const protectedAccess = !script.ffaMode && Boolean(requestedKey && requestedHwid && requestedHwid.length <= 128 && /^(?:FREE|PRO|PREMIUM)-[a-z0-9]{16}$/i.test(requestedKey) && await claimLicenseHwid(script.id, requestedKey, requestedHwid));
+      const normalKeyPattern = /^(?:[a-z0-9]{32,64}|(?:FREE|PRO|PREMIUM)-[a-z0-9]{16})$/i;
+      const hasValidKeyShape = Boolean(requestedKey && normalKeyPattern.test(requestedKey));
+      const protectedAccess = !script.ffaMode && Boolean(requestedKey && requestedHwid && requestedHwid.length <= 128 && hasValidKeyShape && await claimLicenseHwid(script.id, requestedKey, requestedHwid));
       if (!trialAccess && !protectedAccess) {
-        const message = script.ffaMode ? "Este script está en TRIAL GLOBAL. Usa el loader oficial con `script_key = \"trial\"`." : "Este script requiere una key activa. Usa el loader oficial con tu key automática.";
+        const message = script.ffaMode
+          ? (requestedKey ? "La key trial no es válida." : "No key was provided")
+          : (!requestedKey ? "No key was provided" : (!requestedHwid ? "HWID not compatible" : "HWID not compatible"));
         if (acceptsHtml) res.status(403).type("html").send(browserNotice("Key required", message));
-        else res.status(403).type("text/plain").send(message);
+        else {
+          res.status(403).type("text/plain; charset=utf-8").send(`game:GetService("Players").LocalPlayer:Kick(${JSON.stringify(message)})`);
+        }
         return;
       }
       res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300");
