@@ -28,7 +28,7 @@ const { pricesMutate, updatesMutate, trpcProxy } = vi.hoisted(() => {
   const makeProxy = (path: string[] = []): object => new Proxy({}, {
     get: (_target, key: string | symbol) => {
       const name = String(key);
-      if (name === "useQuery") return () => queryResult();
+      if (name === "useQuery") return () => path.join(".") === "discord.listPanels" ? queryResult([{ id: 1, name: "Panel principal", channelId: "123456789012345678" }]) : queryResult();
       if (name === "useMutation") {
         if (path.join(".") === "discord.publishPrices") return () => ({ mutate: pricesMutate, isPending: false });
         if (path.join(".") === "discord.publishUpdates") return () => ({ mutate: updatesMutate, isPending: false });
@@ -55,18 +55,20 @@ describe("Home authenticated dashboard render", () => {
     fireEvent.change(screen.getByPlaceholderText("Nombre de tu script o marca"), { target: { value: "Vanta.vs APP" } });
     fireEvent.change(screen.getAllByPlaceholderText("Ej. Duels Script")[0], { target: { value: "Duels Script" } });
     fireEvent.change(screen.getAllByPlaceholderText("Una línea por plan o método de pago...")[0], { target: { value: "$7 USD" } });
+    fireEvent.change(screen.getByLabelText("Panel existente para publicar"), { target: { value: "123456789012345678" } });
     fireEvent.click(screen.getByRole("button", { name: /Publicar Prices/i }));
-    expect(pricesMutate).toHaveBeenCalledWith(expect.objectContaining({ title: "Vanta.vs APP" }));
+    expect(pricesMutate).toHaveBeenCalledWith(expect.objectContaining({ title: "Vanta.vs APP", channelId: "123456789012345678" }));
     expect(pricesMutate.mock.calls[0][0].description).toContain("**Duels Script**\n$7 USD");
-    expect(pricesMutate.mock.calls[0][0].description).toContain("**Premium Plan**");
+    expect(pricesMutate.mock.calls[0][0].description).not.toContain("Premium Plan");
   });
 
   it("renders the Updates editor and submits its title and content through tRPC", () => {
     render(<Home initialSection="Updates" />);
     fireEvent.change(screen.getByPlaceholderText("Ej. Nueva versión disponible"), { target: { value: "Nueva versión" } });
     fireEvent.change(screen.getByPlaceholderText("Escribe los cambios, correcciones y avisos importantes..."), { target: { value: "Correcciones y mejoras." } });
+    fireEvent.change(screen.getByLabelText("Panel existente para publicar"), { target: { value: "123456789012345678" } });
     fireEvent.click(screen.getByRole("button", { name: /Publicar actualización/i }));
-    expect(updatesMutate).toHaveBeenCalledWith({ title: "Nueva versión", description: "Correcciones y mejoras." });
+    expect(updatesMutate).toHaveBeenCalledWith({ title: "Nueva versión", description: "Correcciones y mejoras.", channelId: "123456789012345678" });
   });
 
   it("renders the informative Overview with one navigation entry per destination and bot status", () => {

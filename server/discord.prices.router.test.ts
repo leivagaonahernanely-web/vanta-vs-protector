@@ -3,6 +3,7 @@ import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 
 const botMocks = vi.hoisted(() => ({ publishPricesMessage: vi.fn(), publishUpdatesMessage: vi.fn() }));
+const channelId = "123456789012345678";
 const discordMocks = vi.hoisted(() => ({ checkDiscordChannel: vi.fn() }));
 
 vi.mock("./discordBot", async () => ({ ...(await vi.importActual<typeof import("./discordBot")>("./discordBot")), ...botMocks }));
@@ -36,7 +37,7 @@ describe("discord prices publishing", () => {
     discordMocks.checkDiscordChannel.mockResolvedValue({ ok: true, status: 200, message: "Canal accesible." });
     botMocks.publishPricesMessage.mockResolvedValue({ channelId: context.user.discordChannelId, title: "Vanta.vs APP", messageId: "prices-message" });
 
-    const result = await appRouter.createCaller(context).discord.publishPrices({ title: "Vanta.vs APP", description: "Accepted Payments\n\n• $7 USD\n• 700 Robux — Lifetime" });
+    const result = await appRouter.createCaller(context).discord.publishPrices({ title: "Vanta.vs APP", description: "Accepted Payments\n\n• $7 USD\n• 700 Robux — Lifetime", channelId });
 
     expect(discordMocks.checkDiscordChannel).toHaveBeenCalledWith(context.user.discordChannelId);
     expect(botMocks.publishPricesMessage).toHaveBeenCalledWith(context.user.discordChannelId, { title: "Vanta.vs APP", description: "Accepted Payments\n\n• $7 USD\n• 700 Robux — Lifetime" });
@@ -47,17 +48,16 @@ describe("discord prices publishing", () => {
     discordMocks.checkDiscordChannel.mockResolvedValue({ ok: true, status: 200, message: "Canal accesible." });
     botMocks.publishUpdatesMessage.mockResolvedValue({ channelId: context.user.discordChannelId, title: "Nueva versión", messageId: "updates-message" });
 
-    const result = await appRouter.createCaller(context).discord.publishUpdates({ title: "Nueva versión", description: "Correcciones y mejoras importantes." });
+    const result = await appRouter.createCaller(context).discord.publishUpdates({ title: "Nueva versión", description: "Correcciones y mejoras importantes.", channelId });
 
     expect(discordMocks.checkDiscordChannel).toHaveBeenCalledWith(context.user.discordChannelId);
     expect(botMocks.publishUpdatesMessage).toHaveBeenCalledWith(context.user.discordChannelId, { title: "Nueva versión", description: "Correcciones y mejoras importantes." });
     expect(result).toEqual({ channelId: context.user.discordChannelId, title: "Nueva versión", messageId: "updates-message" });
   });
 
-  it("requires a configured channel", async () => {
+  it("requires an explicitly selected channel", async () => {
     botMocks.publishPricesMessage.mockClear();
-    const noChannel = { ...context, user: { ...context.user, discordChannelId: null } };
-    await expect(appRouter.createCaller(noChannel).discord.publishPrices({ title: "Prices", description: "Plans" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(appRouter.createCaller(context).discord.publishPrices({ title: "Prices", description: "Contenido" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(botMocks.publishPricesMessage).not.toHaveBeenCalled();
   });
 });

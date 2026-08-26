@@ -327,3 +327,16 @@
 - [x] Hacer que el mensaje de generación normal muestre únicamente la key
 - [x] Pulir UI y sonidos sin volver a mezclar responsabilidades entre módulos
 - [x] Añadir pruebas de separación, formato y respuesta limpia
+
+- [x] Corregir Get Script para reconocer la key canjeada y resolver el script asociado
+- [x] Mantener las Plan Keys separadas de las licencias normales y no listarlas en Generate / Manage
+- [x] Ocultar Free como opción generable en Plan Keys; Free debe ser el plan inicial
+- [x] Dejar Prices únicamente con nombre, descripción y preview
+- [x] Añadir pruebas de Get Script, separación de keys y ausencia de Free generable
+
+- [x] Usar únicamente paneles existentes en /panel, Prices y Updates
+- [x] Mostrar un estado vacío claro cuando no exista ningún panel creado
+- [x] Añadir selección manual de canal/panel a Prices y Updates sin valor automático
+- [x] Hacer que /panel reutilice uno de los paneles existentes, sin crear otro
+- [x] Eliminar Setup de la navegación visible sin borrar datos de configuración
+- [x] Añadir pruebas de selección manual, estado vacío y ausencia de Setup

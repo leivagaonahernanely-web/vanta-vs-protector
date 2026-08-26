@@ -204,6 +204,12 @@ export async function getLicensesByOwner(ownerId: number) {
   return db.select().from(licenses).where(eq(licenses.ownerId, ownerId)).orderBy(desc(licenses.createdAt)).limit(100);
 }
 
+export async function getActiveLicensesByDiscordUserId(discordUserId: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(licenses).where(and(eq(licenses.discordUserId, discordUserId), eq(licenses.status, "active"))).orderBy(desc(licenses.createdAt)).limit(100);
+}
+
 export async function revokeLicense(ownerId: number, id: number) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");

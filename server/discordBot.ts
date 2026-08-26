@@ -35,6 +35,7 @@ import {
   getHostedScriptById,
   getHostedScriptsByUser,
   getLicensesByOwner,
+  getActiveLicensesByDiscordUserId,
   getUserByDiscordUserId,
   getUserByOpenId,
   redeemLicense,
@@ -277,9 +278,9 @@ export async function handleInteraction(interaction: any) {
 
 async function getUserLicenses(discordUserId: string) {
   const user = await getUserByDiscordUserId(discordUserId);
-  if (!user) return { user: undefined, licenses: [] as any[], scripts: [] as any[] };
-  const licenses = (await getLicensesByOwner(user.id)).filter((license: any) => license.discordUserId === discordUserId && license.status === "active" && (!license.expiresAt || license.expiresAt.getTime() > Date.now()));
-  return { user, licenses, scripts: await getHostedScriptsByUser(user.id) };
+  const licenses = (await getActiveLicensesByDiscordUserId(discordUserId)).filter((license: any) => !license.expiresAt || license.expiresAt.getTime() > Date.now());
+  const scripts = user ? await getHostedScriptsByUser(user.id) : [];
+  return { user, licenses, scripts };
 }
 
 async function getScriptForUser(interaction: any) {
