@@ -44,3 +44,17 @@
 - [x] Añadir test del camino exitoso del callback OAuth con intercambio de token y vinculación de identidad
 
 - [x] Añadir una prueba de éxito del callback Discord que simule token, identidad y vinculación
+
+- [x] Rediseñar la pantalla pública y el panel hacia un dashboard oscuro, compacto y limpio inspirado en la nueva referencia
+- [x] Añadir hosting persistente de scripts Lua con slug o ID público y endpoint GET de contenido
+- [x] Generar y mostrar el loader exacto `loadstring(game:HttpGet("URL"))()` con copiar y descargar
+- [x] Añadir pruebas de creación, lectura pública y control de acceso de scripts alojados
+- [x] Validar el video y comparar visualmente el flujo de hosting con la referencia
+
+- [x] Cambiar el flujo de hosting para mostrar una página pública sin source y solo loader
+- [x] Añadir vista privada de dashboard para administrar scripts alojados
+- [ ] Generar loader con URL pública estable y opción de script_key cuando corresponda
+- [ ] No presentar la protección básica como Luraph; dejar adapter preparado para API oficial/licenciada
+
+- [x] Añadir botón o acción real de descarga para el loader o el script alojado
+- [x] Crear pruebas Vitest para hostedScripts.create y hostedScripts.list con acceso autenticado y no autenticado

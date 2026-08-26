@@ -46,3 +46,18 @@ export const protections = mysqlTable("protections", {
 
 export type Protection = typeof protections.$inferSelect;
 export type InsertProtection = typeof protections.$inferInsert;
+
+export const hostedScripts = mysqlTable("hostedScripts", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  slug: varchar("slug", { length: 32 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: varchar("description", { length: 500 }),
+  ffaMode: int("ffaMode").default(0).notNull(),
+  code: text("code").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type HostedScript = typeof hostedScripts.$inferSelect;
+export type InsertHostedScript = typeof hostedScripts.$inferInsert;

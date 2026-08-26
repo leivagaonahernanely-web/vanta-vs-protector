@@ -5,9 +5,18 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { notifyOwner } from "./_core/notification";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createProtection, getProtectionsByUser, updateDiscordChannelId } from "./db";
+import { createHostedScript, createProtection, getHostedScriptsByUser, getProtectionsByUser, updateDiscordChannelId } from "./db";
+import { nanoid } from "nanoid";
 import { sendDiscordChannelMessage } from "./discord";
 import { buildProtectionArtifact, getProviderStatus } from "./protection";
+
+const hostedScriptInput = z.object({
+  name: z.string().trim().min(1).max(255),
+  description: z.string().trim().max(500).optional(),
+  source: z.string().min(1).max(150_000),
+  ffaMode: z.boolean().default(false),
+  obfuscateSource: z.boolean().default(true),
+});
 
 const protectionInput = z.object({
   name: z.string().trim().min(1).max(255),
@@ -38,6 +47,52 @@ export const appRouter = router({
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
+    }),
+  }),
+
+  hostedScripts: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const origin = `${ctx.req.protocol}://${ctx.req.get("host")}`;
+      const rows = await getHostedScriptsByUser(ctx.user.id);
+      return rows.map((row) => ({
+        id: row.id,
+        slug: row.slug,
+        name: row.name,
+        description: row.description ?? "",
+        ffaMode: Boolean(row.ffaMode),
+        createdAt: row.createdAt.toISOString(),
+        url: `${origin}/scripts/hosted/${row.slug}`,
+        loader: `loadstring(game:HttpGet("${origin}/scripts/hosted/${row.slug}"))()`,
+      }));
+    }),
+    create: protectedProcedure.input(hostedScriptInput).mutation(async ({ ctx, input }) => {
+      const artifact = buildProtectionArtifact(input.source, {
+        mode: "balanced",
+        obfuscateStrings: input.obfuscateSource,
+        addLoaderGuard: true,
+      });
+      const slug = nanoid(18);
+      const row = await createHostedScript({
+        userId: ctx.user.id,
+        slug,
+        name: input.name,
+        description: input.description || null,
+        ffaMode: input.ffaMode ? 1 : 0,
+        code: artifact.code,
+      });
+      if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No se pudo alojar el script." });
+      const origin = `${ctx.req.protocol}://${ctx.req.get("host")}`;
+      const url = `${origin}/scripts/hosted/${row.slug}`;
+      return {
+        id: row.id,
+        slug: row.slug,
+        name: row.name,
+        description: row.description ?? "",
+        ffaMode: Boolean(row.ffaMode),
+        createdAt: row.createdAt.toISOString(),
+        url,
+        loader: `loadstring(game:HttpGet("${url}"))()`,
+      };
     }),
   }),
 

@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertProtection, InsertUser, protections, users } from "../drizzle/schema";
+import { HostedScript, InsertHostedScript, InsertProtection, InsertUser, hostedScripts, protections, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -114,5 +114,27 @@ export async function linkDiscordIdentity(userId: number, discordUserId: string,
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   await db.update(users).set({ discordUserId, discordUsername }).where(eq(users.id, userId));
+}
+
+export async function createHostedScript(input: InsertHostedScript): Promise<HostedScript | undefined> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const result = await db.insert(hostedScripts).values(input);
+  const insertedId = Number(result[0].insertId);
+  const rows = await db.select().from(hostedScripts).where(eq(hostedScripts.id, insertedId)).limit(1);
+  return rows[0];
+}
+
+export async function getHostedScriptsByUser(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(hostedScripts).where(eq(hostedScripts.userId, userId)).orderBy(desc(hostedScripts.createdAt)).limit(50);
+}
+
+export async function getHostedScriptBySlug(slug: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(hostedScripts).where(eq(hostedScripts.slug, slug)).limit(1);
+  return rows[0];
 }
 
