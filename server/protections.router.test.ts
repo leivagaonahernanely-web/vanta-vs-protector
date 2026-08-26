@@ -4,6 +4,7 @@ import type { TrpcContext } from "./_core/context";
 const mocks = vi.hoisted(() => ({
   createProtection: vi.fn(),
   getProtectionsByUser: vi.fn(),
+  getWorkspaceUsage: vi.fn().mockResolvedValue({ protections: 0, scripts: 0, keys: 0 }),
   updateDiscordChannelId: vi.fn(),
   notifyOwner: vi.fn().mockResolvedValue(true),
   sendDiscordChannelMessage: vi.fn().mockResolvedValue(true),
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("./db", () => ({
   createProtection: mocks.createProtection,
   getProtectionsByUser: mocks.getProtectionsByUser,
+  getWorkspaceUsage: mocks.getWorkspaceUsage,
   updateDiscordChannelId: mocks.updateDiscordChannelId,
 }));
 vi.mock("./_core/notification", () => ({ notifyOwner: mocks.notifyOwner }));

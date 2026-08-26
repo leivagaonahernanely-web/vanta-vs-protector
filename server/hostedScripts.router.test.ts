@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getHostedScriptsByUser: vi.fn(),
   getHostedScriptSourceByUser: vi.fn(),
   getHostedScriptById: vi.fn(),
+  getWorkspaceUsage: vi.fn().mockResolvedValue({ protections: 0, scripts: 0, keys: 0 }),
   updateHostedScript: vi.fn(),
   deleteHostedScript: vi.fn(),
   buildProtectionArtifact: vi.fn(() => ({ code: "-- protected artifact", status: "protected", checksum: "abc123", message: "OK" })),
@@ -16,6 +17,7 @@ vi.mock("./db", () => ({
   getHostedScriptsByUser: mocks.getHostedScriptsByUser,
   getHostedScriptSourceByUser: mocks.getHostedScriptSourceByUser,
   getHostedScriptById: mocks.getHostedScriptById,
+  getWorkspaceUsage: mocks.getWorkspaceUsage,
   updateHostedScript: mocks.updateHostedScript,
   deleteHostedScript: mocks.deleteHostedScript,
   createProtection: vi.fn(),
@@ -38,7 +40,8 @@ describe("hostedScripts router", () => {
     mocks.createHostedScript.mockResolvedValue(hostedRow);
     const result = await appRouter.createCaller(context()).hostedScripts.create({ name: "demo.lua", description: "demo", source: "print('ok')", ffaMode: true, obfuscateSource: true });
     expect(result.url).toBe("https://vanta.test/scripts/hosted/Abc123456789xyz");
-    expect(result.loader).toContain("loadstring(game:HttpGet(\"https://vanta.test/scripts/hosted/Abc123456789xyz\"))()");
+    expect(result.loader).toContain("script_key = \"trial\"");
+    expect(result.loader).toContain("loadstring(game:HttpGet(\"https://vanta.test/scripts/hosted/Abc123456789xyz?key=trial\"))()");
     expect(mocks.createHostedScript).toHaveBeenCalledWith(expect.objectContaining({ userId: 12, name: "demo.lua", ffaMode: 1, code: "-- protected artifact", sourceCode: "print('ok')" }));
   });
 

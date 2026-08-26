@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, ne, or } from "drizzle-orm";
+import { and, count, desc, eq, isNull, ne, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { accessRules, blacklists, discordPanels, hostedScripts, HostedScript, InsertHostedScript, InsertLicense, InsertProtection, InsertUser, keyAuditLogs, licenses, protections, users, warnings } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -129,6 +129,17 @@ export async function getHostedScriptsByUser(userId: number) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(hostedScripts).where(eq(hostedScripts.userId, userId)).orderBy(desc(hostedScripts.createdAt)).limit(50);
+}
+
+export async function getWorkspaceUsage(userId: number) {
+  const db = await getDb();
+  if (!db) return { protections: 0, scripts: 0, keys: 0 };
+  const [protectionRows, scriptRows, licenseRows] = await Promise.all([
+    db.select({ value: count() }).from(protections).where(eq(protections.userId, userId)),
+    db.select({ value: count() }).from(hostedScripts).where(eq(hostedScripts.userId, userId)),
+    db.select({ value: count() }).from(licenses).where(eq(licenses.ownerId, userId)),
+  ]);
+  return { protections: Number(protectionRows[0]?.value ?? 0), scripts: Number(scriptRows[0]?.value ?? 0), keys: Number(licenseRows[0]?.value ?? 0) };
 }
 
 export async function getHostedScriptById(id: number) {

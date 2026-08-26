@@ -5,13 +5,14 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { notifyOwner } from "./_core/notification";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createAccessRule, createBlacklist, createDiscordPanel, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getDiscordPanelsByOwner, getHostedScriptSourceByUser, getHostedScriptsByUser, getHostedScriptById, updateHostedScript, deleteHostedScript, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, updateDiscordChannelId } from "./db";
+import { createAccessRule, createBlacklist, createDiscordPanel, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getDiscordPanelsByOwner, getHostedScriptSourceByUser, getHostedScriptsByUser, getHostedScriptById, updateHostedScript, deleteHostedScript, getWorkspaceUsage, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, updateDiscordChannelId } from "./db";
 import { nanoid } from "nanoid";
 import { randomInt } from "node:crypto";
 import { checkDiscordChannel, getDiscordBotIdentity, sendDiscordChannelMessage } from "./discord";
 import { deletePublishedPanel, getDiscordGatewayStatus, publishDiscordPanel, publishPricesMessage, publishUpdatesMessage } from "./discordBot";
 import { getProtectionAdapterStatus, getProviderStatus, protectWithAdapter } from "./protection";
 import { durationToDays, type DurationUnit } from "../shared/duration";
+import { PLAN_DEFINITIONS, type PlanTier } from "../shared/plans";
 
 const hostedScriptInput = z.object({
   name: z.string().trim().min(1).max(255),
@@ -40,6 +41,16 @@ const licenseInput = z.object({
 });
 const accessRuleInput = z.object({ kind: z.enum(["user", "role"]), discordId: z.string().regex(/^\d{15,22}$/), label: z.string().trim().max(128).optional() });
 const blacklistInput = z.object({ discordUserId: z.string().regex(/^\d{15,22}$/), reason: z.string().trim().max(500).optional() });
+
+async function assertWorkspaceQuota(userId: number, plan: PlanTier | undefined, metric: "obfuscations" | "scripts" | "keys") {
+  const selected = PLAN_DEFINITIONS.find((item) => item.id === (plan ?? "free")) ?? PLAN_DEFINITIONS[0];
+  const limit = selected[metric];
+  if (limit === "unlimited") return;
+  const usage = await getWorkspaceUsage(userId);
+  const current = metric === "obfuscations" ? usage.protections : metric === "scripts" ? usage.scripts : usage.keys;
+  if (current >= limit) throw new TRPCError({ code: "FORBIDDEN", message: `Has alcanzado el límite de ${selected.label} para ${metric}.` });
+}
+
 
 function generateKeyCode() { return String(randomInt(1_000_000_000, 10_000_000_000)); }
 
@@ -126,6 +137,7 @@ export const appRouter = router({
       return { success: true as const };
     }),
     create: protectedProcedure.input(hostedScriptInput).mutation(async ({ ctx, input }) => {
+      await assertWorkspaceQuota(ctx.user.id, (ctx.user as typeof ctx.user & { plan?: PlanTier }).plan, "scripts");
       const artifact = await protectWithAdapter(input.source, {
         mode: "balanced",
         obfuscateStrings: input.obfuscateSource,
@@ -153,7 +165,7 @@ export const appRouter = router({
         ffaMode: Boolean(row.ffaMode),
         createdAt: row.createdAt.toISOString(),
         url,
-        loader: buildRuntimeLoader(url, row.scriptKey),
+        loader: buildRuntimeLoader(url, row.scriptKey, Boolean(row.ffaMode)),
         scriptKey: row.scriptKey,
       };
     }),
@@ -162,6 +174,7 @@ export const appRouter = router({
   licenseKeys: router({
     list: protectedProcedure.query(({ ctx }) => getLicensesByOwner(ctx.user.id)),
     generate: adminProcedure.input(licenseInput).mutation(async ({ ctx, input }) => {
+      await assertWorkspaceQuota(ctx.user.id, (ctx.user as typeof ctx.user & { plan?: PlanTier }).plan, "keys");
       const durationDays = input.durationValue ? durationToDays(input.durationValue, input.durationUnit as DurationUnit) : undefined;
       const expiresAt = durationDays ? new Date(Date.now() + durationDays * 86_400_000) : null;
       const row = await createLicense({ ownerId: ctx.user.id, plan: input.plan, hostedScriptId: input.hostedScriptId ?? null, keyCode: generateKeyCode(), type: input.type, status: "active", discordUserId: input.discordUserId ?? null, hwid: null, expiresAt });
@@ -195,6 +208,7 @@ export const appRouter = router({
     }),
 
     create: protectedProcedure.input(protectionInput).mutation(async ({ ctx, input }) => {
+      await assertWorkspaceQuota(ctx.user.id, (ctx.user as typeof ctx.user & { plan?: PlanTier }).plan, "obfuscations");
       const channelId = input.discordChannelId ?? ctx.user.discordChannelId ?? undefined;
       if (input.discordChannelId && input.discordChannelId !== ctx.user.discordChannelId) {
         await updateDiscordChannelId(ctx.user.id, input.discordChannelId);
