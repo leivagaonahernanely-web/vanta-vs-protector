@@ -107,9 +107,13 @@ describe("Discord access panel", () => {
     expect(options("deletekey").find((item: any) => item.name === "key").required).toBe(true);
     expect(options("deletekey").find((item: any) => item.name === "user").required).toBe(false);
     expect(options("whitelabel").find((item: any) => item.name === "kind").required).toBe(true);
-    expect(options("whitelabel").find((item: any) => item.name === "target").required).toBe(true);
+    expect(options("whitelabel").find((item: any) => item.name === "target").required).toBe(false);
     expect(options("whitelabel").find((item: any) => item.name === "target").autocomplete).toBe(true);
+    expect(options("whitelabel").find((item: any) => item.name === "user").type).toBe(6);
+    expect(options("whitelabel").find((item: any) => item.name === "role").type).toBe(8);
     expect(options("unwhitelist").find((item: any) => item.name === "target").autocomplete).toBe(true);
+    expect(options("unwhitelist").find((item: any) => item.name === "user").type).toBe(6);
+    expect(options("unwhitelist").find((item: any) => item.name === "role").type).toBe(8);
     expect(options("blacklist").find((item: any) => item.name === "script").required).toBe(true);
     expect(options("blacklist").find((item: any) => item.name === "user").required).toBe(true);
     expect(options("resethwid").find((item: any) => item.name === "script").required).toBe(true);

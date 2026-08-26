@@ -244,13 +244,13 @@
 - [ ] Hacer que Get Script entregue directamente el loader y la key del usuario autorizado
 - [ ] Verificar con pruebas que las cinco acciones del panel responden una sola vez y con datos reales
 
-- [ ] Corregir /whitelabel para usar selector nativo de usuario o rol según el tipo elegido
-- [ ] Quitar el ID manual y cargar opciones válidas del guild actual
-- [ ] Añadir pruebas de opciones y persistencia de whitelist por usuario/rol seleccionado
+- [x] Corregir /whitelabel para usar selector nativo de usuario o rol según el tipo elegido
+- [x] Quitar el ID manual y cargar opciones válidas del guild actual
+- [x] Añadir pruebas de opciones y persistencia de whitelist por usuario/rol seleccionado
 
 - [ ] Vincular de forma segura la cuenta Discord del propietario como owner, sin inventar ni hardcodear un ID
 - [x] Añadir apartado privado Generate / Manage para crear keys Free, Pro y Premium
-- [ ] Aplicar cuotas reales de obfuscaciones, scripts y keys por plan
+- [x] Aplicar cuotas reales de obfuscaciones, scripts y keys por plan
 - [ ] Mostrar duración, cantidad, plan y resultado de las keys generadas
 - [ ] Añadir pruebas de autorización, cuotas y generación de keys por plan
 
