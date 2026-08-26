@@ -175,3 +175,7 @@
 
 - [x] Añadir una prueba verificable de Home para carga básica, navegación visible, Overview sin duplicados y estado del bot
 - [x] Documentar en docs que el spinner de manus.im/my-browser?step=settings pertenece a My Browser/Manus y debe reportarse a soporte
+
+- [x] Corregir el rechazo del canal Discord guardado para distinguir ID inválido, canal inexistente y permisos insuficientes
+- [x] Añadir recuperación visible en Setup y evitar reintentos automáticos con un canal rechazado
+- [x] Añadir pruebas de regresión para los mensajes y estados 404/403 del canal Discord
