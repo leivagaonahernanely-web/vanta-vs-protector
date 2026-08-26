@@ -54,6 +54,7 @@ export const hostedScripts = mysqlTable("hostedScripts", {
   name: varchar("name", { length: 255 }).notNull(),
   description: varchar("description", { length: 500 }),
   ffaMode: int("ffaMode").default(0).notNull(),
+  scriptKey: varchar("scriptKey", { length: 128 }),
   code: text("code").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

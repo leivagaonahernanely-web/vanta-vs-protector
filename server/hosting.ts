@@ -23,7 +23,8 @@ export function registerHostingRoutes(app: Express) {
       }
       res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300");
       const loaderUrl = `${req.protocol}://${req.get("host")}/scripts/hosted/${script.slug}`;
-      const loader = `loadstring(game:HttpGet("${loaderUrl}"))()`;
+      const load = `loadstring(game:HttpGet("${loaderUrl}"))()`;
+      const loader = script.scriptKey ? `script_key = "${script.scriptKey}"\n${load}` : load;
       if (acceptsHtml) {
         const safeName = script.name.replace(/[<>&\"]/g, "");
         const safeLoader = loader.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;");

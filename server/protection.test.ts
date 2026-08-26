@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
-import { buildProtectionArtifact, getProviderStatus } from "./protection";
+import { buildProtectionArtifact, getProtectionAdapterStatus, getProviderStatus, registerOfficialProtectionAdapter } from "./protection";
 import type { TrpcContext } from "./_core/context";
 
 function createPublicContext(): TrpcContext {
@@ -20,6 +20,7 @@ describe("protection configuration", () => {
       configured: expect.any(Boolean),
       hasClientId: expect.any(Boolean),
       hasClientSecret: expect.any(Boolean),
+      adapter: { official: false, provider: "local-runtime-wrapper" },
     });
     expect(JSON.stringify(status)).not.toContain(process.env.VANTA_CLIENT_SECRET ?? "__missing_secret__");
   });
@@ -41,6 +42,11 @@ describe("protection configuration", () => {
     const status = getProviderStatus();
     expect(status.hasClientId).toBe(Boolean(process.env.VANTA_CLIENT_ID));
     expect(status.hasClientSecret).toBe(Boolean(process.env.VANTA_CLIENT_SECRET));
+  });
+
+  it("distinguishes an official adapter when one is registered", () => {
+    registerOfficialProtectionAdapter({ name: "licensed-provider", protect: async () => buildProtectionArtifact("return true", { mode: "balanced", obfuscateStrings: true, addLoaderGuard: true }) });
+    expect(getProtectionAdapterStatus()).toEqual({ provider: "licensed-provider", official: true });
   });
 });
 

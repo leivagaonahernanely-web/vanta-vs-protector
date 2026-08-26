@@ -14,7 +14,7 @@ vi.mock("./db", () => ({
   getProtectionsByUser: vi.fn(),
   updateDiscordChannelId: vi.fn(),
 }));
-vi.mock("./protection", () => ({ buildProtectionArtifact: mocks.buildProtectionArtifact, getProviderStatus: vi.fn(() => ({ configured: true })) }));
+vi.mock("./protection", () => ({ getProviderStatus: vi.fn(() => ({ configured: true })), protectWithAdapter: vi.fn(async (...args: Parameters<typeof mocks.buildProtectionArtifact>) => mocks.buildProtectionArtifact(...args)) }));
 
 import { appRouter } from "./routers";
 

@@ -17,6 +17,21 @@ export type ProtectionArtifact = {
   message: string;
 };
 
+export interface OfficialProtectionAdapter {
+  readonly name: string;
+  protect(source: string, options: ProtectionOptions): Promise<ProtectionArtifact>;
+}
+
+let officialAdapter: OfficialProtectionAdapter | null = null;
+
+export function registerOfficialProtectionAdapter(adapter: OfficialProtectionAdapter) {
+  officialAdapter = adapter;
+}
+
+export function getProtectionAdapterStatus() {
+  return { provider: officialAdapter?.name ?? "local-runtime-wrapper", official: Boolean(officialAdapter) };
+}
+
 export function getProviderStatus() {
   const hasClientId = Boolean(ENV.vantaClientId);
   const hasClientSecret = Boolean(ENV.vantaClientSecret);
@@ -90,4 +105,9 @@ export function buildProtectionArtifact(source: string, options: ProtectionOptio
     status: requiresReview ? "review" : "protected",
     message: requiresReview ? "Artefacto creado y enviado a revisión preventiva." : "Artefacto protegido y listo para descargar.",
   };
+}
+
+export async function protectWithAdapter(source: string, options: ProtectionOptions): Promise<ProtectionArtifact> {
+  if (officialAdapter) return officialAdapter.protect(source, options);
+  return buildProtectionArtifact(source, options);
 }

@@ -8,15 +8,21 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { createHostedScript, createProtection, getHostedScriptsByUser, getProtectionsByUser, updateDiscordChannelId } from "./db";
 import { nanoid } from "nanoid";
 import { sendDiscordChannelMessage } from "./discord";
-import { buildProtectionArtifact, getProviderStatus } from "./protection";
+import { getProtectionAdapterStatus, getProviderStatus, protectWithAdapter } from "./protection";
 
 const hostedScriptInput = z.object({
   name: z.string().trim().min(1).max(255),
   description: z.string().trim().max(500).optional(),
   source: z.string().min(1).max(150_000),
   ffaMode: z.boolean().default(false),
+  scriptKey: z.string().trim().regex(/^[A-Za-z0-9_-]{8,128}$/).optional(),
   obfuscateSource: z.boolean().default(true),
 });
+
+function buildRuntimeLoader(url: string, scriptKey?: string | null) {
+  const load = `loadstring(game:HttpGet(\"${url}\"))()`;
+  return scriptKey ? `script_key = \"${scriptKey}\"\n${load}` : load;
+}
 
 const protectionInput = z.object({
   name: z.string().trim().min(1).max(255),
@@ -62,11 +68,12 @@ export const appRouter = router({
         ffaMode: Boolean(row.ffaMode),
         createdAt: row.createdAt.toISOString(),
         url: `${origin}/scripts/hosted/${row.slug}`,
-        loader: `loadstring(game:HttpGet("${origin}/scripts/hosted/${row.slug}"))()`,
+        loader: buildRuntimeLoader(`${origin}/scripts/hosted/${row.slug}`, row.scriptKey),
+        scriptKey: row.scriptKey,
       }));
     }),
     create: protectedProcedure.input(hostedScriptInput).mutation(async ({ ctx, input }) => {
-      const artifact = buildProtectionArtifact(input.source, {
+      const artifact = await protectWithAdapter(input.source, {
         mode: "balanced",
         obfuscateStrings: input.obfuscateSource,
         addLoaderGuard: true,
@@ -78,6 +85,7 @@ export const appRouter = router({
         name: input.name,
         description: input.description || null,
         ffaMode: input.ffaMode ? 1 : 0,
+        scriptKey: input.scriptKey || null,
         code: artifact.code,
       });
       if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No se pudo alojar el script." });
@@ -91,13 +99,14 @@ export const appRouter = router({
         ffaMode: Boolean(row.ffaMode),
         createdAt: row.createdAt.toISOString(),
         url,
-        loader: `loadstring(game:HttpGet("${url}"))()`,
+        loader: buildRuntimeLoader(url, row.scriptKey),
+        scriptKey: row.scriptKey,
       };
     }),
   }),
 
   protections: router({
-    providerStatus: publicProcedure.query(() => getProviderStatus()),
+    providerStatus: publicProcedure.query(() => ({ ...getProviderStatus(), adapter: getProtectionAdapterStatus() })),
 
     history: protectedProcedure.query(async ({ ctx }) => {
       const rows = await getProtectionsByUser(ctx.user.id);
@@ -111,7 +120,7 @@ export const appRouter = router({
       }
       let artifact;
       try {
-        artifact = buildProtectionArtifact(input.source, {
+        artifact = await protectWithAdapter(input.source, {
           mode: input.mode,
           obfuscateStrings: input.obfuscateStrings,
           addLoaderGuard: input.addLoaderGuard,

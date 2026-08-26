@@ -53,8 +53,14 @@
 
 - [x] Cambiar el flujo de hosting para mostrar una página pública sin source y solo loader
 - [x] Añadir vista privada de dashboard para administrar scripts alojados
-- [ ] Generar loader con URL pública estable y opción de script_key cuando corresponda
-- [ ] No presentar la protección básica como Luraph; dejar adapter preparado para API oficial/licenciada
+- [x] Generar loader con URL pública estable y opción de script_key cuando corresponda
+- [x] No presentar la protección básica como Luraph; dejar adapter preparado para API oficial/licenciada
 
 - [x] Añadir botón o acción real de descarga para el loader o el script alojado
 - [x] Crear pruebas Vitest para hostedScripts.create y hostedScripts.list con acceso autenticado y no autenticado
+
+- [x] Añadir scriptKey opcional al modelo de scripts alojados y al loader generado
+- [x] Crear una interfaz de adapter de proveedor que deje claro cuándo existe una integración oficial licenciada
+
+- [x] Exponer official/provider del adapter en providerStatus y mostrarlo en el panel
+- [x] Probar fallback local y adapter oficial registrado sin sugerir compatibilidad falsa con Luraph
