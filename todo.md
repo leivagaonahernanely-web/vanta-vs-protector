@@ -14,7 +14,7 @@
 - [x] Pruebas Vitest para protección, persistencia, errores y seguridad de configuración
 - [x] Validación visual responsive y revisión de consola/red
 
-- [ ] Conectar un proveedor real en servidor usando VANTA_CLIENT_ID y VANTA_CLIENT_SECRET, con endpoint autenticado y handshake verificable
+- [x] Conectar un proveedor real en servidor usando VANTA_CLIENT_ID y VANTA_CLIENT_SECRET, con endpoint autenticado y handshake verificable
 - [x] Hacer que mode y obfuscateStrings transformen materialmente el artefacto Lua, no solo sus comentarios
 - [x] Manejar notifyOwner() con reintento o fallback no bloqueante y validar su resultado
 - [x] Añadir pruebas Vitest para create, history, persistencia, estados y notificaciones
@@ -22,10 +22,10 @@
 - [x] Configurar la conexión servidor-servidor con el bot de Discord usando sus credenciales privadas
 - [x] Definir el canal o método de Discord para avisos de fallos y revisiones
 
-- [ ] Crear callback OAuth de Discord con state/nonce y cookies seguras
-- [ ] Añadir botón de acceso de Discord y mostrar la identidad autenticada en el panel
-- [ ] Asociar la cuenta Discord con el usuario y evitar exponer Client Secret en el cliente
-- [ ] Añadir pruebas del callback OAuth y de rechazo de state inválido
+- [x] Crear callback OAuth de Discord con state/nonce y cookies seguras
+- [x] Añadir botón de acceso de Discord y mostrar la identidad autenticada en el panel
+- [x] Asociar la cuenta Discord con el usuario y evitar exponer Client Secret en el cliente
+- [x] Añadir pruebas del callback OAuth y de rechazo de state inválido
 
 - [x] Confirmar conexión del bot instalado con un aviso de prueba sin exponer el token
 - [x] Añadir en el panel un campo de ID de canal por usuario y validarlo antes de enviar avisos
@@ -39,3 +39,8 @@
 - [x] Añadir tests de persistencia para updateDiscordChannelId, createProtection y getProtectionsByUser
 
 - [x] Añadir pruebas directas de db.ts para updateDiscordChannelId, createProtection y getProtectionsByUser con mock de Drizzle
+
+- [x] Mostrar explícitamente el nombre o ID de Discord vinculado dentro del panel
+- [x] Añadir test del camino exitoso del callback OAuth con intercambio de token y vinculación de identidad
+
+- [x] Añadir una prueba de éxito del callback Discord que simule token, identidad y vinculación

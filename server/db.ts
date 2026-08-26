@@ -35,7 +35,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     };
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod", "discordChannelId"] as const;
+    const textFields = ["name", "email", "loginMethod", "discordChannelId", "discordUserId", "discordUsername"] as const;
     type TextField = (typeof textFields)[number];
 
     const assignNullable = (field: TextField) => {
@@ -108,5 +108,11 @@ export async function updateDiscordChannelId(userId: number, discordChannelId: s
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   await db.update(users).set({ discordChannelId }).where(eq(users.id, userId));
+}
+
+export async function linkDiscordIdentity(userId: number, discordUserId: string, discordUsername: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(users).set({ discordUserId, discordUsername }).where(eq(users.id, userId));
 }
 
