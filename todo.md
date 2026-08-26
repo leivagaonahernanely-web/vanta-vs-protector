@@ -367,3 +367,8 @@
 - [x] Corregir eliminación real de paneles y limpiar el registro cuando el mensaje ya no existe
 - [x] Auditar botones y formularios para eliminar funciones solo visuales o mezcladas
 - [x] Añadir pruebas de regresión para todos los flujos corregidos
+
+- [x] Diagnosticar el error Failed to fetch al cargar Home
+- [x] Verificar servidor, endpoint tRPC, logs de red y consultas iniciales
+- [x] Corregir la causa de conexión o estabilizar el manejo de errores de API
+- [x] Añadir prueba de regresión para la carga inicial del dashboard
