@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createReconnectGate, discordCommands, formatWhitelistDiagnostic, GET_SCRIPT_COPY_BUTTON_LABEL, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, isConfiguredOwnerId, isGuildOwner, matchesWhitelistRule, mobileViewScriptMessage, panelMessage, parseDuration, respond, scriptRuntimeLoader, targetChoices } from "./discordBot";
+import { createReconnectGate, discordCommands, formatWhitelistDiagnostic, GET_SCRIPT_COPY_BUTTON_LABEL, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, isConfiguredOwnerId, isGuildOwner, matchesWhitelistRule, mobileViewScriptMessage, panelMessage, parseDuration, respond, resolveScriptSelection, scriptRuntimeLoader, targetChoices } from "./discordBot";
 import * as db from "./db";
 
 describe("Discord access panel", () => {
@@ -182,7 +182,7 @@ describe("Discord access panel", () => {
     vi.spyOn(db, "getHostedScriptsByUser").mockResolvedValue(scripts as any);
     const interaction = { options: { getFocused: () => ({ name: "script", value: "vanta" }) }, user: { id: "owner-id" } };
     const results = await targetChoices(interaction);
-    expect(results).toEqual([{ name: "Vanta Script", value: "Vanta Script" }]);
+    expect(results).toEqual([{ name: "Vanta Script · #1", value: "script:1" }]);
   });
 
   it("autocompletes guild users and roles based on the selected kind", async () => {
@@ -195,14 +195,22 @@ describe("Discord access panel", () => {
       ["1501316920975036614", { id: "1501316920975036614", name: "Staff" }],
     ]);
     const make = (kind: string, focused: string) => ({ guildId: "1501316920975036615", options: { getString: () => kind, getFocused: () => ({ name: "target", value: focused }) }, guild: { members: { cache: members }, roles: { cache: roles } } });
-    expect(await targetChoices(make("user", "hern"))).toEqual([{ name: "User · Hernán", value: "user:1501316920975036611" }]);
-    expect(await targetChoices(make("role", "prem"))).toEqual([{ name: "Role · Premium", value: "role:1501316920975036613" }]);
+    expect(await targetChoices(make("user", "hern"))).toEqual([{ name: "@Hernán", value: "user:1501316920975036611" }]);
+    expect(await targetChoices(make("role", "prem"))).toEqual([{ name: "@Premium", value: "role:1501316920975036613" }]);
   });
 
   it("recognizes the Discord guild owner independently from the linked database identity", () => {
     expect(isGuildOwner({ actorId: "guild-owner", guildOwnerId: "guild-owner" })).toBe(true);
     expect(isGuildOwner({ actorId: "other-user", guildOwnerId: "guild-owner" })).toBe(false);
     expect(isGuildOwner({ actorId: "guild-owner", guildOwnerId: null })).toBe(false);
+  });
+
+  it("resolves script autocomplete selections by exact owner-scoped script id", async () => {
+    const lookup = vi.spyOn(db, "getHostedScriptByOwnerId").mockResolvedValue({ id: 240002, userId: 1, name: "Vanta anti tp bat" } as any);
+    const script = await resolveScriptSelection(1, "script:240002");
+    expect(lookup).toHaveBeenCalledWith(1, 240002);
+    expect(script?.id).toBe(240002);
+    lookup.mockRestore();
   });
 
   it("formats a safe whitelist diagnostic with guild, member, roles and script context", () => {

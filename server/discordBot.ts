@@ -360,12 +360,12 @@ export async function targetChoices(interaction: any) {
         scripts = cached?.scripts ?? [];
       }
     }
-    return scripts.filter((script: any) => !query || script.name.toLowerCase().includes(query)).slice(0, 25).map((script: any) => ({ name: script.name.slice(0, 100), value: script.name }));
+    return scripts.filter((script: any) => !query || `${script.name} ${script.id}`.toLowerCase().includes(query)).slice(0, 25).map((script: any) => ({ name: `${script.name} · #${script.id}`.slice(0, 100), value: `script:${script.id}` }));
   }
   const kind = interaction.options.getString("kind") ?? "user";
   return kind === "role"
-    ? [...(interaction.guild?.roles?.cache?.values?.() ?? [])].filter((role: Role) => role.id !== interaction.guildId && (!query || role.name.toLowerCase().includes(query))).slice(0, 25).map((role: Role) => ({ name: `Role · ${role.name}`.slice(0, 100), value: `role:${role.id}` }))
-    : [...(interaction.guild?.members?.cache?.values?.() ?? [])].filter((member: any) => !member.user?.bot && (!query || `${member.displayName} ${member.user?.username}`.toLowerCase().includes(query))).slice(0, 25).map((member: any) => ({ name: `User · ${member.displayName || member.user.username}`.slice(0, 100), value: `user:${member.user.id}` }));
+    ? [...(interaction.guild?.roles?.cache?.values?.() ?? [])].filter((role: Role) => role.id !== interaction.guildId && (!query || role.name.toLowerCase().includes(query))).slice(0, 25).map((role: Role) => ({ name: `@${role.name}`.slice(0, 100), value: `role:${role.id}` }))
+    : [...(interaction.guild?.members?.cache?.values?.() ?? [])].filter((member: any) => !member.user?.bot && (!query || `${member.displayName} ${member.user?.username}`.toLowerCase().includes(query))).slice(0, 25).map((member: any) => ({ name: `@${member.displayName || member.user.username}`.slice(0, 100), value: `user:${member.user.id}` }));
 }
 
 export async function handleInteraction(interaction: any) {
@@ -620,10 +620,19 @@ async function configureKeyRole(interaction: any, role: { id: string }) {
   await setKeyManagerRole(owner.id, role.id);
   return respond(interaction, { content: `✅ El rol <@&${role.id}> ahora puede usar "/generatekey" y "/deletekey".`, ephemeral: true });
 }
+export async function resolveScriptSelection(ownerId: number, selection: string) {
+  const raw = selection.trim();
+  if (raw.startsWith("script:")) {
+    const id = Number(raw.slice("script:".length));
+    if (Number.isInteger(id) && id > 0) return getHostedScriptByOwnerId(ownerId, id);
+  }
+  return getHostedScriptByName(ownerId, raw);
+}
+
 async function whitelist(interaction: any, discordId: string, kind: "user" | "role", scriptName: string) {
   const owner = await ownerAccount(interaction);
   if (!owner || !(await isConfiguredOwner(interaction))) return respond(interaction, { content: "⛔ Solo el owner vinculado puede modificar la whitelist.", ephemeral: true });
-  const script = await getHostedScriptByName(owner.id, scriptName);
+  const script = await resolveScriptSelection(owner.id, scriptName);
   if (!script) return respond(interaction, { content: "❌ Selecciona un script hosteado válido de tu workspace.", ephemeral: true });
   let canonicalId = normalizeDiscordId(discordId);
   let roleName = "Buyer role";
@@ -648,7 +657,7 @@ async function whitelist(interaction: any, discordId: string, kind: "user" | "ro
 async function unwhitelist(interaction: any, discordId: string, scriptName: string) {
   const owner = await ownerAccount(interaction);
   if (!owner || !(await isConfiguredOwner(interaction))) return respond(interaction, { content: "⛔ Solo el owner vinculado puede modificar la whitelist.", ephemeral: true });
-  const script = await getHostedScriptByName(owner.id, scriptName);
+  const script = await resolveScriptSelection(owner.id, scriptName);
   if (!script) return respond(interaction, { content: "❌ Selecciona un script hosteado válido de tu workspace.", ephemeral: true });
   const removed = await deleteAccessRuleByDiscordId(owner.id, discordId.trim(), script.id);
   return respond(interaction, { content: removed ? `✅ Whitelist retirada para **${discordId.trim()}** en **${script.name}**.` : "No se encontró una regla activa para ese script y destino.", ephemeral: true });

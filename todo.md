@@ -573,3 +573,7 @@
 - [x] Separar explícitamente channelId, panelId, hostedScriptId y roleId en el flujo de whitelist — la respuesta pública muestra canal, script y Role ID por separado
 - [x] Validar que el roleId seleccionado pertenece al servidor Discord del panel antes de guardarlo — Discord roles.fetch rechaza IDs de canal/panel
 - [x] Hacer que Get Script compare el roleId del miembro en ese guild con el roleId whitelist del script — fetch forzado de miembro y comparación normalizada
+- [x] Asociar whitelist al hostedScriptId del panel seleccionado, sin usar el script global o un script distinto — el autocomplete usa `script:id` y el backend resuelve por owner e ID exactos
+- [x] Hacer que target muestre y acepte menciones visibles de roles y usuarios del servidor — muestra `@Rol` y `@Usuario`, conservando el identificador técnico internamente
+- [x] Diferenciar el mensaje de usuario sin key del mensaje de usuario sin whitelist — Get Script mantiene la autorización por key y reporta whitelist solo cuando no hay licencia
+- [x] Añadir pruebas para whitelist en script 240002 y selección target role/user — 140 pruebas Vitest pasan y TypeScript no reporta errores
