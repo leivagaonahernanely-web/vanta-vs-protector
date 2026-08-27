@@ -103,6 +103,16 @@ describe("Discord access panel", () => {
     expect(payload.content).toContain("owner vinculado");
   });
 
+  it("acknowledges slash commands before work and edits the deferred reply", async () => {
+    const editReply = vi.fn().mockResolvedValue(undefined);
+    let interaction: any;
+    const deferReply = vi.fn(async () => { interaction.deferred = true; });
+    interaction = { isModalSubmit: () => false, isButton: () => false, isChatInputCommand: () => true, commandName: "stats", replied: false, deferred: false, deferReply, editReply };
+    await handleInteraction(interaction);
+    expect(deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(editReply).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining("está conectado") }));
+  });
+
   it("runs /updates as a public styled embed", async () => {
     const reply = vi.fn();
     const interaction = { isModalSubmit: () => false, isButton: () => false, isChatInputCommand: () => true, commandName: "updates", replied: false, deferred: false, reply };

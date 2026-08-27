@@ -177,8 +177,18 @@ export async function respond(interaction: any, payload: any) {
   const target = interaction as object;
   if (respondedInteractions.has(target)) return undefined;
   respondedInteractions.add(target);
+  if (interaction.deferred && interaction.editReply) return interaction.editReply(payload);
   if (interaction.replied || interaction.deferred) return interaction.followUp(payload);
   return interaction.reply(payload);
+}
+async function prepareInteraction(interaction: any) {
+  if (interaction.replied || interaction.deferred || !interaction.deferReply) return;
+  // Autocomplete must answer with respond(), and redeem opens a modal; neither
+  // can be deferred. Every other interaction gets an acknowledgement before DB
+  // and Discord API work so Discord never displays “The application did not respond”.
+  if (interaction.isAutocomplete?.() || (interaction.isButton?.() && interaction.customId === "vanta:redeem")) return;
+  const ephemeral = interaction.isModalSubmit?.() || interaction.isButton?.() || interaction.commandName !== "panel" && interaction.commandName !== "prices" && interaction.commandName !== "updates" && interaction.commandName !== "dropkey";
+  await interaction.deferReply({ ephemeral });
 }
 export function mobileViewScriptMessage(script: any, accessKey: string, licenseId: number) {
   return `📜 **${script.name}**\n\n\`\`lua\n${scriptRuntimeLoader(script, accessKey, licenseId)}\n\`\``;
@@ -333,7 +343,15 @@ export async function targetChoices(interaction: any) {
 
 export async function handleInteraction(interaction: any) {
   try {
-    if (interaction.isAutocomplete?.()) return interaction.respond(await targetChoices(interaction));
+    if (interaction.isAutocomplete?.()) {
+      try {
+        return await interaction.respond(await targetChoices(interaction));
+      } catch (error) {
+        console.error("[Discord Bot] Autocomplete failed:", error);
+        return interaction.respond([]).catch(() => undefined);
+      }
+    }
+    await prepareInteraction(interaction);
     if (interaction.isModalSubmit()) return handleModal(interaction);
     if (interaction.isButton()) return handleButton(interaction);
     if (!interaction.isChatInputCommand()) return;
@@ -360,10 +378,18 @@ export async function handleInteraction(interaction: any) {
     if (interaction.commandName === "blacklist") return blacklistCommand(interaction);
     if (interaction.commandName === "whitelabel") return whitelistCommand(interaction);
     if (interaction.commandName === "unwhitelist") return unwhitelistCommand(interaction);
+    return respond(interaction, { content: "❌ Este comando ya no está disponible. Escribe `/` de nuevo para cargar la lista actual.", ephemeral: true });
   } catch (error) {
     console.error("[Discord Bot] Interaction handler failed:", error);
     const currentInteraction = interaction as any;
-    if (!currentInteraction.replied && !currentInteraction.deferred) await respond(currentInteraction, { content: "No se pudo completar la acción. Revisa la configuración del panel.", ephemeral: true });
+    if (!currentInteraction.replied) {
+      respondedInteractions.delete(currentInteraction);
+      try {
+        await respond(currentInteraction, { content: "No se pudo completar la acción. Revisa la configuración del panel.", ephemeral: true });
+      } catch (responseError) {
+        console.error("[Discord Bot] Could not send interaction error response:", responseError);
+      }
+    }
   }
 }
 
@@ -606,7 +632,7 @@ async function dropKeys(interaction: any, amount: number) {
   if (!result.allowed || !result.owner) return respond(interaction, { content: "⛔ No tienes permiso para hacer un drop.", ephemeral: true });
   const keys: string[] = [];
   for (let i = 0; i < amount; i++) { const row = await createLicense({ ownerId: result.owner.id, keyCode: keyCode(), type: "license", status: "active", discordUserId: null, hwid: null, expiresAt: null, hostedScriptId: null }); if (row) { keys.push(row.keyCode); await createKeyAuditLog({ ownerId: result.owner.id, actorDiscordId: interaction.user.id, action: "generate", keyCode: row.keyCode }); } }
-  await interaction.reply({ content: "# Key drop!!\\n@everyone" });
+  await respond(interaction, { content: "# Key drop!!\\n@everyone" });
   for (let index = amount; index > 0; index--) await interaction.followUp({ content: `${index}` });
   await interaction.followUp({ content: "# GO!!" });
   for (const generatedKey of keys) await interaction.followUp({ content: generatedKey });

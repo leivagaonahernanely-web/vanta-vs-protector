@@ -512,3 +512,7 @@
 - [x] Estabilizar el listado y autocompletado de scripts hosteados en comandos slash, evitando cargas infinitas o listas vacías — implementada caché de 15s y timeout de 2s para asegurar respuesta a Discord
 
 - [x] Corregir el autocomplete de /whitelabel para que devuelva scripts hosteados y no muestre “No hay opciones que coincidan” — precarga al iniciar, caché de 15 segundos y timeout de 2.5 segundos
+
+- [x] Corregir el fallo del bot que deja los comandos slash sin respuesta aunque el Gateway aparezca en línea — respuestas diferidas, fallback para comandos obsoletos y cierre seguro de errores
+
+- [x] Mantener compatibilidad con Autoscale sin cambiar el modo de hosting y mejorar la reconexión/respuesta del bot mientras la instancia esté activa — se conserva Autoscale y se evita bloquear las interacciones
