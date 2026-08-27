@@ -390,7 +390,12 @@ async function handleButton(interaction: ButtonInteraction) {
     return respond(interaction, { content: `\`${key}\``, ephemeral: true });
   }
   if (interaction.customId === "vanta:role") return getRoleForUser(interaction);
-  if (interaction.customId === "vanta:hwid") { await resetLicenseHwidByDiscordUserId(interaction.user.id); return respond(interaction, { content: "✅ HWID reiniciado correctamente.", ephemeral: true }); }
+  if (interaction.customId === "vanta:hwid") {
+    const reset = await resetLicenseHwidByDiscordUserId(interaction.user.id);
+    if (reset.reason === "not_found") return respond(interaction, { content: "❌ No tienes una key activa vinculada a tu Discord.", ephemeral: true });
+    if (reset.reason === "cooldown") return respond(interaction, { content: `⏳ El HWID ya fue reiniciado. Podrás volver a hacerlo <t:${Math.floor(reset.retryAt.getTime() / 1000)}:R>.`, ephemeral: true });
+    return respond(interaction, { content: "✅ HWID reiniciado correctamente. El próximo reset estará disponible en 24 horas.", ephemeral: true });
+  }
   if (interaction.customId === "vanta:stats") {
     const access = await getUserLicenses(interaction.user.id);
     const license = access.licenses[0];
@@ -471,7 +476,8 @@ async function resetHwidCommand(interaction: any) {
   const target = interaction.options.getUser("user", true);
   const result = await canManageKeys(interaction);
   if (!result.allowed) return respond(interaction, { content: "⛔ Solo el propietario, un administrador o el rol delegado puede reiniciar HWID.", ephemeral: true });
-  await resetLicenseHwidByDiscordUserId(target.id);
+  const reset = await resetLicenseHwidByDiscordUserId(target.id, true);
+  if (reset.reason === "not_found") return respond(interaction, { content: "❌ No se encontraron keys activas para ese usuario.", ephemeral: true });
   return respond(interaction, { content: `✅ HWID reiniciado para <@${target.id}> en el script indicado.`, ephemeral: true });
 }
 

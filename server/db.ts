@@ -1,4 +1,4 @@
-import { and, count, desc, eq, isNull, ne, or } from "drizzle-orm";
+import { and, count, desc, eq, isNull, lt, ne, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { accessRules, blacklists, discordPanels, hostedScripts, HostedScript, InsertHostedScript, InsertLicense, InsertProtection, InsertUser, keyAuditLogs, licenses, protections, users, warnings } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -369,10 +369,21 @@ export async function deleteLicenseByKeyCode(ownerId: number, keyCode: string) {
   return Number(result[0]?.affectedRows ?? 0) > 0;
 }
 
-export async function resetLicenseHwidByDiscordUserId(discordUserId: string) {
+export async function resetLicenseHwidByDiscordUserId(discordUserId: string, bypassCooldown = false) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  await db.update(licenses).set({ hwid: null }).where(eq(licenses.discordUserId, discordUserId));
+  const rows = await db.select({ id: licenses.id, hwidResetAt: licenses.hwidResetAt }).from(licenses).where(and(eq(licenses.discordUserId, discordUserId), eq(licenses.status, "active"))).limit(100);
+  if (rows.length === 0) return { reset: false as const, reason: "not_found" as const };
+  const cooldownMs = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  if (!bypassCooldown) {
+    const blocked = rows.find((row) => row.hwidResetAt && now - row.hwidResetAt.getTime() < cooldownMs);
+    if (blocked?.hwidResetAt) return { reset: false as const, reason: "cooldown" as const, retryAt: new Date(blocked.hwidResetAt.getTime() + cooldownMs) };
+  }
+  const filters = [eq(licenses.discordUserId, discordUserId), eq(licenses.status, "active")];
+  if (!bypassCooldown) filters.push(or(isNull(licenses.hwidResetAt), lt(licenses.hwidResetAt, new Date(now - cooldownMs)))!);
+  await db.update(licenses).set({ hwid: null, hwidResetAt: new Date(now) }).where(and(...filters));
+  return { reset: true as const, resetAt: new Date(now), count: rows.length };
 }
 
 export async function getHostedScriptSourceByUser(userId: number, id: number) {

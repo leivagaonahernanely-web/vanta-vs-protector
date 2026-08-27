@@ -439,3 +439,7 @@
 - [x] Corregir el loader compacto para que funcione en el executor real sin volver al snippet grande mediante endpoint de segunda etapa firmado
 - [x] Cambiar el acceso principal de la web a Discord OAuth y conservar la vinculación de cuenta
 - [x] Añadir pruebas del loader compacto funcional y del login principal por Discord
+
+- [x] Reparar selección y carga de archivos Lua desde móvil y escritorio con botón táctil e input ampliado
+- [x] Hacer cumplir el cooldown persistente de reset HWID en backend, bloqueando repeticiones durante 24 horas y manteniendo bypass administrativo
+- [x] Añadir pruebas de carga Lua y reset HWID bloqueado/permitido durante cooldown

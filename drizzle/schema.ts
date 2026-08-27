@@ -79,6 +79,7 @@ export const licenses = mysqlTable("licenses", {
   status: mysqlEnum("status", ["active", "revoked", "expired"]).default("active").notNull(),
   discordUserId: varchar("discordUserId", { length: 32 }),
   hwid: varchar("hwid", { length: 128 }),
+  hwidResetAt: timestamp("hwidResetAt"),
   expiresAt: timestamp("expiresAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

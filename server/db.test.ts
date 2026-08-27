@@ -34,7 +34,7 @@ vi.mock("drizzle-orm/mysql2", () => ({
   })),
 }));
 
-import { createDiscordPanel, createProtection, ensureUserApiKey, getDiscordPanelsByOwner, getProtectionsByUser, updateDiscordChannelId } from "./db";
+import { createDiscordPanel, createProtection, ensureUserApiKey, getDiscordPanelsByOwner, getProtectionsByUser, resetLicenseHwidByDiscordUserId, updateDiscordChannelId } from "./db";
 
 const saved = {
   id: 4,
@@ -66,6 +66,24 @@ describe("database persistence helpers", () => {
     expect(result).toBe("VANTA_persisted_key_value");
     const update = database.updateSet.mock.calls.at(-1)?.[0] as { apiKey?: string };
     expect(update.apiKey).toMatch(/^VANTA-[A-Za-z0-9_-]{32,40}$/);
+    expect(database.updateWhere).toHaveBeenCalled();
+  });
+
+  it("blocks a repeated user HWID reset during the 24-hour cooldown", async () => {
+    database.selectLimit.mockResolvedValueOnce([{ id: 4, hwidResetAt: new Date(Date.now() - 60 * 60 * 1000) }]);
+    database.updateWhere.mockClear();
+    const result = await resetLicenseHwidByDiscordUserId("discord-user");
+    expect(result.reset).toBe(false);
+    expect(result.reason).toBe("cooldown");
+    expect(result.retryAt).toBeInstanceOf(Date);
+    expect(database.updateWhere).not.toHaveBeenCalled();
+  });
+
+  it("resets an eligible user HWID and persists the reset timestamp", async () => {
+    database.selectLimit.mockResolvedValueOnce([{ id: 4, hwidResetAt: null }]);
+    const result = await resetLicenseHwidByDiscordUserId("discord-user");
+    expect(result.reset).toBe(true);
+    expect(database.updateSet).toHaveBeenCalledWith(expect.objectContaining({ hwid: null, hwidResetAt: expect.any(Date) }));
     expect(database.updateWhere).toHaveBeenCalled();
   });
 
