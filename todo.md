@@ -451,3 +451,6 @@
 - [x] Renombrar el botón de edición solicitado a “Modificar” sin cambiar su acción
 
 - [x] Aumentar a 2 MB el límite de archivos `.lua`, `.luau` y `.txt` y actualizar pruebas
+
+- [x] Mostrar el código generado en un cuadro compacto con vista previa y desplazamiento interno
+- [x] Reemplazar “Copiar loadstring entero” por “Mobile View Script” con copiado automático para móvil
