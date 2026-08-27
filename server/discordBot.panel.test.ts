@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createReconnectGate, discordCommands, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, isGuildOwner, panelMessage, parseDuration, respond, scriptRuntimeLoader, targetChoices } from "./discordBot";
+import { createReconnectGate, discordCommands, GET_SCRIPT_COPY_BUTTON_LABEL, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, isGuildOwner, panelMessage, parseDuration, respond, scriptRuntimeLoader, targetChoices } from "./discordBot";
 
 describe("Discord access panel", () => {
   it("parses key durations in days, months and years", () => {
@@ -16,6 +16,10 @@ describe("Discord access panel", () => {
     expect(protectedLoader).toContain('script_key = "1234567890"');
     expect(protectedLoader).toContain("?key=1234567890");
     expect(protectedLoader).toContain("RbxAnalyticsService");
+  });
+
+  it("labels the Get Script copy action for mobile users", () => {
+    expect(GET_SCRIPT_COPY_BUTTON_LABEL).toBe("Mobile View Script");
   });
 
   it("uses the active license key when building a protected Get Script loader", () => {

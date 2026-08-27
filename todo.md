@@ -454,3 +454,5 @@
 
 - [x] Mostrar el código generado en un cuadro compacto con vista previa y desplazamiento interno
 - [x] Reemplazar “Copiar loadstring entero” por “Mobile View Script” con copiado automático para móvil
+
+- [x] Mover “Mobile View Script” al resultado de Get Script y copiar desde ahí el bloque completo del loader

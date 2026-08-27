@@ -51,6 +51,7 @@ import {
 import { randomInt } from "node:crypto";
 
 const PANEL_URL = "https://vanta-prot-hfw5hmym.manus.space";
+export const GET_SCRIPT_COPY_BUTTON_LABEL = "Mobile View Script";
 export const discordCommands = [
   new SlashCommandBuilder().setName("ping").setDescription("Verifica la latencia del bot").toJSON(),
   new SlashCommandBuilder().setName("panel").setDescription("Publica el panel de Vanta.vs Protector").toJSON(),
@@ -332,7 +333,7 @@ async function getScriptForUser(interaction: any) {
   if (!script) return respond(interaction, { content: "❌ Tu key está activa, pero todavía no hay un script asignado.", ephemeral: true });
   const loader = scriptRuntimeLoader(script, license.keyCode, license.id);
   const copyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId("vanta:copy-loader").setLabel("Copiar loadstring completo").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("vanta:copy-loader").setLabel(GET_SCRIPT_COPY_BUTTON_LABEL).setStyle(ButtonStyle.Secondary),
   );
   return respond(interaction, { content: `📜 **${script.name}**\n\n\`\`\`lua\n${loader}\n\`\`\``, components: [copyRow], ephemeral: true });
 }
