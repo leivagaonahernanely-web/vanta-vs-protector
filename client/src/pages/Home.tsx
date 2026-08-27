@@ -51,6 +51,16 @@ function downloadText(filename: string, value: string) {
   URL.revokeObjectURL(url);
 }
 
+export function encodeSourceBase64(source: string) {
+  const bytes = new TextEncoder().encode(source);
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    const chunk = bytes.subarray(index, index + 0x8000);
+    for (let offset = 0; offset < chunk.length; offset += 1) binary += String.fromCharCode(chunk[offset]);
+  }
+  return btoa(binary);
+}
+
 export function friendlyApiError(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : String(error ?? "");
   if (/Unexpected token ['\"]?</.test(message) || /not valid JSON/i.test(message)) {
@@ -178,7 +188,7 @@ export default function Home(props: any = {}) {
   function createHosted() {
     if (!name.trim()) { toast.error("Escribe el nombre del script antes de alojarlo"); return; }
     if (!source.trim()) { toast.error("Pega el código Lua antes de alojarlo"); return; }
-    const payload = { name: name.trim(), description: description || undefined, scriptKey: scriptKey || undefined, source, ffaMode, obfuscateSource };
+    const payload = { name: name.trim(), description: description || undefined, scriptKey: scriptKey || undefined, sourceBase64: encodeSourceBase64(source), ffaMode, obfuscateSource };
     if (editingScriptId) updateHosted.mutate({ id: editingScriptId, ...payload }); else hostScript.mutate(payload);
   }
   function editHostedScript(script: HostedItem) {

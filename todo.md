@@ -483,3 +483,5 @@
 
 - [x] Corregir la ruta efectiva que reinicia HWID repetidamente y eliminar cualquier bypass no autorizado
 - [x] Cambiar la etiqueta real de Get Script de “Copiar loadstring completo” a “Mobile View Script”
+
+- [x] Eliminar definitivamente `Unexpected token '<'` en la mutación que sigue devolviendo HTML en vez de JSON — source enviada en base64 y decodificada server-side

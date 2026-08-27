@@ -23,11 +23,25 @@ const ownerProcedure = protectedProcedure.use(({ ctx, next }) => {
 const hostedScriptInput = z.object({
   name: z.string().trim().min(1).max(255),
   description: z.string().trim().max(500).optional(),
-  source: z.string().min(1).max(2_000_000),
+  source: z.string().min(1).max(2_000_000).optional(),
+  sourceBase64: z.string().min(1).max(2_800_000).optional(),
   ffaMode: z.boolean().default(false),
   scriptKey: z.string().trim().regex(/^(?:FREE|PRO|PREMIUM)-[a-z0-9]{16}$/i).optional(),
   obfuscateSource: z.boolean().default(true),
-});
+}).refine((input) => Boolean(input.source || input.sourceBase64), { message: "La source es obligatoria." });
+
+function decodeHostedSource(input: { source?: string; sourceBase64?: string }) {
+  if (input.source) return input.source;
+  if (!input.sourceBase64) throw new TRPCError({ code: "BAD_REQUEST", message: "La source es obligatoria." });
+  let source: string;
+  try {
+    source = Buffer.from(input.sourceBase64, "base64").toString("utf8");
+  } catch {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "La source codificada no es válida." });
+  }
+  if (!source || source.length > 2_000_000) throw new TRPCError({ code: "BAD_REQUEST", message: "La source debe tener entre 1 byte y 2 MB." });
+  return source;
+}
 
 function buildRuntimeLoader(url: string, scriptKey?: string | null, ffaMode = false) {
   const runtimeKey = ffaMode ? "trial" : scriptKey;
@@ -157,11 +171,12 @@ export const appRouter = router({
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Script no encontrado." });
       return row;
     }),
-    update: protectedProcedure.input(hostedScriptInput.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    update: protectedProcedure.input(hostedScriptInput.safeExtend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const existing = await getHostedScriptById(input.id);
       if (!existing || existing.userId !== ctx.user.id) throw new TRPCError({ code: "NOT_FOUND", message: "Script no encontrado." });
-      const artifact = await protectWithAdapter(input.source, { mode: "balanced", obfuscateStrings: input.obfuscateSource, addLoaderGuard: true });
-      const row = await updateHostedScript(ctx.user.id, input.id, { name: input.name, description: input.description || null, ffaMode: input.ffaMode ? 1 : 0, scriptKey: input.scriptKey || null, code: artifact.code, sourceCode: input.source });
+      const source = decodeHostedSource(input);
+      const artifact = await protectWithAdapter(source, { mode: "balanced", obfuscateStrings: input.obfuscateSource, addLoaderGuard: true });
+      const row = await updateHostedScript(ctx.user.id, input.id, { name: input.name, description: input.description || null, ffaMode: input.ffaMode ? 1 : 0, scriptKey: input.scriptKey || null, code: artifact.code, sourceCode: source });
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Script no encontrado." });
       return { id: row.id, slug: row.slug, name: row.name, description: row.description ?? "", ffaMode: Boolean(row.ffaMode), createdAt: row.createdAt.toISOString(), url: `${ctx.req.protocol}://${ctx.req.get("host")}/scripts/hosted/${row.slug}`, loader: buildRuntimeLoader(`${ctx.req.protocol}://${ctx.req.get("host")}/scripts/hosted/${row.slug}`, row.scriptKey, Boolean(row.ffaMode)), scriptKey: row.scriptKey };
     }),
@@ -173,7 +188,8 @@ export const appRouter = router({
     }),
     create: protectedProcedure.input(hostedScriptInput).mutation(async ({ ctx, input }) => {
       await assertWorkspaceQuota(ctx.user.id, (ctx.user as typeof ctx.user & { plan?: PlanTier }).plan, "scripts");
-      const artifact = await protectWithAdapter(input.source, {
+      const source = decodeHostedSource(input);
+      const artifact = await protectWithAdapter(source, {
         mode: "balanced",
         obfuscateStrings: input.obfuscateSource,
         addLoaderGuard: true,
@@ -187,7 +203,7 @@ export const appRouter = router({
         ffaMode: input.ffaMode ? 1 : 0,
         scriptKey: input.scriptKey || null,
         code: artifact.code,
-        sourceCode: input.source,
+        sourceCode: source,
       });
       if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No se pudo alojar el script." });
       const origin = `${ctx.req.protocol}://${ctx.req.get("host")}`;
