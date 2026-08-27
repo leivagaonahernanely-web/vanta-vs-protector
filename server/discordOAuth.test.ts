@@ -38,6 +38,7 @@ describe("Discord OAuth callback", () => {
     const response = responseMock();
     await routes.get("/api/discord/start")?.({ query: {}, protocol: "https", headers: {}, get: () => "example.com" }, response);
     expect(String(response.redirectTarget)).toContain(encodeURIComponent("https://example.com/api/discord/callback"));
+    expect(response.cookie).toHaveBeenCalledWith("__Host-discord_oauth_state", expect.any(String), expect.objectContaining({ sameSite: "lax", secure: true }));
   });
 
   it("generates the same canonical callback for preview and published hosts", async () => {

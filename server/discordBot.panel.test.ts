@@ -15,6 +15,7 @@ describe("Discord access panel", () => {
     expect(ffa).toContain("/scripts/hosted/ffa-script");
     expect(protectedLoader).toContain('script_key = "1234567890"');
     expect(protectedLoader).toContain("?key=1234567890");
+    expect(protectedLoader).toContain("RbxAnalyticsService");
   });
 
   it("uses the active license key when building a protected Get Script loader", () => {
@@ -22,12 +23,14 @@ describe("Discord access panel", () => {
     expect(loader).toContain('script_key = "86vC3ZULuEQpOImpm5VBB6oLROAQmPLe"');
     expect(loader).toContain("?key=86vC3ZULuEQpOImpm5VBB6oLROAQmPLe");
     expect(loader).not.toContain("internal-script-key");
+    expect(loader).toContain("&hwid=\" .. hwid");
   });
 
   it("builds the requested two-row action layout", () => {
     const message = panelMessage();
     const ids = message.components.flatMap((row: any) => row.components.map((button: any) => button.data.custom_id));
     expect(ids).toEqual(["vanta:redeem", "vanta:script", "vanta:role", "vanta:hwid", "vanta:stats"]);
+    expect(discordCommands.some((command: any) => command.name === "apikey")).toBe(true);
     expect(message.embeds[0].data.title).toBe("Vanta.vs Protector · Access Panel");
     expect(message.embeds[0].data.color).toBe(0x5865f2);
     expect(message.embeds[0].data.description).toContain("Vanta.vs Protector");

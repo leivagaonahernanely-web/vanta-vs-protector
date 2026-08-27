@@ -55,7 +55,7 @@ export function registerDiscordOAuthRoutes(app: Express) {
     const nonce = crypto.randomBytes(24).toString("hex");
     const redirectUri = `${origin}${CALLBACK_PATH}`;
     const state = encodeState({ nonce, redirectUri });
-    res.cookie(STATE_COOKIE, nonce, { httpOnly: true, secure: true, sameSite: "none", path: "/", maxAge: 600 });
+    res.cookie(STATE_COOKIE, nonce, { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 600 });
     const params = new URLSearchParams({ client_id: ENV.vantaClientId, redirect_uri: redirectUri, response_type: "code", scope: "identify email", state });
     res.redirect(`https://discord.com/oauth2/authorize?${params.toString()}`);
   });
@@ -69,7 +69,7 @@ export function registerDiscordOAuthRoutes(app: Express) {
       res.status(403).json({ error: "invalid Discord OAuth state" });
       return;
     }
-    res.clearCookie(STATE_COOKIE, { httpOnly: true, secure: true, sameSite: "none", path: "/" });
+    res.clearCookie(STATE_COOKIE, { httpOnly: true, secure: true, sameSite: "lax", path: "/" });
 
     try {
       const tokenResponse = await fetch("https://discord.com/api/oauth2/token", {

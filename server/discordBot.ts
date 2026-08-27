@@ -132,7 +132,9 @@ export function scriptRuntimeLoader(script: any, accessKey?: string) {
   const url = `${PANEL_URL}/scripts/hosted/${script.slug}`;
   const runtimeKey = script.ffaMode ? "trial" : (accessKey || script.scriptKey);
   const accessUrl = runtimeKey ? `${url}?key=${encodeURIComponent(runtimeKey)}` : url;
-  const load = `loadstring(game:HttpGet("${accessUrl}"))()`;
+  const load = script.ffaMode || !runtimeKey
+    ? `loadstring(game:HttpGet("${accessUrl}"))()`
+    : `local hwid = game:GetService("RbxAnalyticsService"):GetClientId()\nloadstring(game:HttpGet("${accessUrl}&hwid=" .. hwid))()`;
   return !script.ffaMode && runtimeKey ? `script_key = "${runtimeKey}"\n${load}` : load;
 }
 
@@ -314,9 +316,18 @@ async function getScriptForUser(interaction: any) {
   if (!script) return respond(interaction, { content: "❌ Tu key está activa, pero todavía no hay un script asignado.", ephemeral: true });
   const loader = scriptRuntimeLoader(script, license.keyCode);
   const copyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`vanta:copy-key:${license.keyCode}`).setLabel("Copiar key").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("vanta:copy-loader").setLabel("Copiar loadstring completo").setStyle(ButtonStyle.Secondary),
   );
-  return respond(interaction, { content: `📜 **${script.name}**\n\n🔑 **Key activa:** \`${license.keyCode}\`\n\n📦 **Loadstring con la key:**\n\`\`\`lua\n${loader}\n\`\`\``, components: [copyRow], ephemeral: true });
+  return respond(interaction, { content: `📜 **${script.name}**\n\n\`\`\`lua\n${loader}\n\`\`\``, components: [copyRow], ephemeral: true });
+}
+
+async function copyScriptForUser(interaction: any) {
+  const access = await getUserLicenses(interaction.user.id);
+  const license = access.licenses[0];
+  if (!license) return respond(interaction, { content: "❌ No tienes una key activa.", ephemeral: true });
+  const script = license.hostedScriptId ? await getHostedScriptById(license.hostedScriptId) : access.scripts[0];
+  if (!script) return respond(interaction, { content: "❌ Tu key no tiene un script asignado.", ephemeral: true });
+  return respond(interaction, { content: `\`\`\`lua\n${scriptRuntimeLoader(script, license.keyCode)}\n\`\`\``, ephemeral: true });
 }
 
 async function configureBuyerRole(interaction: any, role: { id: string }) {
@@ -351,6 +362,7 @@ async function handleButton(interaction: ButtonInteraction) {
     return interaction.showModal(modal);
   }
   if (interaction.customId === "vanta:script") return getScriptForUser(interaction);
+  if (interaction.customId === "vanta:copy-loader") return copyScriptForUser(interaction);
   if (interaction.customId.startsWith("vanta:copy-key:")) {
     const key = interaction.customId.slice("vanta:copy-key:".length).trim();
     if (!/^[A-Za-z0-9-]{1,64}$/.test(key)) return respond(interaction, { content: "❌ Esta key ya no es válida.", ephemeral: true });

@@ -413,3 +413,8 @@
 - [x] Mostrar la API key en Overview con botón de copiar
 - [x] Diagnosticar y corregir HTTP 403 del loader Lua en la línea 2 aceptando HWID por query desde Roblox
 - [x] Añadir pruebas para API key, /apikey, Overview y acceso del loader
+
+- [x] Get Script: copiar únicamente el bloque completo script_key + loadstring, sin mostrar key separada
+- [x] Verificar que /apikey se registre y aparezca en la sincronización de comandos Discord
+- [x] Reparar el error actual de Conectar con Discord y validar el callback OAuth
+- [x] Añadir pruebas de formato copiable, /apikey y OAuth Discord
