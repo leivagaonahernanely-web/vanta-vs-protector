@@ -480,3 +480,6 @@
 - [x] Hacer cumplir el cooldown de reset HWID por licencia y bloquear resets repetidos antes del intervalo permitido
 
 - [x] Unificar web, botón Discord y `/resethwid` para impedir resets repetidos y dejar bypass solo en la acción administrativa explícita — el cooldown ahora es obligatorio en todas las rutas
+
+- [x] Corregir la ruta efectiva que reinicia HWID repetidamente y eliminar cualquier bypass no autorizado
+- [x] Cambiar la etiqueta real de Get Script de “Copiar loadstring completo” a “Mobile View Script”

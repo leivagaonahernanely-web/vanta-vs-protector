@@ -383,7 +383,13 @@ async function handleButton(interaction: ButtonInteraction) {
     return interaction.showModal(modal);
   }
   if (interaction.customId === "vanta:script") return getScriptForUser(interaction);
-  if (interaction.customId === "vanta:copy-loader") return copyScriptForUser(interaction);
+  if (interaction.customId === "vanta:copy-loader") {
+    const updatedRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId("vanta:copy-loader").setLabel(GET_SCRIPT_COPY_BUTTON_LABEL).setStyle(ButtonStyle.Secondary),
+    );
+    if (interaction.message?.edit) await interaction.message.edit({ components: [updatedRow] }).catch(() => undefined);
+    return copyScriptForUser(interaction);
+  }
   if (interaction.customId.startsWith("vanta:copy-key:")) {
     const key = interaction.customId.slice("vanta:copy-key:".length).trim();
     if (!/^[A-Za-z0-9-]{1,64}$/.test(key)) return respond(interaction, { content: "❌ Esta key ya no es válida.", ephemeral: true });
