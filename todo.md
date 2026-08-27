@@ -475,6 +475,6 @@
 
 - [x] Formatear la respuesta de Mobile View Script con dos backticks de apertura y cierre, no tres
 
-- [ ] Corregir el 403 HTML al crear scripts, especialmente con sources grandes, sin afectar la privacidad ni el loader
+- [x] Corregir el 403 HTML al crear scripts, especialmente con sources grandes, sin afectar la privacidad ni el loader — backend alineado a 2 MB y error HTML normalizado
 
 - [x] Hacer cumplir el cooldown de reset HWID por licencia y bloquear resets repetidos antes del intervalo permitido

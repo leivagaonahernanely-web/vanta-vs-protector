@@ -45,6 +45,14 @@ describe("hostedScripts router", () => {
     expect(mocks.createHostedScript).toHaveBeenCalledWith(expect.objectContaining({ userId: 12, name: "demo.lua", ffaMode: 1, code: "-- protected artifact", sourceCode: "print('ok')" }));
   });
 
+  it("accepts a hosted source of exactly 2 MB", async () => {
+    mocks.createHostedScript.mockResolvedValue(hostedRow);
+    const source = "x".repeat(2_000_000);
+    const result = await appRouter.createCaller(context()).hostedScripts.create({ name: "large.lua", source, ffaMode: true, obfuscateSource: true });
+    expect(result.slug).toBe(hostedRow.slug);
+    expect(mocks.createHostedScript).toHaveBeenCalledWith(expect.objectContaining({ sourceCode: source }));
+  });
+
   it("updates a hosted script while preserving its stable slug", async () => {
     mocks.getHostedScriptById.mockResolvedValue(hostedRow);
     mocks.updateHostedScript.mockResolvedValue({ ...hostedRow, name: "updated.lua", sourceCode: "print('new')", code: "-- protected artifact" });

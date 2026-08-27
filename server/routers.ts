@@ -23,7 +23,7 @@ const ownerProcedure = protectedProcedure.use(({ ctx, next }) => {
 const hostedScriptInput = z.object({
   name: z.string().trim().min(1).max(255),
   description: z.string().trim().max(500).optional(),
-  source: z.string().min(1).max(150_000),
+  source: z.string().min(1).max(2_000_000),
   ffaMode: z.boolean().default(false),
   scriptKey: z.string().trim().regex(/^(?:FREE|PRO|PREMIUM)-[a-z0-9]{16}$/i).optional(),
   obfuscateSource: z.boolean().default(true),
