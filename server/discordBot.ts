@@ -100,6 +100,7 @@ export function handleGatewayFailure(reason: string, reconnect: () => boolean = 
 const keyActionTimestamps = new Map<string, number>();
 const KEY_ACTION_COOLDOWN_MS = 10_000;
 const respondedInteractions = new WeakSet<object>();
+const processingInteractions = new WeakSet<object>();
 const scriptChoiceCache = new Map<number, { expiresAt: number; scripts: any[] }>();
 const SCRIPT_CHOICE_CACHE_MS = 15_000;
 const SCRIPT_CHOICE_TIMEOUT_MS = 2_500;
@@ -342,6 +343,9 @@ export async function targetChoices(interaction: any) {
 }
 
 export async function handleInteraction(interaction: any) {
+  const interactionTarget = interaction as object;
+  if (processingInteractions.has(interactionTarget) || interaction.replied) return;
+  processingInteractions.add(interactionTarget);
   try {
     if (interaction.isAutocomplete?.()) {
       try {

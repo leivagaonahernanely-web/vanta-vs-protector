@@ -100,7 +100,7 @@ describe("Discord OAuth callback", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const handler = routes.get("/api/discord/callback");
     await handler?.({ query: { code: "attacker-code", state: "not-valid" }, headers: { cookie: "" } }, response);
-    expect(response.statusCode).toBe(403);
+    expect(response.redirectTarget).toBe("/?discord=oauth-invalid");
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });

@@ -113,6 +113,17 @@ describe("Discord access panel", () => {
     expect(editReply).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining("está conectado") }));
   });
 
+  it("ignores duplicate delivery of the same interaction", async () => {
+    const editReply = vi.fn().mockResolvedValue(undefined);
+    let interaction: any;
+    const deferReply = vi.fn(async () => { interaction.deferred = true; });
+    interaction = { isModalSubmit: () => false, isButton: () => false, isChatInputCommand: () => true, commandName: "stats", replied: false, deferred: false, deferReply, editReply };
+    await handleInteraction(interaction);
+    await handleInteraction(interaction);
+    expect(deferReply).toHaveBeenCalledTimes(1);
+    expect(editReply).toHaveBeenCalledTimes(1);
+  });
+
   it("runs /updates as a public styled embed", async () => {
     const reply = vi.fn();
     const interaction = { isModalSubmit: () => false, isButton: () => false, isChatInputCommand: () => true, commandName: "updates", replied: false, deferred: false, reply };

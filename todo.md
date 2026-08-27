@@ -518,3 +518,6 @@
 - [x] Mantener compatibilidad con Autoscale sin cambiar el modo de hosting y mejorar la reconexión/respuesta del bot mientras la instancia esté activa — se conserva Autoscale y se evita bloquear las interacciones
 
 - [x] Corregir Invalid Discord OAuth state en el callback publicado y mantener el state seguro entre móvil y Discord — cookie temporal con SameSite=None y política request-aware
+
+- [x] Unificar el callback de Discord en una sola ruta publicada y evitar que una visita directa muestre JSON sin contexto — `/api/discord/callback` redirige a la app cuando el enlace es directo, vencido o inválido
+- [x] Quitar el bloque Head Key del dashboard Overview y cualquier referencia visual que lo mezcle con el login — eliminada la tarjeta API key de Overview

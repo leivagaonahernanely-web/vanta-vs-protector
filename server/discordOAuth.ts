@@ -72,7 +72,9 @@ export function registerDiscordOAuthRoutes(app: Express) {
     const state = decodeState(rawState);
     const expectedNonce = parseCookie(req.headers.cookie ?? "")[STATE_COOKIE];
     if (!code || !state || !expectedNonce || state.nonce !== expectedNonce || !state.redirectUri.endsWith(CALLBACK_PATH)) {
-      res.status(403).json({ error: "invalid Discord OAuth state" });
+      // A direct/stale callback must return the user to the app instead of
+      // exposing a raw JSON page. The state check still fails closed.
+      res.redirect("/?discord=oauth-invalid");
       return;
     }
     res.clearCookie(STATE_COOKIE, getSessionCookieOptions(req));
@@ -120,7 +122,7 @@ export function registerDiscordOAuthRoutes(app: Express) {
     } catch (error) {
       console.error("[Discord OAuth] Callback failed", error);
       const message = error instanceof Error ? error.message : "No se pudo conectar Discord.";
-      res.status(502).json({ error: message });
+      res.redirect(`/?discord=${encodeURIComponent(message.includes("redirect URI") ? "redirect-invalid" : "callback-error")}`);
     }
   });
 }
