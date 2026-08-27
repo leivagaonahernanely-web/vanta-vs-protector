@@ -56,7 +56,7 @@ export const discordCommands = [
   new SlashCommandBuilder().setName("stats").setDescription("Muestra el estado del acceso").toJSON(),
   new SlashCommandBuilder().setName("apikey").setDescription("Muestra la API key de tu cuenta vinculada").toJSON(),
   new SlashCommandBuilder().setName("getscript").setDescription("Obtiene el enlace de acceso al script").toJSON(),
-  new SlashCommandBuilder().setName("getrole").setDescription("Configura el rol que recibirá un usuario con key activa").addRoleOption(o => o.setName("role").setDescription("Rol comprador").setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.Administrator.toString()).toJSON(),
+  new SlashCommandBuilder().setName("getrole").setDescription("Configura el rol que recibirá un usuario con key activa").addRoleOption(o => o.setName("role").setDescription("Rol comprador").setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("redeem").setDescription("Canjea una key de acceso").addStringOption(o => o.setName("key").setDescription("Key alfanumérica de mínimo 32 caracteres").setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("generatekey").setDescription("Genera una key aleatoria para un script hosteado").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addStringOption(o => o.setName("duration").setDescription("Duración; vacío = forever").setRequired(false)).toJSON(),
   new SlashCommandBuilder().setName("deletekey").setDescription("Elimina una key").addStringOption(o => o.setName("key").setDescription("Key a eliminar").setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario opcional").setRequired(false)).addRoleOption(o => o.setName("role").setDescription("Rol opcional").setRequired(false)).toJSON(),
@@ -69,7 +69,7 @@ export const discordCommands = [
   new SlashCommandBuilder().setName("dropkey").setDescription("Genera un drop de keys").addIntegerOption(o => o.setName("amount").setDescription("Cantidad de keys").setRequired(true).setMinValue(1).setMaxValue(50)).toJSON(),
   new SlashCommandBuilder().setName("prices").setDescription("Publica la información de precios").toJSON(),
   new SlashCommandBuilder().setName("updates").setDescription("Publica una actualización del proyecto").toJSON(),
-  new SlashCommandBuilder().setName("generatekeyrol").setDescription("Configura el rol autorizado para gestionar keys").addRoleOption(o => o.setName("role").setDescription("Rol delegado").setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.Administrator.toString()).toJSON(),
+  new SlashCommandBuilder().setName("generatekeyrol").setDescription("Configura el rol autorizado para gestionar keys").addRoleOption(o => o.setName("role").setDescription("Rol delegado").setRequired(true)).toJSON(),
 ];
 
 let started = false;

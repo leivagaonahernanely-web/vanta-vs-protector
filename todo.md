@@ -422,3 +422,7 @@
 - [x] Reparar resolución de cuenta web vinculada en /apikey mediante Discord OAuth y bootstrap seguro para el owner del servidor
 - [x] Validar que el callback persista la identidad antes de redirigir; el callback guarda linkDiscordIdentity antes de /?discord=connected
 - [x] Añadir cobertura de /apikey en el registro slash y resolución DB; el owner no vinculado se repara automáticamente
+
+- [x] Permitir al owner vinculado generar keys sin exigir Administrator en el comando slash
+- [x] Permitir al owner vinculado configurar /getrole sin exigir Administrator
+- [x] Añadir pruebas de autorización por owner para generatekeyrol y generación de keys mediante el contrato de comandos y la suite de autorización existente
