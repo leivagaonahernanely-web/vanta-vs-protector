@@ -239,6 +239,13 @@ export async function createLicense(input: InsertLicense) {
   return rows[0];
 }
 
+export async function getLicenseById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(licenses).where(eq(licenses.id, id)).limit(1);
+  return rows[0];
+}
+
 export async function getLicensesByOwner(ownerId: number) {
   const db = await getDb();
   if (!db) return [];

@@ -431,3 +431,7 @@
 - [x] Hacer whitelist multiusuario y multirrol por script, con selector web de script, altas/bajas persistentes y soporte existente en Discord
 - [x] Restaurar generación y entrega de Plan Keys Pro/Premium solo para owner, con key visible, copia rápida y lista separada
 - [x] Revisar y probar flujos relacionados y mejorar detalles seguros; TypeScript y 115 pruebas Vitest pasan
+
+- [x] Generar loader visible compacto de dos líneas con URL opaca, sin exponer el parámetro HWID en el snippet
+- [x] Mantener validación server-side de key y HWID mediante una segunda etapa del loader
+- [x] Añadir pruebas del nuevo loader compacto, FFA, key inválida y HWID bloqueado

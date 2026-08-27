@@ -20,6 +20,7 @@ import {
 import { durationToMs } from "../shared/duration";
 import { buildPlansDescription } from "../shared/plans";
 import { ENV } from "./_core/env";
+import { makeLoaderToken } from "./loaderTokens";
 import {
   createAccessRuleIfAbsent,
   createBlacklist,
@@ -130,9 +131,13 @@ export async function respond(interaction: any, payload: any) {
   if (interaction.replied || interaction.deferred) return interaction.followUp(payload);
   return interaction.reply(payload);
 }
-export function scriptRuntimeLoader(script: any, accessKey?: string) {
+export function scriptRuntimeLoader(script: any, accessKey?: string, licenseId?: number) {
   const url = `${PANEL_URL}/scripts/hosted/${script.slug}`;
   const runtimeKey = script.ffaMode ? "trial" : (accessKey || script.scriptKey);
+  if (!script.ffaMode && accessKey && licenseId) {
+    const compactUrl = `${PANEL_URL}/scripts/loaders/${makeLoaderToken(licenseId, accessKey)}`;
+    return `script_key = "${accessKey}"\nloadstring(game:HttpGet("${compactUrl}"))()`;
+  }
   const accessUrl = runtimeKey ? `${url}?key=${encodeURIComponent(runtimeKey)}` : url;
   const load = script.ffaMode || !runtimeKey
     ? `loadstring(game:HttpGet("${accessUrl}"))()`
@@ -325,7 +330,7 @@ async function getScriptForUser(interaction: any) {
   if (!license) return respond(interaction, { content: "❌ No tienes una key activa. Pulsa Redeem Key y canjea una key válida antes de solicitar el script.", ephemeral: true });
   const script = license.hostedScriptId ? await getHostedScriptById(license.hostedScriptId) : access.scripts[0];
   if (!script) return respond(interaction, { content: "❌ Tu key está activa, pero todavía no hay un script asignado.", ephemeral: true });
-  const loader = scriptRuntimeLoader(script, license.keyCode);
+  const loader = scriptRuntimeLoader(script, license.keyCode, license.id);
   const copyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId("vanta:copy-loader").setLabel("Copiar loadstring completo").setStyle(ButtonStyle.Secondary),
   );

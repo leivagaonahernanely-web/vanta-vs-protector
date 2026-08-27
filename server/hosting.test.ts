@@ -1,15 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
-const { findMock, licenseMock } = vi.hoisted(() => ({ findMock: vi.fn(), licenseMock: vi.fn() }));
-vi.mock("./db", () => ({ getHostedScriptBySlug: findMock, claimLicenseHwid: licenseMock }));
+const { findMock, licenseMock, licenseByIdMock, scriptByIdMock } = vi.hoisted(() => ({ findMock: vi.fn(), licenseMock: vi.fn(), licenseByIdMock: vi.fn(), scriptByIdMock: vi.fn() }));
+vi.mock("./db", () => ({ getHostedScriptBySlug: findMock, claimLicenseHwid: licenseMock, getLicenseById: licenseByIdMock, getHostedScriptById: scriptByIdMock }));
 
 import { registerHostingRoutes } from "./hosting";
+import { makeLoaderToken } from "./loaderTokens";
 
 type Handler = (req: any, res: any) => Promise<void> | void;
 
-function getHandler() {
+function getHandler(pathPart = "/scripts/hosted") {
   let handler: Handler | undefined;
-  registerHostingRoutes({ get: (_path: string, next: Handler) => { handler = next; } } as never);
+  registerHostingRoutes({ get: (path: string, next: Handler) => { if (path.includes(pathPart)) handler = next; } } as never);
   return handler!;
 }
 
@@ -71,6 +72,19 @@ describe("public hosted scripts", () => {
     await getHandler()({ params: { slug: script.slug }, query: { key: "86vC3ZULuEQpOImpm5VBB6oLROAQmPLe" }, headers: { accept: "*/*", "x-hwid": "device-a" }, protocol: "https", get: () => "vanta.test" }, response);
     expect(response.statusCode).toBe(200);
     expect(response.body).toBe("return true");
+  });
+
+  it("returns a compact second-stage loader for a valid opaque license token", async () => {
+    const protectedScript = { ...script, id: 9, ffaMode: 0, scriptKey: null };
+    const license = { id: 4, status: "active", hostedScriptId: 9, keyCode: "86vC3ZULuEQpOImpm5VBB6oLROAQmPLe", expiresAt: null };
+    licenseByIdMock.mockResolvedValue(license);
+    scriptByIdMock.mockResolvedValue(protectedScript);
+    const response = responseMock();
+    await getHandler("/scripts/loaders")({ params: { token: makeLoaderToken(license.id, license.keyCode) }, query: {}, headers: { accept: "*/*" }, protocol: "https", get: () => "vanta.test" }, response);
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain("RbxAnalyticsService");
+    expect(response.body).toContain("/scripts/hosted/scriptSlug123456789?key=");
+    expect(response.body).toContain("&hwid=\" .. h");
   });
 
   it("serves only the FFA artifact to non-browser runtime clients with trial", async () => {

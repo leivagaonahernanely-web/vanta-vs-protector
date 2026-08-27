@@ -1,11 +1,32 @@
 import type { Express, Request, Response } from "express";
-import { claimLicenseHwid, getHostedScriptBySlug } from "./db";
+import { claimLicenseHwid, getHostedScriptBySlug, getLicenseById, getHostedScriptById } from "./db";
+import { verifyLoaderToken } from "./loaderTokens";
 
 function browserNotice(title: string, message: string) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} · Vanta.vs Protector</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#061a2d;color:#f3f6fa;font:15px system-ui,sans-serif}main{width:min(100%,540px);padding:42px 24px;border:1px solid #174568;border-radius:20px;background:#08213a;text-align:center;box-shadow:0 24px 70px #0007}.mark{width:42px;height:42px;display:grid;place-items:center;margin:0 auto 18px;border-radius:50%;background:#f5f7fa;color:#071a2d;font-weight:800}.eyebrow{color:#65baff;font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}h1{margin:12px 0 0;font-size:30px}p{color:#98b1c5;line-height:1.5}</style></head><body><main><div class="mark">&lt;/&gt;</div><div class="eyebrow">Vanta.vs Protector</div><h1>${title}</h1><p>${message}</p></main></body></html>`;
 }
 
 export function registerHostingRoutes(app: Express) {
+  app.get("/scripts/loaders/:token", async (req: Request, res: Response) => {
+    const token = typeof req.params.token === "string" ? req.params.token : "";
+    const match = /^(\d+)-([A-Za-z0-9_-]{24})\.lua$/.exec(token);
+    if (!match) { res.status(404).type("text/plain").send("Loader not found"); return; }
+    try {
+      const license = await getLicenseById(Number(match[1]));
+      if (!license || license.status !== "active" || !license.hostedScriptId || (license.expiresAt && license.expiresAt.getTime() <= Date.now()) || !verifyLoaderToken(token.replace(/^\d+-|\.lua$/g, ""), license.id, license.keyCode)) {
+        res.status(404).type("text/plain").send("Loader not found"); return;
+      }
+      const script = await getHostedScriptById(license.hostedScriptId);
+      if (!script) { res.status(404).type("text/plain").send("Loader not found"); return; }
+      const endpoint = `${req.protocol}://${req.get("host")}/scripts/hosted/${script.slug}?key=${encodeURIComponent(license.keyCode)}`;
+      const stageTwo = `local h = game:GetService("RbxAnalyticsService"):GetClientId()\nloadstring(game:HttpGet("${endpoint}&hwid=" .. h))()`;
+      res.setHeader("Cache-Control", "private, no-store");
+      res.type("text/plain; charset=utf-8").send(stageTwo);
+    } catch (error) {
+      console.error("[Hosting] Loader token failed", error);
+      res.status(404).type("text/plain").send("Loader not found");
+    }
+  });
   app.get("/scripts/hosted/:slug", async (req: Request, res: Response) => {
     const slug = typeof req.params.slug === "string" ? req.params.slug : "";
     const acceptsHtml = typeof req.headers.accept === "string" && req.headers.accept.includes("text/html");
