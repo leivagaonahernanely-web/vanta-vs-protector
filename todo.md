@@ -557,3 +557,8 @@
 - [x] Hacer que Get Script cree o recupere automáticamente la key del script autorizado por rol
 - [x] Hacer que Stats, Get Role, Reset HWID y Redeem respeten el contexto del panel y el acceso por rol — Redeem conserva su canje manual y el resto provisiona acceso por whitelist
 - [x] Mantener privadas las respuestas personales y no añadir slash commands no solicitados — keys, Get Script, Stats, Role y HWID siguen siendo efímeros; /getkey no se registra
+- [x] Restaurar compatibilidad de las keys existentes sin borrarlas ni invalidarlas al corregir whitelist — Get Script consulta primero licencias activas y no revoca ni elimina ninguna
+- [x] Permitir acceso por key válida aunque el usuario no tenga whitelist — la whitelist ya no es requisito si existe una licencia activa para el workspace
+- [x] Hacer que whitelist y key del mismo usuario/script produzcan una sola autorización efectiva sin duplicar licencias — se recupera la existente antes de crear una automática
+- [x] Corregir el guardado y reconocimiento de whitelist por rol/usuario cuando ya existe una key — el flujo combina regla y licencia sin invalidar la key
+- [x] Añadir regresiones para key existente, whitelist adicional y acceso combinado — 138 pruebas Vitest pasan y TypeScript no reporta errores

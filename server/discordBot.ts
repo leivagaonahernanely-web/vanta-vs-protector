@@ -482,15 +482,21 @@ async function getKeyForWhitelistedUser(interaction: any) {
 async function panelAccess(interaction: any) {
   const owner = await ownerAccount(interaction);
   const panelContext = getPanelContext(interaction);
-  if (!owner || !panelContext?.hostedScriptId) return { owner, script: undefined, license: undefined };
-  const access = await getUserLicenses(interaction.user.id, owner.id, panelContext.hostedScriptId);
-  let license = access.licenses[0];
+  if (!owner) return { owner, script: undefined, license: undefined };
+  // A valid redeemed key remains sufficient even without a whitelist. For
+  // legacy panels without encoded context, resolve the user's active key first
+  // and use its assigned script instead of forcing a new whitelist license.
+  const access = await getUserLicenses(interaction.user.id, owner.id);
+  const license = panelContext?.hostedScriptId
+    ? access.licenses.find((item: any) => Number(item.hostedScriptId) === panelContext.hostedScriptId)
+    : access.licenses[0];
   let script = license?.hostedScriptId ? await getHostedScriptByOwnerId(owner.id, license.hostedScriptId) : undefined;
   if (!license) {
     const match = await getWhitelistScriptForMember(interaction);
     if (match) {
       script = match.script;
-      license = await createLicense({ ownerId: match.owner.id, hostedScriptId: match.script.id, keyCode: keyCode(), type: "license", status: "active", discordUserId: interaction.user.id, hwid: null, expiresAt: null });
+      const created = await createLicense({ ownerId: match.owner.id, hostedScriptId: match.script.id, keyCode: keyCode(), type: "license", status: "active", discordUserId: interaction.user.id, hwid: null, expiresAt: null });
+      return { owner, script, license: created };
     }
   }
   return { owner, script, license };
