@@ -464,3 +464,5 @@
 - [x] Comparar los dos videos y adaptar el flujo al recorrido más cómodo del segundo
 
 - [x] Reorganizar Scripts para que el editor y Release Output sean compactos y la source completa solo aparezca bajo demanda
+
+- [x] Retirar el ajuste TLS temporal añadido al modo desarrollo y conservar solo los cambios de interfaz de Scripts/Get Script
