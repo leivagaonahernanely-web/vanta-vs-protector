@@ -568,3 +568,8 @@
 - [x] Permitir Generate Key únicamente para scripts del workspace propio del usuario — valida hostedScriptId con getHostedScriptByOwnerId(ctx.user.id, ...)
 - [x] Corregir owner resolution para no usar el owner global en consultas del dashboard de cada cuenta — el owner global queda solo para acciones administrativas del bot
 - [x] Añadir pruebas que demuestren aislamiento entre dos workspaces y generación de key en script propio — suite completa pasa con 138 pruebas
+- [x] Corregir el fallo persistente donde una regla whitelist visible no coincide con Get Script para el mismo rol y script — el flujo valida el rol real del guild y conserva el hostedScriptId del script
+- [x] Verificar y cubrir con pruebas la relación exacta entre owner, hostedScriptId, rol Discord y panel publicado — el panel mantiene owner/script context y la suite pasa con 139 pruebas
+- [x] Separar explícitamente channelId, panelId, hostedScriptId y roleId en el flujo de whitelist — la respuesta pública muestra canal, script y Role ID por separado
+- [x] Validar que el roleId seleccionado pertenece al servidor Discord del panel antes de guardarlo — Discord roles.fetch rechaza IDs de canal/panel
+- [x] Hacer que Get Script compare el roleId del miembro en ese guild con el roleId whitelist del script — fetch forzado de miembro y comparación normalizada

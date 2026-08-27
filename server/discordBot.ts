@@ -625,10 +625,24 @@ async function whitelist(interaction: any, discordId: string, kind: "user" | "ro
   if (!owner || !(await isConfiguredOwner(interaction))) return respond(interaction, { content: "⛔ Solo el owner vinculado puede modificar la whitelist.", ephemeral: true });
   const script = await getHostedScriptByName(owner.id, scriptName);
   if (!script) return respond(interaction, { content: "❌ Selecciona un script hosteado válido de tu workspace.", ephemeral: true });
-  const counts = await createAccessRuleIfAbsent({ ownerId: owner.id, hostedScriptId: script.id, kind, discordId: discordId.trim(), label: kind === "role" ? "Buyer role" : "Buyer user" });
+  let canonicalId = normalizeDiscordId(discordId);
+  let roleName = "Buyer role";
+  if (kind === "role") {
+    if (!interaction.guild?.roles?.fetch) return respond(interaction, { content: "❌ Selecciona el rol desde un servidor Discord; no se puede usar un ID de canal o panel como whitelist.", ephemeral: true });
+    try {
+      const role = await interaction.guild.roles.fetch(canonicalId ?? discordId.trim());
+      if (!role) return respond(interaction, { content: "❌ Ese ID no corresponde a un rol del servidor actual. Selecciona el rol desde el desplegable de Discord.", ephemeral: true });
+      canonicalId = normalizeDiscordId(role.id);
+      roleName = role.name;
+    } catch {
+      return respond(interaction, { content: "❌ No pude encontrar ese rol en el servidor actual. Selecciona el rol desde el desplegable de Discord.", ephemeral: true });
+    }
+  }
+  if (!canonicalId) return respond(interaction, { content: "❌ El destino debe ser un usuario o rol válido de Discord.", ephemeral: true });
+  const counts = await createAccessRuleIfAbsent({ ownerId: owner.id, hostedScriptId: script.id, kind, discordId: canonicalId, label: kind === "role" ? roleName : "Buyer user" });
   const rules = await getAccessRulesByOwner(owner.id);
   const channel = interaction.channelId ? `<#${interaction.channelId}>` : "canal actual";
-  const embed = new EmbedBuilder().setColor(0x57f287).setTitle("✅ Whitelisted").setDescription(`Acceso concedido a **${kind === "role" ? `<@&${discordId}>` : `<@${discordId}>`}** en **${script.name}**.\n\n**Added:** ${counts.added} · **Already whitelisted:** ${counts.alreadyWhitelisted} · **Failed:** ${counts.failed}\n\nAccess the script via → ${channel}`).setFooter({ text: `Reglas activas: ${rules.length}` });
+  const embed = new EmbedBuilder().setColor(0x57f287).setTitle("✅ Whitelisted").setDescription(`Acceso concedido a **${kind === "role" ? `<@&${canonicalId}>` : `<@${canonicalId}>`}** en **${script.name}**.\n\n**Added:** ${counts.added} · **Already whitelisted:** ${counts.alreadyWhitelisted} · **Failed:** ${counts.failed}\n**Role ID:** \`${kind === "role" ? canonicalId : "no aplica"}\` · **Script ID:** \`${script.id}\`\n\nAccess the script via → ${channel}`).setFooter({ text: `Reglas activas: ${rules.length}` });
   return respond(interaction, { embeds: [embed] });
 }
 async function unwhitelist(interaction: any, discordId: string, scriptName: string) {
