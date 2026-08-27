@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createReconnectGate, discordCommands, GET_SCRIPT_COPY_BUTTON_LABEL, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, isGuildOwner, matchesWhitelistRule, mobileViewScriptMessage, panelMessage, parseDuration, respond, scriptRuntimeLoader, targetChoices } from "./discordBot";
+import { createReconnectGate, discordCommands, GET_SCRIPT_COPY_BUTTON_LABEL, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, isConfiguredOwnerId, isGuildOwner, matchesWhitelistRule, mobileViewScriptMessage, panelMessage, parseDuration, respond, scriptRuntimeLoader, targetChoices } from "./discordBot";
 
 describe("Discord access panel", () => {
   it("parses key durations in days, months and years", () => {
@@ -178,6 +178,12 @@ describe("Discord access panel", () => {
     expect(matchesWhitelistRule({ kind: "role", discordId: "r1", hostedScriptId: 7, active: 1 }, "u2", ["r1"])).toBe(true);
     expect(matchesWhitelistRule({ kind: "role", discordId: "r1", hostedScriptId: 7, active: 1 }, "u2", ["r2"])).toBe(false);
     expect(matchesWhitelistRule({ kind: "role", discordId: "r1", hostedScriptId: 7, active: 0 }, "u2", ["r1"])).toBe(false);
+  });
+
+  it("recognizes the linked owner identity using normalized Discord IDs", () => {
+    expect(isConfiguredOwnerId({ actorId: " 1501316920975036611 ", linkedDiscordUserId: "1501316920975036611" })).toBe(true);
+    expect(isConfiguredOwnerId({ actorId: "1501316920975036611", linkedDiscordUserId: "other" })).toBe(false);
+    expect(isConfiguredOwnerId({ actorId: "1501316920975036611", linkedDiscordUserId: null })).toBe(false);
   });
 
   it("allows key management only to the owner, an administrator or the configured role", () => {

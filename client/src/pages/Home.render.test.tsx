@@ -2,18 +2,19 @@
 import React from "react";
 import { fireEvent, render, screen, cleanup } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/_core/hooks/useAuth", () => ({
-  useAuth: () => ({
+  useAuth: vi.fn(() => ({
     user: { name: "Owner", email: "owner@example.com", role: "admin", isOwner: true, discordUsername: "Protectorscripts" },
     loading: false,
     isAuthenticated: true,
     logout: vi.fn(),
-  }),
+  })),
 }));
 
-vi.mock("@/const", () => ({ startLogin: vi.fn() }));
+vi.mock("@/const", () => ({ startLogin: vi.fn(), startDiscordLogin: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/components/ui/button", () => ({ Button: ({ children, ...props }: { children: React.ReactNode }) => <button {...props}>{children}</button> }));
 vi.mock("@/components/ui/input", () => ({ Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} /> }));
@@ -45,11 +46,25 @@ import Home, { friendlyApiError } from "./Home";
 
 afterEach(() => {
   cleanup();
+  vi.mocked(useAuth).mockImplementation(() => ({
+    user: { name: "Owner", email: "owner@example.com", role: "admin", isOwner: true, discordUsername: "Protectorscripts" },
+    loading: false,
+    isAuthenticated: true,
+    logout: vi.fn(),
+  }) as never);
   pricesMutate.mockClear();
   updatesMutate.mockClear();
 });
 
 describe("Home authenticated dashboard render", () => {
+  it("exposes Discord as the login provider on the unauthenticated entry", async () => {
+    const auth = await import("@/_core/hooks/useAuth");
+    vi.mocked(auth.useAuth).mockReturnValue({ user: null, loading: false, isAuthenticated: false, logout: vi.fn() } as never);
+    render(<Home />);
+    expect(screen.getByRole("heading", { name: "Inicia sesión con Discord" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Continuar con Discord/i })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Continuar con acceso/i })).toBeNull();
+  });
   it("normalizes HTML API parse errors into an actionable message", () => {
     expect(friendlyApiError(new Error("Unexpected token '<', \"<html>\" is not valid JSON"), "fallback")).toContain("respuesta inválida");
     expect(friendlyApiError(new Error("El Gateway Discord no está conectado."), "fallback")).toBe("El Gateway Discord no está conectado.");

@@ -118,10 +118,27 @@ export function matchesWhitelistRule(rule: { kind: "user" | "role"; discordId: s
 export function isGuildOwner(input: { actorId: string; guildOwnerId?: string | null }) {
   return Boolean(input.guildOwnerId && input.actorId === input.guildOwnerId);
 }
+function normalizeDiscordIdentity(value: unknown) {
+  const normalized = String(value ?? "").trim();
+  return normalized || undefined;
+}
+export function isConfiguredOwnerId(input: { actorId: unknown; linkedDiscordUserId?: unknown | null }) {
+  const actorId = normalizeDiscordIdentity(input.actorId);
+  const linkedDiscordUserId = normalizeDiscordIdentity(input.linkedDiscordUserId);
+  return Boolean(actorId && linkedDiscordUserId && actorId === linkedDiscordUserId);
+}
 async function ownerAccount() { return ENV.ownerOpenId ? getUserByOpenId(ENV.ownerOpenId) : undefined; }
 async function isConfiguredOwner(interaction: any) {
   const owner = await ownerAccount();
-  return Boolean(owner?.discordUserId && interaction.user?.id === owner.discordUserId);
+  if (!owner) return false;
+  if (isConfiguredOwnerId({ actorId: interaction.user?.id, linkedDiscordUserId: owner.discordUserId })) return true;
+  // Bootstrap only when the owner account has not been linked yet. This keeps
+  // whitelist administration owner-only without allowing an arbitrary member.
+  if (!normalizeDiscordIdentity(owner.discordUserId) && isGuildOwner({ actorId: String(interaction.user?.id ?? ""), guildOwnerId: interaction.guild?.ownerId })) {
+    await linkDiscordIdentity(owner.id, String(interaction.user.id), interaction.user.globalName || interaction.user.username || "Discord owner", interaction.user.globalName || null, interaction.user.displayAvatarURL?.({ extension: "png", size: 128 }) ?? null);
+    return true;
+  }
+  return false;
 }
 async function canManageKeys(interaction: any) {
   const owner = await ownerAccount();
@@ -463,7 +480,7 @@ async function configureKeyRole(interaction: any, role: { id: string }) {
 }
 async function whitelist(interaction: any, discordId: string, kind: "user" | "role", scriptName: string) {
   const owner = await ownerAccount();
-  if (!owner || interaction.user.id !== owner.discordUserId) return respond(interaction, { content: "⛔ Solo el owner vinculado puede modificar la whitelist.", ephemeral: true });
+  if (!owner || !(await isConfiguredOwner(interaction))) return respond(interaction, { content: "⛔ Solo el owner vinculado puede modificar la whitelist.", ephemeral: true });
   const script = await getHostedScriptByName(owner.id, scriptName);
   if (!script) return respond(interaction, { content: "❌ Selecciona un script hosteado válido de tu workspace.", ephemeral: true });
   const counts = await createAccessRuleIfAbsent({ ownerId: owner.id, hostedScriptId: script.id, kind, discordId: discordId.trim(), label: kind === "role" ? "Buyer role" : "Buyer user" });
@@ -474,7 +491,7 @@ async function whitelist(interaction: any, discordId: string, kind: "user" | "ro
 }
 async function unwhitelist(interaction: any, discordId: string, scriptName: string) {
   const owner = await ownerAccount();
-  if (!owner || interaction.user.id !== owner.discordUserId) return respond(interaction, { content: "⛔ Solo el owner vinculado puede modificar la whitelist.", ephemeral: true });
+  if (!owner || !(await isConfiguredOwner(interaction))) return respond(interaction, { content: "⛔ Solo el owner vinculado puede modificar la whitelist.", ephemeral: true });
   const script = await getHostedScriptByName(owner.id, scriptName);
   if (!script) return respond(interaction, { content: "❌ Selecciona un script hosteado válido de tu workspace.", ephemeral: true });
   const removed = await deleteAccessRuleByDiscordId(owner.id, discordId.trim(), script.id);

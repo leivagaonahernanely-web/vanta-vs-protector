@@ -504,3 +504,6 @@
 - [x] Corregir el reconocimiento de API key vinculada para que el bot y el panel la acepten inmediatamente y tras reinicios
 
 - [x] Hacer que el bot autorrecupere la API key persistente por la identidad Discord vinculada, incluso tras reinicios — recuperación reforzada por discordUserId y fallback seguro para el owner
+
+- [x] Corregir el permiso de whitelist para que el owner Discord vinculado pueda modificarla sin el mensaje de rechazo — comparación normalizada de identidad vinculada y bootstrap solo si la cuenta aún no está enlazada
+- [x] Cambiar la pantalla inicial para ofrecer inicio de sesión con Discord como método principal, sin Google/Manus visible — también se actualizó el redirect automático de sesión expirada

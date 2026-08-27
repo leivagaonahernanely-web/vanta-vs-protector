@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import React from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { startLogin } from "@/const";
+import { startDiscordLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { clearRejectedDiscordChannel, defaultSetup, getDiscordChannelUpdate, getSetupStatus, loadSetupSettings, parseDiscordChannelInput, saveSetupSettings } from "@/lib/setup";
 import { readLuaFile, validateLuaFile } from "@/lib/lua-upload";
@@ -214,7 +214,7 @@ export default function Home(props: any = {}) {
     readLuaFile(file).then((text) => { setSource(text); toast.success(`Archivo cargado: ${file.name}`); }).catch(() => toast.error("No se pudo leer el archivo Lua"));
     if (luaFileInputRef.current) luaFileInputRef.current.value = "";
   }
-  function connectDiscord() { const oauthOrigin = window.location.origin; window.location.assign(`/api/discord/start?origin=${encodeURIComponent(oauthOrigin)}`); }
+  function connectDiscord() { startDiscordLogin(); }
   function selectNav(item: string) { setActive(item); setMobileOpen(false); playUiChime(soundEnabled); }
   function toggleSound() { const next = !soundEnabled; setSoundEnabled(next); setSoundPreference(localStorage, next); playUiChime(true); }
   function updatePriceBlock(index: number, field: keyof PriceBlock, value: string) { setPricesBlocks((current) => current.map((block, itemIndex) => itemIndex === index ? { ...block, [field]: value } : block)); }
@@ -244,7 +244,7 @@ export default function Home(props: any = {}) {
 
   if (loading) return <div className="auth-screen"><div className="auth-card"><div className="auth-icon"><Code2 size={19} /></div><div className="skeleton-line" /><div className="skeleton-line short" /></div></div>;
 
-  if (!isAuthenticated) return <div className="auth-screen"><div className="auth-card"><div className="auth-icon"><Code2 size={20} /></div><h1>Inicia sesión para continuar</h1><p>Accede a tu workspace para proteger y alojar tus scripts Lua.</p><Button className="primary-button full-button" onClick={() => startLogin()}>Continuar con acceso <ExternalLink size={15} /></Button><div className="auth-foot"><span>Vanta.vs Protector</span><span>Secure workspace</span></div></div><span className="made-by">Built for controlled delivery</span></div>;
+  if (!isAuthenticated) return <div className="auth-screen"><div className="auth-card"><div className="auth-icon"><Code2 size={20} /></div><h1>Inicia sesión con Discord</h1><p>Vincula tu cuenta de Discord para entrar a Vanta.vs Protector y administrar tu workspace.</p><Button className="primary-button full-button" onClick={startDiscordLogin}><span className="discord-login-mark">D</span> Continuar con Discord <ExternalLink size={15} /></Button><div className="auth-foot"><span>Vanta.vs Protector</span><span>Acceso seguro por Discord</span></div></div><span className="made-by">Built for controlled delivery</span></div>;
 
   const scripts = (hostedQuery.data ?? []) as HostedItem[];
   const scriptById = new Map(scripts.map((script) => [script.id, script.name]));
