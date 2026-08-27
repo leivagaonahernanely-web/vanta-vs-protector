@@ -30,6 +30,14 @@ describe("Discord access panel", () => {
     expect(loader).toContain("&hwid=\" .. hwid");
   });
 
+  it("builds Mobile View Script as exactly two compact lines", () => {
+    const loader = scriptRuntimeLoader({ slug: "mobile-script", ffaMode: false, scriptKey: "internal-key" }, "mbe2krjut4gdyiggoqc3t47zq3eaxnkl", 42);
+    expect(loader.split("\n")).toHaveLength(2);
+    expect(loader).toContain('/scripts/loaders/');
+    expect(loader).not.toContain("RbxAnalyticsService");
+    expect(loader).not.toContain("/scripts/hosted/");
+  });
+
   it("builds the requested two-row action layout", () => {
     const message = panelMessage();
     const ids = message.components.flatMap((row: any) => row.components.map((button: any) => button.data.custom_id));

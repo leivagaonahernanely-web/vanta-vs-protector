@@ -344,7 +344,7 @@ async function copyScriptForUser(interaction: any) {
   if (!license) return respond(interaction, { content: "❌ No tienes una key activa.", ephemeral: true });
   const script = license.hostedScriptId ? await getHostedScriptById(license.hostedScriptId) : access.scripts[0];
   if (!script) return respond(interaction, { content: "❌ Tu key no tiene un script asignado.", ephemeral: true });
-  return respond(interaction, { content: `\`\`\`lua\n${scriptRuntimeLoader(script, license.keyCode)}\n\`\`\``, ephemeral: true });
+  return respond(interaction, { content: `📜 **${script.name}**\n\n\`\`\`lua\n${scriptRuntimeLoader(script, license.keyCode, license.id)}\n\`\`\``, ephemeral: true });
 }
 
 async function configureBuyerRole(interaction: any, role: { id: string }) {

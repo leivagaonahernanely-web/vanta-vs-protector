@@ -468,3 +468,5 @@
 - [x] Retirar el ajuste TLS temporal añadido al modo desarrollo y conservar solo los cambios de interfaz de Scripts/Get Script
 
 - [x] Limitar el editor principal de source a un cuadro compacto con desplazamiento interno, sin expandir la página
+
+- [x] Hacer que Mobile View Script muestre y copie solo `script_key` + loadstring compacto de `/scripts/loaders/...lua`, sin HWID visible
