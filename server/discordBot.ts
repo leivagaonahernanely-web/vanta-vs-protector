@@ -218,7 +218,6 @@ export function panelMessage() {
     .setTimestamp();
   const rowOne = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId("vanta:redeem").setLabel("🔑 Redeem Key").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId("vanta:get-key").setLabel("🔐 Get Key").setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId("vanta:script").setLabel("📜 Get Script").setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId("vanta:role").setLabel("👤 Get Role").setStyle(ButtonStyle.Primary),
   );

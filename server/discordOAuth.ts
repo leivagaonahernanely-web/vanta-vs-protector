@@ -10,6 +10,8 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const";
 
 const STATE_COOKIE = "__Host-discord_oauth_state";
 const CALLBACK_PATH = "/api/discord/callback";
+const INVITE_PATH = "/api/discord/invite";
+const BOT_INVITE_PERMISSIONS = "268520448"; // View channel, send/embed messages, history and manage roles.
 
 type DiscordState = { nonce: string; redirectUri: string };
 type DiscordTokenResponse = { access_token?: string };
@@ -45,6 +47,20 @@ function getOrigin(req: Request) {
 }
 
 export function registerDiscordOAuthRoutes(app: Express) {
+  app.get(INVITE_PATH, (_req: Request, res: Response) => {
+    if (!ENV.vantaClientId) {
+      res.status(503).json({ error: "La invitación del bot no está configurada." });
+      return;
+    }
+    const params = new URLSearchParams({
+      client_id: ENV.vantaClientId,
+      permissions: BOT_INVITE_PERMISSIONS,
+      scope: "bot applications.commands",
+      integration_type: "0",
+    });
+    res.redirect(`https://discord.com/oauth2/authorize?${params.toString()}`);
+  });
+
   app.get("/api/discord/start", (req: Request, res: Response) => {
     if (!ENV.vantaClientId || !ENV.vantaClientSecret) {
       res.status(503).json({ error: "Discord OAuth no está configurado." });

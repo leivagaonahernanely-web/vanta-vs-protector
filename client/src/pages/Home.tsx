@@ -264,6 +264,7 @@ export default function Home(props: any = {}) {
           {dashboardNavItems.filter((item) => item.group === group && (user?.isOwner === true || (item.label !== "License keys" && item.label !== "Plan keys" && item.label !== "Logs"))).map((item) => <button key={item.label} className={active === item.label ? "active" : ""} onClick={() => selectNav(item.label)}>{navIcon(item.icon)} {item.label === "License keys" ? "Generate / Manage" : item.label === "Plan keys" ? "Plan Keys" : item.label}{item.badge === "scripts" && <span className="nav-badge">{scripts.length}</span>}</button>)}
         </div>)}
         <button onClick={connectDiscord}><Link2 size={16} /> {user?.discordUsername ? "Discord conectado" : "Conectar Discord"}</button>
+        <a className="invite-bot-link" href="/api/discord/invite" target="_blank" rel="noreferrer"><ExternalLink size={16} /> Invitar bot</a>
       </nav>
       <div className="sidebar-bottom"><div className="sidebar-user"><span className="avatar">{user?.discordAvatarUrl ? <img src={user.discordAvatarUrl} alt="Avatar Discord" /> : (user?.name || "V").slice(0, 1).toUpperCase()}</span><span><strong>{user?.discordUsername || user?.name || "Cuenta"}</strong><small>{user?.discordNickname ? `Apodo: ${user.discordNickname} · ` : ""}{user?.discordUserId ? `ID: ${user.discordUserId}` : user?.email || "Discord no vinculado"}</small></span><button onClick={() => logout()} aria-label="Cerrar sesión"><LogOut size={15} /></button></div><span className="version">Vanta.vs Protector / 1.0</span></div>
     </aside>

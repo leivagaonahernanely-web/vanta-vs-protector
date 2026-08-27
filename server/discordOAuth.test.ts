@@ -36,6 +36,17 @@ function responseMock() {
 }
 
 describe("Discord OAuth callback", () => {
+  it("builds a separate official bot invite without an OAuth callback", async () => {
+    const response = responseMock();
+    await registeredRoutes().get("/api/discord/invite")?.({ query: {} }, response);
+    const invite = new URL(String(response.redirectTarget));
+    expect(invite.origin).toBe("https://discord.com");
+    expect(invite.pathname).toBe("/oauth2/authorize");
+    expect(invite.searchParams.get("scope")).toContain("bot");
+    expect(invite.searchParams.get("scope")).toContain("applications.commands");
+    expect(invite.searchParams.get("redirect_uri")).toBeNull();
+  });
+
   it("builds the canonical callback from the request host when origin is omitted", async () => {
     const routes = registeredRoutes();
     const response = responseMock();

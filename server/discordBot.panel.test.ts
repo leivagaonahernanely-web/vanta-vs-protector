@@ -46,7 +46,7 @@ describe("Discord access panel", () => {
   it("builds the requested two-row action layout", () => {
     const message = panelMessage();
     const ids = message.components.flatMap((row: any) => row.components.map((button: any) => button.data.custom_id));
-    expect(ids).toEqual(["vanta:redeem", "vanta:get-key", "vanta:script", "vanta:role", "vanta:hwid", "vanta:stats"]);
+    expect(ids).toEqual(["vanta:redeem", "vanta:script", "vanta:role", "vanta:hwid", "vanta:stats"]);
     expect(discordCommands.some((command: any) => command.name === "apikey")).toBe(true);
     expect(message.embeds[0].data.title).toBe("Vanta.vs Protector · Access Panel");
     expect(message.embeds[0].data.color).toBe(0x5865f2);
