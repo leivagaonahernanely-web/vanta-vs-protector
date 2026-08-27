@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createReconnectGate, discordCommands, GET_SCRIPT_COPY_BUTTON_LABEL, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, isGuildOwner, panelMessage, parseDuration, respond, scriptRuntimeLoader, targetChoices } from "./discordBot";
+import { createReconnectGate, discordCommands, GET_SCRIPT_COPY_BUTTON_LABEL, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, isGuildOwner, mobileViewScriptMessage, panelMessage, parseDuration, respond, scriptRuntimeLoader, targetChoices } from "./discordBot";
 
 describe("Discord access panel", () => {
   it("parses key durations in days, months and years", () => {
@@ -32,10 +32,14 @@ describe("Discord access panel", () => {
 
   it("builds Mobile View Script as exactly two compact lines", () => {
     const loader = scriptRuntimeLoader({ slug: "mobile-script", ffaMode: false, scriptKey: "internal-key" }, "mbe2krjut4gdyiggoqc3t47zq3eaxnkl", 42);
+    const message = mobileViewScriptMessage({ name: "Vanta.vs", slug: "mobile-script", ffaMode: false }, "mbe2krjut4gdyiggoqc3t47zq3eaxnkl", 42);
     expect(loader.split("\n")).toHaveLength(2);
     expect(loader).toContain('/scripts/loaders/');
     expect(loader).not.toContain("RbxAnalyticsService");
     expect(loader).not.toContain("/scripts/hosted/");
+    expect(message).toContain("``lua");
+    expect(message).toContain("\n``");
+    expect(message).not.toContain("```lua");
   });
 
   it("builds the requested two-row action layout", () => {

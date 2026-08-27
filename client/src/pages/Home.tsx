@@ -51,6 +51,14 @@ function downloadText(filename: string, value: string) {
   URL.revokeObjectURL(url);
 }
 
+export function friendlyApiError(error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  if (/Unexpected token ['\"]?</.test(message) || /not valid JSON/i.test(message)) {
+    return "El servidor devolvió una respuesta inválida. Recarga la página e inténtalo de nuevo; si continúa, prueba desde el dominio publicado.";
+  }
+  return message || fallback;
+}
+
 async function copyText(value: string) {
   try {
     if (navigator.clipboard?.writeText) {
@@ -162,9 +170,9 @@ export default function Home(props: any = {}) {
   const publishUpdates = trpc.discord.publishUpdates.useMutation({ onSuccess: () => toast.success("Actualización publicada en Discord"), onError: (error) => toast.error(error.message) });
   const hostScript = trpc.hostedScripts.create.useMutation({
     onSuccess: (item) => { setHostedResult(item); setSource(""); setEditingScriptId(null); void hostedQuery.refetch(); playUiChime(soundEnabled); toast.success("Script alojado"); },
-    onError: (error) => toast.error(error.message || "No se pudo alojar el script"),
+    onError: (error) => toast.error(friendlyApiError(error, "No se pudo alojar el script")),
   });
-  const updateHosted = trpc.hostedScripts.update.useMutation({ onSuccess: (item) => { setHostedResult(item); setEditingScriptId(null); setSource(""); void hostedQuery.refetch(); toast.success("Script actualizado y loader renovado"); }, onError: (error) => toast.error(error.message || "No se pudo actualizar el script") });
+  const updateHosted = trpc.hostedScripts.update.useMutation({ onSuccess: (item) => { setHostedResult(item); setEditingScriptId(null); setSource(""); void hostedQuery.refetch(); toast.success("Script actualizado y loader renovado"); }, onError: (error) => toast.error(friendlyApiError(error, "No se pudo actualizar el script")) });
   const deleteHosted = trpc.hostedScripts.remove.useMutation({ onSuccess: () => { setEditingScriptId(null); setHostedResult(null); void hostedQuery.refetch(); toast.success("Script eliminado"); }, onError: (error) => toast.error(error.message || "No se pudo eliminar el script") });
 
   function createHosted() {

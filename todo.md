@@ -470,3 +470,7 @@
 - [x] Limitar el editor principal de source a un cuadro compacto con desplazamiento interno, sin expandir la página
 
 - [x] Hacer que Mobile View Script muestre y copie solo `script_key` + loadstring compacto de `/scripts/loaders/...lua`, sin HWID visible
+
+- [x] Evitar el parseo crudo de HTML como JSON y devolver un mensaje accionable para la mutación afectada
+
+- [x] Formatear la respuesta de Mobile View Script con dos backticks de apertura y cierre, no tres

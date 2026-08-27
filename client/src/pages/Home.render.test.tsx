@@ -41,7 +41,7 @@ const { pricesMutate, updatesMutate, trpcProxy } = vi.hoisted(() => {
 });
 vi.mock("@/lib/trpc", () => ({ trpc: trpcProxy }));
 
-import Home from "./Home";
+import Home, { friendlyApiError } from "./Home";
 
 afterEach(() => {
   cleanup();
@@ -50,6 +50,10 @@ afterEach(() => {
 });
 
 describe("Home authenticated dashboard render", () => {
+  it("normalizes HTML API parse errors into an actionable message", () => {
+    expect(friendlyApiError(new Error("Unexpected token '<', \"<html>\" is not valid JSON"), "fallback")).toContain("respuesta inválida");
+    expect(friendlyApiError(new Error("El Gateway Discord no está conectado."), "fallback")).toBe("El Gateway Discord no está conectado.");
+  });
   it("renders the Prices editor and submits its structured payload through tRPC", () => {
     render(<Home initialSection="Prices" />);
     fireEvent.change(screen.getByPlaceholderText("Nombre de tu script o marca"), { target: { value: "Vanta.vs APP" } });

@@ -132,6 +132,10 @@ export async function respond(interaction: any, payload: any) {
   if (interaction.replied || interaction.deferred) return interaction.followUp(payload);
   return interaction.reply(payload);
 }
+export function mobileViewScriptMessage(script: any, accessKey: string, licenseId: number) {
+  return `📜 **${script.name}**\n\n\`\`lua\n${scriptRuntimeLoader(script, accessKey, licenseId)}\n\`\``;
+}
+
 export function scriptRuntimeLoader(script: any, accessKey?: string, licenseId?: number) {
   const url = `${PANEL_URL}/scripts/hosted/${script.slug}`;
   const runtimeKey = script.ffaMode ? "trial" : (accessKey || script.scriptKey);
@@ -344,7 +348,7 @@ async function copyScriptForUser(interaction: any) {
   if (!license) return respond(interaction, { content: "❌ No tienes una key activa.", ephemeral: true });
   const script = license.hostedScriptId ? await getHostedScriptById(license.hostedScriptId) : access.scripts[0];
   if (!script) return respond(interaction, { content: "❌ Tu key no tiene un script asignado.", ephemeral: true });
-  return respond(interaction, { content: `📜 **${script.name}**\n\n\`\`\`lua\n${scriptRuntimeLoader(script, license.keyCode, license.id)}\n\`\`\``, ephemeral: true });
+  return respond(interaction, { content: mobileViewScriptMessage(script, license.keyCode, license.id), ephemeral: true });
 }
 
 async function configureBuyerRole(interaction: any, role: { id: string }) {
