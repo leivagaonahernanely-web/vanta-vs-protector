@@ -77,7 +77,9 @@ export function registerDiscordOAuthRoutes(app: Express) {
     // Discord is a cross-site top-level redirect. SameSite=None keeps the
     // nonce available in mobile Chrome and in in-app browsers while the
     // HttpOnly + Secure policy prevents script access in production.
-    res.cookie(STATE_COOKIE, nonce, { ...getSessionCookieOptions(req), maxAge: 600 });
+    // Express expects maxAge in milliseconds. 600 would expire in 0.6s,
+    // before a mobile browser returns from Discord; keep the OAuth state for 10 minutes.
+    res.cookie(STATE_COOKIE, nonce, { ...getSessionCookieOptions(req), maxAge: 10 * 60 * 1000 });
     const params = new URLSearchParams({ client_id: ENV.vantaClientId, redirect_uri: redirectUri, response_type: "code", scope: "identify email", state });
     res.redirect(`https://discord.com/oauth2/authorize?${params.toString()}`);
   });

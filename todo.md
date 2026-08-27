@@ -527,3 +527,5 @@
 
 - [x] Corregir el ciclo de login Discord que vuelve a la pantalla inicial después de autorizar — cookie de sesión persistente con Secure/SameSite compatibles con dominio público HTTPS
 - [x] Verificar que la cookie de sesión se cree con dominio, ruta y seguridad compatibles con el dominio publicado y móvil — inferencia segura para hosts públicos detrás de proxy y pruebas de callback exitoso
+
+- [x] Corregir la expiración de la cookie temporal Discord OAuth: 600 ms debe ser 10 minutos (600000 ms) — ahora emite Max-Age=600 y conserva el state durante 10 minutos
