@@ -59,12 +59,28 @@ describe("protection validation", () => {
     })).toThrow("El script Lua está vacío.");
   });
 
-  it("rejects scripts larger than the server limit", () => {
-    expect(() => buildProtectionArtifact("x".repeat(150_001), {
+  it("accepts a source of exactly 2 MB and rejects larger UTF-8 payloads", () => {
+    const exactLimit = "x".repeat(2_000_000);
+    expect(() => buildProtectionArtifact(exactLimit, {
       mode: "fast",
       obfuscateStrings: false,
       addLoaderGuard: false,
-    })).toThrow("150 KB");
+    })).not.toThrow();
+    expect(() => buildProtectionArtifact(`${exactLimit}x`, {
+      mode: "fast",
+      obfuscateStrings: false,
+      addLoaderGuard: false,
+    })).toThrow("2 MB");
+  });
+
+  it("preserves emoji source within the UTF-8 byte limit", () => {
+    const source = "print('✅ Vanta.vs 🚀')";
+    const artifact = buildProtectionArtifact(source, {
+      mode: "fast",
+      obfuscateStrings: false,
+      addLoaderGuard: false,
+    });
+    expect(artifact.code).toContain("Vanta.vs");
   });
 });
 

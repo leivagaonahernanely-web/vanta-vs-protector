@@ -55,7 +55,8 @@ function escapeLua(value: string) {
 export function buildProtectionArtifact(source: string, options: ProtectionOptions): ProtectionArtifact {
   const trimmed = source.trim();
   if (!trimmed) throw new Error("El script Lua está vacío.");
-  if (trimmed.length > 150_000) throw new Error("El script supera el límite de 150 KB para esta protección.");
+  const sourceBytes = Buffer.byteLength(trimmed, "utf8");
+  if (sourceBytes > 2_000_000) throw new Error("El script supera el límite de 2 MB para esta protección.");
 
   const checksum = createHash("sha256").update(trimmed).digest("hex").slice(0, 16);
   const requiresReview = options.mode === "fortified" || /\b(loadstring|load)\s*\(/i.test(trimmed);

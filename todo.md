@@ -487,3 +487,6 @@
 - [x] Eliminar definitivamente `Unexpected token '<'` en la mutación que sigue devolviendo HTML en vez de JSON — source enviada en base64 y decodificada server-side
 
 - [x] Verificar y corregir el 403 HTML que continúa en la versión publicada al alojar una source — payload gzip+base64 para reducir el body
+
+- [x] Eliminar cualquier límite residual de 150 KB y aceptar hasta 2 MB medidos en bytes UTF-8
+- [x] Preservar emojis y Unicode durante carga, compresión, decodificación y guardado de sources
