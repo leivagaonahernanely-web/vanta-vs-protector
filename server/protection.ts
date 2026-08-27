@@ -42,9 +42,10 @@ export function getProviderStatus() {
   };
 }
 
-function encodeLua(source: string, obfuscateStrings: boolean) {
+function encodeLua(source: string, obfuscateStrings: boolean, shift = 0) {
   const prepared = obfuscateStrings ? source.split("").reverse().join("") : source;
-  return Buffer.from(prepared, "utf8").toString("base64");
+  const shifted = shift ? Buffer.from(prepared, "utf8").map((byte) => (byte + shift) % 256) : Buffer.from(prepared, "utf8");
+  return shifted.toString("base64");
 }
 
 function escapeLua(value: string) {
@@ -58,7 +59,8 @@ export function buildProtectionArtifact(source: string, options: ProtectionOptio
 
   const checksum = createHash("sha256").update(trimmed).digest("hex").slice(0, 16);
   const requiresReview = options.mode === "fortified" || /\b(loadstring|load)\s*\(/i.test(trimmed);
-  const encoded = encodeLua(trimmed, options.obfuscateStrings);
+  const shift = options.mode === "fortified" ? (parseInt(checksum.slice(0, 2), 16) % 251 || 1) : 0;
+  const encoded = encodeLua(trimmed, options.obfuscateStrings, shift);
   const guard = options.addLoaderGuard
     ? `\nlocal __vanta_guard = function()\n  assert(type(__vanta_payload) == "string", "VANTA_GUARD")\nend\n__vanta_guard()`
     : "";
@@ -82,7 +84,7 @@ export function buildProtectionArtifact(source: string, options: ProtectionOptio
     "    if #x ~= 8 then return '' end",
     "    local c = 0",
     "    for i = 1, 8 do c = c + (x:sub(i, i) == '1' and 2^(8 - i) or 0) end",
-    "    return string.char(c)",
+    `    return string.char((c - ${shift}) % 256)`,
     "  end))",
     "end",
     guard.trim(),
@@ -93,7 +95,7 @@ export function buildProtectionArtifact(source: string, options: ProtectionOptio
       ? "local __vanta_load = loadstring or load"
       : "local __vanta_load = loadstring or load",
     options.mode === "fortified"
-      ? "assert(#__vanta_source > 0, \"VANTA_SOURCE\")"
+      ? `assert(#__vanta_source > 0, "VANTA_SOURCE")\nassert(${shift} > 0, "VANTA_SHIFT")`
       : "-- VANTA_SOURCE_CHECK: standard",
     "local __vanta_chunk = assert(__vanta_load(__vanta_source))",
     "return __vanta_chunk()",

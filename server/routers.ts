@@ -48,7 +48,7 @@ const licenseInput = z.object({
   durationUnit: z.enum(["days", "months", "years"]).default("days"),
   keyKind: z.enum(["normal", "plan"]).default("normal"),
 });
-const accessRuleInput = z.object({ kind: z.enum(["user", "role"]), discordId: z.string().regex(/^\d{15,22}$/), label: z.string().trim().max(128).optional() });
+const accessRuleInput = z.object({ kind: z.enum(["user", "role"]), discordId: z.string().regex(/^\d{15,22}$/), hostedScriptId: z.number().int().positive().optional(), label: z.string().trim().max(128).optional() });
 const blacklistInput = z.object({ discordUserId: z.string().regex(/^\d{15,22}$/), reason: z.string().trim().max(500).optional() });
 
 async function assertWorkspaceQuota(userId: number, plan: PlanTier | undefined, metric: "obfuscations" | "scripts" | "keys") {
@@ -238,7 +238,7 @@ export const appRouter = router({
     }),
     whitelist: router({
       list: protectedProcedure.query(({ ctx }) => getAccessRulesByOwner(ctx.user.id)),
-      add: protectedProcedure.input(accessRuleInput).mutation(({ ctx, input }) => createAccessRule({ ownerId: ctx.user.id, kind: input.kind, discordId: input.discordId, label: input.label ?? null, active: 1 })),
+      add: protectedProcedure.input(accessRuleInput).mutation(({ ctx, input }) => createAccessRule({ ownerId: ctx.user.id, hostedScriptId: input.hostedScriptId ?? null, kind: input.kind, discordId: input.discordId, label: input.label ?? null, active: 1 })),
       remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => deleteAccessRule(ctx.user.id, input.id)),
     }),
     logs: router({

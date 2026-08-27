@@ -426,3 +426,8 @@
 - [x] Permitir al owner vinculado generar keys sin exigir Administrator en el comando slash
 - [x] Permitir al owner vinculado configurar /getrole sin exigir Administrator
 - [x] Añadir pruebas de autorización por owner para generatekeyrol y generación de keys mediante el contrato de comandos y la suite de autorización existente
+
+- [x] Mejorar ofuscador interno con una capa byte-shift dependiente del checksum en Fortified y salida protegida sin afirmar integración Luraph
+- [x] Hacer whitelist multiusuario y multirrol por script, con selector web de script, altas/bajas persistentes y soporte existente en Discord
+- [x] Restaurar generación y entrega de Plan Keys Pro/Premium solo para owner, con key visible, copia rápida y lista separada
+- [x] Revisar y probar flujos relacionados y mejorar detalles seguros; TypeScript y 115 pruebas Vitest pasan
