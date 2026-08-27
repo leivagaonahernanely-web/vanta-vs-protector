@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createReconnectGate, discordCommands, GET_SCRIPT_COPY_BUTTON_LABEL, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, isConfiguredOwnerId, isGuildOwner, matchesWhitelistRule, mobileViewScriptMessage, panelMessage, parseDuration, respond, scriptRuntimeLoader, targetChoices } from "./discordBot";
+import * as db from "./db";
 
 describe("Discord access panel", () => {
   it("parses key durations in days, months and years", () => {
@@ -151,6 +152,15 @@ describe("Discord access panel", () => {
     expect(options("addtime").every((item: any) => item.required)).toBe(true);
     expect(options("warn").every((item: any) => item.required)).toBe(true);
     expect(options("dropkey").find((item: any) => item.name === "amount").required).toBe(true);
+  });
+
+  it("autocompletes hosted scripts for the owner with cache support", async () => {
+    const scripts = [{ id: 1, name: "Vanta Script" }];
+    vi.spyOn(db, "getUserByOpenId").mockResolvedValue({ id: 1, discordUserId: "owner-id" } as any);
+    vi.spyOn(db, "getHostedScriptsByUser").mockResolvedValue(scripts as any);
+    const interaction = { options: { getFocused: () => ({ name: "script", value: "vanta" }) }, user: { id: "owner-id" } };
+    const results = await targetChoices(interaction);
+    expect(results).toEqual([{ name: "Vanta Script", value: "Vanta Script" }]);
   });
 
   it("autocompletes guild users and roles based on the selected kind", async () => {

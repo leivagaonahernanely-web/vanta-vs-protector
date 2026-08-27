@@ -100,6 +100,9 @@ export function handleGatewayFailure(reason: string, reconnect: () => boolean = 
 const keyActionTimestamps = new Map<string, number>();
 const KEY_ACTION_COOLDOWN_MS = 10_000;
 const respondedInteractions = new WeakSet<object>();
+const scriptChoiceCache = new Map<number, { expiresAt: number; scripts: any[] }>();
+const SCRIPT_CHOICE_CACHE_MS = 15_000;
+const SCRIPT_CHOICE_TIMEOUT_MS = 2_000;
 
 const KEY_ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 function keyCode() { let key = ""; for (let index = 0; index < 32; index += 1) key += KEY_ALPHABET[randomInt(0, KEY_ALPHABET.length)]; return key; }
@@ -109,7 +112,9 @@ function memberHasRole(interaction: ButtonInteraction | any, roleId: string | un
   return Array.isArray(roles) ? roles.includes(roleId) : Boolean(roles?.cache?.has(roleId));
 }
 export function hasKeyManagementAccess(input: { actorId: string; ownerId?: string | null; isAdministrator: boolean; hasManagerRole: boolean }) {
-  return Boolean(input.ownerId && (input.actorId === input.ownerId || input.isAdministrator || input.hasManagerRole));
+  const actorId = String(input.actorId ?? "").trim();
+  const ownerId = String(input.ownerId ?? "").trim();
+  return Boolean(ownerId && (actorId === ownerId || input.isAdministrator || input.hasManagerRole));
 }
 export function matchesWhitelistRule(rule: { kind: "user" | "role"; discordId: string; active?: number | null; hostedScriptId?: number | null }, discordUserId: string, roleIds: string[]) {
   if (rule.active === 0 || !rule.hostedScriptId) return false;
@@ -127,9 +132,16 @@ export function isConfiguredOwnerId(input: { actorId: unknown; linkedDiscordUser
   const linkedDiscordUserId = normalizeDiscordIdentity(input.linkedDiscordUserId);
   return Boolean(actorId && linkedDiscordUserId && actorId === linkedDiscordUserId);
 }
-async function ownerAccount() { return ENV.ownerOpenId ? getUserByOpenId(ENV.ownerOpenId) : undefined; }
+async function ownerAccount(interaction?: any) {
+  const configuredOwner = ENV.ownerOpenId ? await getUserByOpenId(ENV.ownerOpenId) : undefined;
+  if (configuredOwner) return configuredOwner;
+  const actorId = normalizeDiscordIdentity(interaction?.user?.id);
+  if (!actorId) return undefined;
+  const linkedAdmin = await getUserByDiscordUserId(actorId);
+  return linkedAdmin?.role === "admin" ? linkedAdmin : undefined;
+}
 async function isConfiguredOwner(interaction: any) {
-  const owner = await ownerAccount();
+  const owner = await ownerAccount(interaction);
   if (!owner) return false;
   if (isConfiguredOwnerId({ actorId: interaction.user?.id, linkedDiscordUserId: owner.discordUserId })) return true;
   // Bootstrap only when the owner account has not been linked yet. This keeps
@@ -141,11 +153,14 @@ async function isConfiguredOwner(interaction: any) {
   return false;
 }
 async function canManageKeys(interaction: any) {
-  const owner = await ownerAccount();
+  const owner = await ownerAccount(interaction);
   if (!owner) return { allowed: false, owner: undefined };
   const managerRole = await getKeyManagerRoleId(owner.id);
-  const actorIsGuildOwner = isGuildOwner({ actorId: interaction.user.id, guildOwnerId: interaction.guild?.ownerId });
-  return { allowed: actorIsGuildOwner || hasKeyManagementAccess({ actorId: interaction.user.id, ownerId: owner.discordUserId, isAdministrator: Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)), hasManagerRole: memberHasRole(interaction, managerRole) }), owner };
+  const actorIsConfiguredOwner = await isConfiguredOwner(interaction);
+  const actorIsGuildOwner = isGuildOwner({ actorId: String(interaction.user?.id ?? ""), guildOwnerId: interaction.guild?.ownerId });
+  const isAdministrator = Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.Administrator));
+  const hasManagerRole = memberHasRole(interaction, managerRole);
+  return { allowed: actorIsConfiguredOwner || actorIsGuildOwner || hasKeyManagementAccess({ actorId: interaction.user?.id, ownerId: owner.discordUserId, isAdministrator, hasManagerRole }), owner };
 }
 export async function respond(interaction: any, payload: any) {
   const target = interaction as object;
@@ -280,8 +295,22 @@ export async function targetChoices(interaction: any) {
   const focused = interaction.options.getFocused?.(true);
   const query = String(focused?.value ?? "").toLowerCase();
   if (focused?.name === "script") {
-    const owner = await ownerAccount();
-    const scripts = owner ? await getHostedScriptsByUser(owner.id) : [];
+    const owner = await ownerAccount(interaction);
+    if (!owner) return [];
+    const cached = scriptChoiceCache.get(owner.id);
+    let scripts = cached && cached.expiresAt > Date.now() ? cached.scripts : undefined;
+    if (!scripts) {
+      try {
+        scripts = await Promise.race([
+          getHostedScriptsByUser(owner.id),
+          new Promise<any[]>((_, reject) => setTimeout(() => reject(new Error("script autocomplete timeout")), SCRIPT_CHOICE_TIMEOUT_MS)),
+        ]);
+        scriptChoiceCache.set(owner.id, { expiresAt: Date.now() + SCRIPT_CHOICE_CACHE_MS, scripts });
+      } catch (error) {
+        console.warn("[Discord Bot] Script autocomplete unavailable:", error instanceof Error ? error.message : "unknown error");
+        scripts = cached?.scripts ?? [];
+      }
+    }
     return scripts.filter((script: any) => !query || script.name.toLowerCase().includes(query)).slice(0, 25).map((script: any) => ({ name: script.name.slice(0, 100), value: script.name }));
   }
   const kind = interaction.options.getString("kind") ?? "user";
@@ -328,7 +357,7 @@ export async function handleInteraction(interaction: any) {
 
 async function apiKeyForUser(interaction: any) {
   let result = await getApiKeyByDiscordUserId(interaction.user.id);
-  const owner = await ownerAccount();
+  const owner = await ownerAccount(interaction);
   if (!result && owner && (interaction.guild?.ownerId === interaction.user.id || owner.discordUserId === interaction.user.id)) {
     if (owner) {
       const displayName = interaction.user.globalName || interaction.user.username || "Discord owner";
@@ -354,7 +383,7 @@ async function getUserLicenses(discordUserId: string) {
 }
 
 async function getWhitelistScriptForMember(interaction: any) {
-  const owner = await ownerAccount();
+  const owner = await ownerAccount(interaction);
   if (!owner) return undefined;
   let member = interaction.member;
   if (interaction.guild?.members?.fetch) {
@@ -401,7 +430,7 @@ async function copyScriptForUser(interaction: any) {
 }
 
 async function configureBuyerRole(interaction: any, role: { id: string }) {
-  const owner = await ownerAccount();
+  const owner = await ownerAccount(interaction);
   if (!owner || !(await isConfiguredOwner(interaction))) return respond(interaction, { content: "⛔ Solo el owner vinculado puede configurar el rol comprador.", ephemeral: true });
   await setBuyerRoleId(owner.id, role.id);
   return respond(interaction, { content: `✅ Rol comprador configurado: <@&${role.id}>. Los usuarios con una key activa podrán obtenerlo desde Get Role.`, ephemeral: true });
@@ -473,13 +502,13 @@ async function redeem(interaction: any, rawKey: string) {
   return respond(interaction, license ? { content: `✅ Key canjeada correctamente: **${license.keyCode}**.`, ephemeral: true } : { content: "❌ Key inválida, expirada o ya vinculada a otra cuenta.", ephemeral: true });
 }
 async function configureKeyRole(interaction: any, role: { id: string }) {
-  const owner = await ownerAccount();
+  const owner = await ownerAccount(interaction);
   if (!owner || !(await isConfiguredOwner(interaction))) return respond(interaction, { content: "⛔ Solo el owner vinculado desde la web puede configurar Generate Key Role.", ephemeral: true });
   await setKeyManagerRole(owner.id, role.id);
   return respond(interaction, { content: `✅ El rol <@&${role.id}> ahora puede usar "/generatekey" y "/deletekey".`, ephemeral: true });
 }
 async function whitelist(interaction: any, discordId: string, kind: "user" | "role", scriptName: string) {
-  const owner = await ownerAccount();
+  const owner = await ownerAccount(interaction);
   if (!owner || !(await isConfiguredOwner(interaction))) return respond(interaction, { content: "⛔ Solo el owner vinculado puede modificar la whitelist.", ephemeral: true });
   const script = await getHostedScriptByName(owner.id, scriptName);
   if (!script) return respond(interaction, { content: "❌ Selecciona un script hosteado válido de tu workspace.", ephemeral: true });
@@ -490,7 +519,7 @@ async function whitelist(interaction: any, discordId: string, kind: "user" | "ro
   return respond(interaction, { embeds: [embed] });
 }
 async function unwhitelist(interaction: any, discordId: string, scriptName: string) {
-  const owner = await ownerAccount();
+  const owner = await ownerAccount(interaction);
   if (!owner || !(await isConfiguredOwner(interaction))) return respond(interaction, { content: "⛔ Solo el owner vinculado puede modificar la whitelist.", ephemeral: true });
   const script = await getHostedScriptByName(owner.id, scriptName);
   if (!script) return respond(interaction, { content: "❌ Selecciona un script hosteado válido de tu workspace.", ephemeral: true });
@@ -554,8 +583,8 @@ async function addTime(interaction: any, key: string, rawDuration: string) {
 }
 
 async function warn(interaction: any, user: { id: string }, reason: string) {
-  const owner = await ownerAccount();
-  if (!owner || (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) && interaction.user.id !== owner.discordUserId)) return respond(interaction, { content: "⛔ Solo el propietario o un administrador puede advertir usuarios.", ephemeral: true });
+  const owner = await ownerAccount(interaction);
+  if (!owner || (!(await isConfiguredOwner(interaction)) && !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator))) return respond(interaction, { content: "⛔ Solo el propietario o un administrador puede advertir usuarios.", ephemeral: true });
   await createWarning({ ownerId: owner.id, discordUserId: user.id, reason: reason.trim(), hostedScriptId: null });
   return respond(interaction, { content: `⚠️ <@${user.id}> recibió una advertencia.\nRazón: ${reason.trim()}` });
 }
@@ -572,11 +601,11 @@ async function dropKeys(interaction: any, amount: number) {
   return undefined;
 }
 async function blacklistCommand(interaction: any) {
-  const owner = await ownerAccount();
+  const owner = await ownerAccount(interaction);
   const user = interaction.options.getUser("user", true);
   const script = interaction.options.getString("script", true);
   const reason = interaction.options.getString("reason") ?? "Sin razón indicada";
-  if (!owner || (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) && interaction.user.id !== owner.discordUserId)) return respond(interaction, { content: "⛔ Solo el propietario o un administrador puede usar blacklist.", ephemeral: true });
+  if (!owner || (!(await isConfiguredOwner(interaction)) && !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator))) return respond(interaction, { content: "⛔ Solo el propietario o un administrador puede usar blacklist.", ephemeral: true });
   await createBlacklist({ ownerId: owner.id, discordUserId: user.id, reason, active: 1 });
   return respond(interaction, { content: `✅ Blacklist aplicada para <@${user.id}> en **${script}**.\nRazón: ${reason}` });
 }

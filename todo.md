@@ -507,3 +507,6 @@
 
 - [x] Corregir el permiso de whitelist para que el owner Discord vinculado pueda modificarla sin el mensaje de rechazo — comparación normalizada de identidad vinculada y bootstrap solo si la cuenta aún no está enlazada
 - [x] Cambiar la pantalla inicial para ofrecer inicio de sesión con Discord como método principal, sin Google/Manus visible — también se actualizó el redirect automático de sesión expirada
+
+- [x] Corregir permisos de Generate Key y comandos administrativos para owner y rol delegado — unificada la autorización por identidad vinculada y bootstrap seguro del owner del servidor
+- [x] Estabilizar el listado y autocompletado de scripts hosteados en comandos slash, evitando cargas infinitas o listas vacías — implementada caché de 15s y timeout de 2s para asegurar respuesta a Discord
