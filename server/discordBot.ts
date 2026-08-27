@@ -565,6 +565,10 @@ async function getRoleForUser(interaction: any) {
 
 async function handleButton(interaction: ButtonInteraction) {
   const panelAction = String(interaction.customId).split(":").slice(0, 2).join(":");
+  const requiresPanelContext = ["vanta:redeem", "vanta:script", "vanta:role", "vanta:hwid", "vanta:stats", "vanta:copy-loader"].includes(panelAction);
+  if (requiresPanelContext && !getPanelContext(interaction)) {
+    return respond(interaction, { content: "⚠️ Este panel es antiguo o no está vinculado a un script. Pide al owner que lo vuelva a publicar desde el dashboard.", ephemeral: true });
+  }
   if (panelAction === "vanta:redeem") {
     const panelContext = getPanelContext(interaction);
     const modal = new ModalBuilder().setCustomId(panelActionId("redeem-modal", panelContext?.ownerId, panelContext?.hostedScriptId)).setTitle("Redeem Key");

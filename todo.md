@@ -586,3 +586,7 @@
 - [x] Verificar que Generate Key permita crear keys reales solo para scripts del workspace autenticado — mantiene filtro por owner y script exacto
 - [x] Impedir que una cuenta vea scripts o paneles de otra cuenta en Discord y web — consultas y caché usan la identidad vinculada
 - [x] Completar y probar el nuevo contrato nativo de whitelist y unwhitelist — bot reiniciado y comandos sincronizados
+- [x] Garantizar que todos los botones Get Script publicados incluyan ownerId y hostedScriptId válidos — panelMessage y publishDiscordPanel usan contexto owner/script
+- [x] Evitar que paneles antiguos o incompletos consulten una whitelist global o devuelvan diagnóstico técnico al usuario — botones sin contexto se detienen antes de consultar acceso
+- [x] Mostrar un mensaje limpio para panel sin contexto y exigir republicación cuando sea necesario
+- [x] Añadir pruebas de customId completo, fallback visual y resolución de whitelist desde Get Script — suite completa pasa con 140 pruebas
