@@ -58,6 +58,7 @@ export const discordCommands = [
   new SlashCommandBuilder().setName("stats").setDescription("Muestra el estado del acceso").toJSON(),
   new SlashCommandBuilder().setName("apikey").setDescription("Muestra la API key de tu cuenta vinculada").toJSON(),
   new SlashCommandBuilder().setName("getscript").setDescription("Obtiene el enlace de acceso al script").toJSON(),
+  new SlashCommandBuilder().setName("getkey").setDescription("Entrega la key automática si estás en la whitelist").toJSON(),
   new SlashCommandBuilder().setName("getrole").setDescription("Configura el rol que recibirá un usuario con key activa").addRoleOption(o => o.setName("role").setDescription("Rol comprador").setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("redeem").setDescription("Canjea una key de acceso").addStringOption(o => o.setName("key").setDescription("Key alfanumérica de mínimo 32 caracteres").setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("generatekey").setDescription("Genera una key aleatoria para un script hosteado").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addStringOption(o => o.setName("duration").setDescription("Duración; vacío = forever").setRequired(false)).toJSON(),
@@ -159,6 +160,7 @@ export function panelMessage() {
     .setTimestamp();
   const rowOne = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId("vanta:redeem").setLabel("🔑 Redeem Key").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId("vanta:get-key").setLabel("🔐 Get Key").setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId("vanta:script").setLabel("📜 Get Script").setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId("vanta:role").setLabel("👤 Get Role").setStyle(ButtonStyle.Primary),
   );
@@ -283,6 +285,7 @@ export async function handleInteraction(interaction: any) {
     if (interaction.commandName === "stats") return respond(interaction, { content: "Vanta.vs Protector está conectado. Usa el dashboard web para consultar scripts, licencias y actividad.", ephemeral: true });
     if (interaction.commandName === "apikey") return apiKeyForUser(interaction);
     if (interaction.commandName === "getscript") return getScriptForUser(interaction);
+    if (interaction.commandName === "getkey") return getKeyForWhitelistedUser(interaction);
     if (interaction.commandName === "getrole") return configureBuyerRole(interaction, interaction.options.getRole("role", true));
     if (interaction.commandName === "redeem") return redeem(interaction, interaction.options.getString("key", true));
     if (interaction.commandName === "resethwid") return resetHwidCommand(interaction);
@@ -327,6 +330,26 @@ async function getUserLicenses(discordUserId: string) {
   const scriptRows = await Promise.all(ownerIds.map((ownerId) => getHostedScriptsByUser(ownerId)));
   const scripts = scriptRows.flat();
   return { user, licenses, scripts };
+}
+
+async function getWhitelistScriptForMember(interaction: any) {
+  const owner = await ownerAccount();
+  if (!owner) return undefined;
+  const rules = (await getAccessRulesByOwner(owner.id)).filter((rule: any) => rule.active && rule.hostedScriptId && ((rule.kind === "user" && rule.discordId === interaction.user.id) || (rule.kind === "role" && memberHasRole(interaction, rule.discordId))));
+  for (const rule of rules) {
+    const script = await getHostedScriptById(Number(rule.hostedScriptId));
+    if (script) return { owner, script };
+  }
+  return undefined;
+}
+
+async function getKeyForWhitelistedUser(interaction: any) {
+  const match = await getWhitelistScriptForMember(interaction);
+  if (!match) return respond(interaction, { content: "❌ No tienes un usuario o rol whitelisted para ningún script. Pide al owner que te añada y vuelve a pulsar Get Key.", ephemeral: true });
+  const existing = (await getActiveLicensesByDiscordUserId(interaction.user.id)).find((license: any) => Number(license.ownerId) === match.owner.id && Number(license.hostedScriptId) === match.script.id && (!license.expiresAt || license.expiresAt.getTime() > Date.now()));
+  const license = existing ?? await createLicense({ ownerId: match.owner.id, hostedScriptId: match.script.id, keyCode: keyCode(), type: "license", status: "active", discordUserId: interaction.user.id, hwid: null, expiresAt: null });
+  if (!license) return respond(interaction, { content: "❌ No se pudo crear tu key automática. Inténtalo de nuevo.", ephemeral: true });
+  return respond(interaction, { content: `✅ **Whitelist verificada** para **${match.script.name}**.\n\nTu key automática:\n\`${license.keyCode}\`\n\nEsta key queda vinculada a tu cuenta de Discord y al script autorizado.`, ephemeral: true });
 }
 
 async function getScriptForUser(interaction: any) {
@@ -382,6 +405,7 @@ async function handleButton(interaction: ButtonInteraction) {
     modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
     return interaction.showModal(modal);
   }
+  if (interaction.customId === "vanta:get-key") return getKeyForWhitelistedUser(interaction);
   if (interaction.customId === "vanta:script") return getScriptForUser(interaction);
   if (interaction.customId === "vanta:copy-loader") {
     const updatedRow = new ActionRowBuilder<ButtonBuilder>().addComponents(

@@ -492,3 +492,7 @@
 - [x] Preservar emojis y Unicode durante carga, compresión, decodificación y guardado de sources
 
 - [x] Aumentar la capacidad de `hostedScripts.code` y `sourceCode` para almacenar artefactos de hasta 2 MB con emojis
+
+- [x] Corregir la aplicación runtime de whitelist por rol para que los miembros autorizados reciban una key automática vinculada al script, en lugar de intentar ejecutar sin identidad
+
+- [x] Hacer que los miembros con rol whitelisted reciban o recuperen automáticamente una key vinculada al script mediante Get Key
