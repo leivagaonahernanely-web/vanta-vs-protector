@@ -76,3 +76,6 @@ button { cursor: pointer; }
 .price-block-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }
 .price-block-head strong { color: #bdbdbd; font: 600 .63rem ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
 @media (max-width: 680px) { .plan-manager-heading { flex-direction: column; gap: 10px; } .plan-manager-current { align-self: flex-start; } .quota-row { grid-template-columns: 1fr; gap: 12px; } .plan-selector-card { min-height: 96px; } }
+
+.source-editor { width: 100%; height: 220px !important; min-height: 220px !important; max-height: 220px !important; overflow-y: auto !important; overflow-x: auto !important; resize: none !important; white-space: pre; }
+@media (max-width: 680px) { .source-editor { height: 180px !important; min-height: 180px !important; max-height: 180px !important; } }
