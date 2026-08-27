@@ -449,3 +449,5 @@
 - [x] Añadir pruebas de importación TXT/Lua y validación de extensiones
 
 - [x] Renombrar el botón de edición solicitado a “Modificar” sin cambiar su acción
+
+- [x] Aumentar a 2 MB el límite de archivos `.lua`, `.luau` y `.txt` y actualizar pruebas

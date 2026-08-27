@@ -14,6 +14,7 @@ describe("Lua file upload", () => {
     expect(validateLuaFile({ name: "source.txt", size: 10 })).toBeNull();
     expect(validateLuaFile({ name: "source.luau", size: 10 })).toBeNull();
     expect(validateLuaFile({ name: "source.exe", size: 10 })).toBe("Selecciona un archivo .lua, .luau o .txt");
-    expect(validateLuaFile({ name: "script.lua", size: LUA_SOURCE_LIMIT + 1 })).toBe("El archivo supera el límite de 150 KB");
+    expect(validateLuaFile({ name: "script.lua", size: LUA_SOURCE_LIMIT })).toBeNull();
+    expect(validateLuaFile({ name: "script.lua", size: LUA_SOURCE_LIMIT + 1 })).toBe("El archivo supera el límite de 2 MB");
   });
 });

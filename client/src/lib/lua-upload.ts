@@ -1,8 +1,8 @@
-export const LUA_SOURCE_LIMIT = 150_000;
+export const LUA_SOURCE_LIMIT = 2 * 1024 * 1024;
 
 export function validateLuaFile(file: Pick<File, "name" | "size">) {
   if (!/\.(lua|luau|txt)$/i.test(file.name)) return "Selecciona un archivo .lua, .luau o .txt";
-  if (file.size > LUA_SOURCE_LIMIT) return "El archivo supera el límite de 150 KB";
+  if (file.size > LUA_SOURCE_LIMIT) return "El archivo supera el límite de 2 MB";
   return null;
 }
 
