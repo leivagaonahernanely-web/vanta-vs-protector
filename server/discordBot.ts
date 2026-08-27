@@ -102,7 +102,7 @@ const KEY_ACTION_COOLDOWN_MS = 10_000;
 const respondedInteractions = new WeakSet<object>();
 const scriptChoiceCache = new Map<number, { expiresAt: number; scripts: any[] }>();
 const SCRIPT_CHOICE_CACHE_MS = 15_000;
-const SCRIPT_CHOICE_TIMEOUT_MS = 2_000;
+const SCRIPT_CHOICE_TIMEOUT_MS = 2_500;
 
 const KEY_ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 function keyCode() { let key = ""; for (let index = 0; index < 32; index += 1) key += KEY_ALPHABET[randomInt(0, KEY_ALPHABET.length)]; return key; }
@@ -139,6 +139,17 @@ async function ownerAccount(interaction?: any) {
   if (!actorId) return undefined;
   const linkedAdmin = await getUserByDiscordUserId(actorId);
   return linkedAdmin?.role === "admin" ? linkedAdmin : undefined;
+}
+async function warmScriptChoiceCache() {
+  try {
+    const owner = await ownerAccount();
+    if (!owner) return;
+    const scripts = await getHostedScriptsByUser(owner.id);
+    scriptChoiceCache.set(owner.id, { expiresAt: Date.now() + SCRIPT_CHOICE_CACHE_MS, scripts });
+    console.log(`[Discord Bot] Autocomplete de scripts listo: ${scripts.length} script(s) cargado(s).`);
+  } catch (error) {
+    console.warn("[Discord Bot] No se pudo precargar el autocomplete de scripts:", error instanceof Error ? error.message : "unknown error");
+  }
 }
 async function isConfiguredOwner(interaction: any) {
   const owner = await ownerAccount(interaction);
@@ -280,6 +291,7 @@ export function startDiscordBot() {
       await rest.put(Routes.applicationCommands(readyClient.application.id), { body: [] });
       await Promise.all(Array.from(readyClient.guilds.cache.keys()).map((guildId) => rest.put(Routes.applicationGuildCommands(readyClient.application.id, guildId), { body: discordCommands })));
       console.log(`[Discord Bot] Online como ${readyClient.user.tag}; comandos slash sincronizados por servidor sin duplicados.`);
+      void warmScriptChoiceCache();
     } catch (error) {
       const detail = error && typeof error === "object" && "rawError" in error ? JSON.stringify((error as { rawError?: unknown }).rawError) : error instanceof Error ? error.message : String(error);
       console.error("[Discord Bot] No se pudieron sincronizar los comandos slash; el Gateway sigue online:", detail);

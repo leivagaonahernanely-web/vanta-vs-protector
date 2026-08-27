@@ -510,3 +510,5 @@
 
 - [x] Corregir permisos de Generate Key y comandos administrativos para owner y rol delegado — unificada la autorización por identidad vinculada y bootstrap seguro del owner del servidor
 - [x] Estabilizar el listado y autocompletado de scripts hosteados en comandos slash, evitando cargas infinitas o listas vacías — implementada caché de 15s y timeout de 2s para asegurar respuesta a Discord
+
+- [x] Corregir el autocomplete de /whitelabel para que devuelva scripts hosteados y no muestre “No hay opciones que coincidan” — precarga al iniciar, caché de 15 segundos y timeout de 2.5 segundos
