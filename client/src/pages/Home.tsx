@@ -160,17 +160,22 @@ export default function Home(props: any = {}) {
   const discordStatus = trpc.discord.status.useQuery(undefined, { refetchInterval: 10_000 });
   const botStatus = getBotStatusLabel({ isLoading: discordStatus.isLoading, isError: discordStatus.isError, ...discordStatus.data });
   const botStatusClass = getBotStatusClass({ isLoading: discordStatus.isLoading, isError: discordStatus.isError, ...discordStatus.data });
-  const hostedQuery = trpc.hostedScripts.list.useQuery(undefined, { enabled: isAuthenticated });
+  const hostedQuery = trpc.hostedScripts.list.useQuery(undefined, { enabled: isAuthenticated, refetchOnMount: "always" });
   const sourceQuery = trpc.hostedScripts.source.useQuery({ id: sourcePreview?.id ?? 0 }, { enabled: Boolean(sourcePreview) && isAuthenticated });
   const providerStatus = trpc.protections.providerStatus.useQuery();
   const protectionHistoryQuery = trpc.protections.history.useQuery(undefined, { enabled: isAuthenticated });
-  const panelsQuery = trpc.discord.listPanels.useQuery(undefined, { enabled: isAuthenticated });
+  const panelsQuery = trpc.discord.listPanels.useQuery(undefined, { enabled: isAuthenticated, refetchOnMount: "always" });
   const licensesQuery = trpc.licenseKeys.list.useQuery(undefined, { enabled: isAuthenticated });
   const planKeysQuery = trpc.planKeys.useQuery(undefined, { enabled: isAuthenticated && user?.isOwner === true });
   const workspaceUsageQuery = trpc.workspace.usage.useQuery(undefined, { enabled: isAuthenticated, refetchInterval: 15_000 });
   const blacklistQuery = trpc.access.blacklist.list.useQuery(undefined, { enabled: isAuthenticated });
   const whitelistQuery = trpc.access.whitelist.list.useQuery(undefined, { enabled: isAuthenticated });
   const auditLogsQuery = trpc.access.logs.list.useQuery(undefined, { enabled: isAuthenticated });
+  React.useEffect(() => {
+    if (!isAuthenticated || !user?.id) return;
+    void hostedQuery.refetch();
+    void panelsQuery.refetch();
+  }, [isAuthenticated, user?.id]);
   const generateLicense = trpc.licenseKeys.generate.useMutation({ onSuccess: (row, variables) => { setGeneratedKey(row.keyCode); void navigator.clipboard?.writeText(row.keyCode).then(() => toast.success("Key generada y copiada automáticamente")).catch(() => toast.success("Key generada")); void licensesQuery.refetch(); if (variables.keyKind === "plan") void planKeysQuery.refetch(); }, onError: (e) => toast.error(e.message) });
   const revokeLicense = trpc.licenseKeys.revoke.useMutation({ onSuccess: () => { void licensesQuery.refetch(); toast.success("Key revocada"); } });
   const deleteLicense = trpc.licenseKeys.remove.useMutation({ onSuccess: () => { void licensesQuery.refetch(); toast.success("Key eliminada"); } });
