@@ -500,3 +500,7 @@
 - [x] Persistir la vinculación Discord/API key para que sobreviva al reinicio del bot y de Discord — confirmada en users.apiKey y recuperación por discordUserId
 - [x] Corregir la resolución de roles reales en whitelist y Get Key
 - [x] Permitir borrar scripts autorizados sin que el panel falle por permisos o referencias
+
+- [x] Corregir el reconocimiento de API key vinculada para que el bot y el panel la acepten inmediatamente y tras reinicios
+
+- [x] Hacer que el bot autorrecupere la API key persistente por la identidad Discord vinculada, incluso tras reinicios — recuperación reforzada por discordUserId y fallback seguro para el owner

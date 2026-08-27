@@ -311,8 +311,8 @@ export async function handleInteraction(interaction: any) {
 
 async function apiKeyForUser(interaction: any) {
   let result = await getApiKeyByDiscordUserId(interaction.user.id);
-  if (!result && interaction.guild?.ownerId === interaction.user.id) {
-    const owner = await ownerAccount();
+  const owner = await ownerAccount();
+  if (!result && owner && (interaction.guild?.ownerId === interaction.user.id || owner.discordUserId === interaction.user.id)) {
     if (owner) {
       const displayName = interaction.user.globalName || interaction.user.username || "Discord owner";
       await linkDiscordIdentity(owner.id, interaction.user.id, displayName, interaction.user.globalName || null, interaction.user.displayAvatarURL?.({ extension: "png", size: 128 }) ?? null);
