@@ -474,3 +474,7 @@
 - [x] Evitar el parseo crudo de HTML como JSON y devolver un mensaje accionable para la mutación afectada
 
 - [x] Formatear la respuesta de Mobile View Script con dos backticks de apertura y cierre, no tres
+
+- [ ] Corregir el 403 HTML al crear scripts, especialmente con sources grandes, sin afectar la privacidad ni el loader
+
+- [x] Hacer cumplir el cooldown de reset HWID por licencia y bloquear resets repetidos antes del intervalo permitido

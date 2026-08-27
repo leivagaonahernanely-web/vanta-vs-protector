@@ -264,10 +264,24 @@ export async function revokeLicense(ownerId: number, id: number) {
   await db.update(licenses).set({ status: "revoked" }).where(and(eq(licenses.id, id), eq(licenses.ownerId, ownerId)));
 }
 
-export async function resetLicenseHwid(ownerId: number, id: number) {
+export async function resetLicenseHwid(ownerId: number, id: number, bypassCooldown = false) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  await db.update(licenses).set({ hwid: null }).where(and(eq(licenses.id, id), eq(licenses.ownerId, ownerId)));
+  const rows = await db.select({ id: licenses.id, hwidResetAt: licenses.hwidResetAt }).from(licenses).where(and(eq(licenses.id, id), eq(licenses.ownerId, ownerId), eq(licenses.status, "active"))).limit(1);
+  const license = rows[0];
+  if (!license) return { reset: false as const, reason: "not_found" as const };
+  const cooldownMs = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  if (!bypassCooldown && license.hwidResetAt && now - license.hwidResetAt.getTime() < cooldownMs) {
+    return { reset: false as const, reason: "cooldown" as const, retryAt: new Date(license.hwidResetAt.getTime() + cooldownMs) };
+  }
+  const filters = [eq(licenses.id, id), eq(licenses.ownerId, ownerId), eq(licenses.status, "active")];
+  if (!bypassCooldown) filters.push(or(isNull(licenses.hwidResetAt), lt(licenses.hwidResetAt, new Date(now - cooldownMs)))!);
+  const result = await db.update(licenses).set({ hwid: null, hwidResetAt: new Date(now) }).where(and(...filters));
+  if (Number(result[0]?.affectedRows ?? 0) === 0) {
+    return { reset: false as const, reason: "cooldown" as const, retryAt: new Date(now + cooldownMs) };
+  }
+  return { reset: true as const, resetAt: new Date(now) };
 }
 
 export async function deleteLicense(ownerId: number, id: number) {

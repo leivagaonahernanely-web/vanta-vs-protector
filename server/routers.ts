@@ -222,7 +222,14 @@ export const appRouter = router({
     }),
     revoke: ownerProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => revokeLicense(ctx.user.id, input.id)),
     remove: ownerProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => deleteLicense(ctx.user.id, input.id)),
-    resetHwid: ownerProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => resetLicenseHwid(ctx.user.id, input.id)),
+    resetHwid: ownerProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const result = await resetLicenseHwid(ctx.user.id, input.id);
+      if (!result.reset && result.reason === "cooldown") {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `El HWID ya fue reiniciado. Podrás volver a hacerlo el ${result.retryAt.toLocaleString()}.` });
+      }
+      if (!result.reset) throw new TRPCError({ code: "NOT_FOUND", message: "No se encontró una licencia activa para ese usuario." });
+      return result;
+    }),
   }),
 
   planKeys: ownerProcedure.query(async ({ ctx }) => {

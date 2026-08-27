@@ -10,7 +10,7 @@ const dbMocks = vi.hoisted(() => ({
   getBlacklistsByOwner: vi.fn().mockResolvedValue([]),
   createAccessRule: vi.fn(),
   getAccessRulesByOwner: vi.fn().mockResolvedValue([]),
-  resetLicenseHwid: vi.fn(),
+  resetLicenseHwid: vi.fn().mockResolvedValue({ reset: true, resetAt: new Date() }),
   revokeLicense: vi.fn(),
   deleteLicense: vi.fn(),
   redeemPlanKey: vi.fn(),
@@ -87,6 +87,11 @@ describe("access management", () => {
     expect(dbMocks.resetLicenseHwid).toHaveBeenCalledWith(7, 9);
     expect(dbMocks.revokeLicense).toHaveBeenCalledWith(7, 9);
     expect(dbMocks.deleteLicense).toHaveBeenCalledWith(7, 9);
+  });
+
+  it("blocks a web HWID reset while its 24-hour cooldown is active", async () => {
+    dbMocks.resetLicenseHwid.mockResolvedValue({ reset: false, reason: "cooldown", retryAt: new Date(Date.now() + 60_000) });
+    await expect(appRouter.createCaller(context).licenseKeys.resetHwid({ id: 9 })).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS", message: expect.stringContaining("El HWID ya fue reiniciado") });
   });
 
   it("creates blacklist and whitelist rules for the authenticated owner", async () => {
