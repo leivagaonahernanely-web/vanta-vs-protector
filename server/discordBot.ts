@@ -37,6 +37,8 @@ import {
   getLicensesByOwner,
   getActiveLicensesByDiscordUserId,
   getApiKeyByDiscordUserId,
+  ensureUserApiKey,
+  linkDiscordIdentity,
   getBuyerRoleId,
   setBuyerRoleId,
   getUserByDiscordUserId,
@@ -291,7 +293,16 @@ export async function handleInteraction(interaction: any) {
 }
 
 async function apiKeyForUser(interaction: any) {
-  const result = await getApiKeyByDiscordUserId(interaction.user.id);
+  let result = await getApiKeyByDiscordUserId(interaction.user.id);
+  if (!result && interaction.guild?.ownerId === interaction.user.id) {
+    const owner = await ownerAccount();
+    if (owner) {
+      const displayName = interaction.user.globalName || interaction.user.username || "Discord owner";
+      await linkDiscordIdentity(owner.id, interaction.user.id, displayName, interaction.user.globalName || null, interaction.user.displayAvatarURL?.({ extension: "png", size: 128 }) ?? null);
+      await ensureUserApiKey(owner.id);
+      result = await getApiKeyByDiscordUserId(interaction.user.id);
+    }
+  }
   if (!result?.apiKey) return respond(interaction, { content: "❌ No hay una cuenta web vinculada a este usuario de Discord. Vincula Discord desde Vanta.vs Protector e inténtalo otra vez.", ephemeral: true });
   const copyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`vanta:copy-api-key:${result.apiKey}`).setLabel("Copiar API key").setStyle(ButtonStyle.Secondary),

@@ -156,7 +156,7 @@ export default function Home(props: any = {}) {
     if (validationError) { toast.error(validationError); return; }
     readLuaFile(file).then(setSource).catch(() => toast.error("No se pudo leer el archivo Lua"));
   }
-  function connectDiscord() { const oauthOrigin = window.location.hostname.endsWith(".manus.space") ? window.location.origin : "https://vanta-prot-hfw5hmym.manus.space"; window.location.assign(`${oauthOrigin}/api/discord/start?origin=${encodeURIComponent(oauthOrigin)}`); }
+  function connectDiscord() { const oauthOrigin = window.location.origin; window.location.assign(`/api/discord/start?origin=${encodeURIComponent(oauthOrigin)}`); }
   function selectNav(item: string) { setActive(item); setMobileOpen(false); playUiChime(soundEnabled); }
   function toggleSound() { const next = !soundEnabled; setSoundEnabled(next); setSoundPreference(localStorage, next); playUiChime(true); }
   function updatePriceBlock(index: number, field: keyof PriceBlock, value: string) { setPricesBlocks((current) => current.map((block, itemIndex) => itemIndex === index ? { ...block, [field]: value } : block)); }

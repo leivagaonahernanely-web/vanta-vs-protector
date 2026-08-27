@@ -418,3 +418,7 @@
 - [x] Verificar que /apikey se registre y aparezca en la sincronización de comandos Discord
 - [x] Reparar el error actual de Conectar con Discord y validar el callback OAuth
 - [x] Añadir pruebas de formato copiable, /apikey y OAuth Discord
+
+- [x] Reparar resolución de cuenta web vinculada en /apikey mediante Discord OAuth y bootstrap seguro para el owner del servidor
+- [x] Validar que el callback persista la identidad antes de redirigir; el callback guarda linkDiscordIdentity antes de /?discord=connected
+- [x] Añadir cobertura de /apikey en el registro slash y resolución DB; el owner no vinculado se repara automáticamente
