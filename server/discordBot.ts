@@ -111,6 +111,10 @@ function memberHasRole(interaction: ButtonInteraction | any, roleId: string | un
 export function hasKeyManagementAccess(input: { actorId: string; ownerId?: string | null; isAdministrator: boolean; hasManagerRole: boolean }) {
   return Boolean(input.ownerId && (input.actorId === input.ownerId || input.isAdministrator || input.hasManagerRole));
 }
+export function matchesWhitelistRule(rule: { kind: "user" | "role"; discordId: string; active?: number | null; hostedScriptId?: number | null }, discordUserId: string, roleIds: string[]) {
+  if (rule.active === 0 || !rule.hostedScriptId) return false;
+  return rule.kind === "user" ? rule.discordId === discordUserId : roleIds.includes(rule.discordId);
+}
 export function isGuildOwner(input: { actorId: string; guildOwnerId?: string | null }) {
   return Boolean(input.guildOwnerId && input.actorId === input.guildOwnerId);
 }
@@ -335,7 +339,12 @@ async function getUserLicenses(discordUserId: string) {
 async function getWhitelistScriptForMember(interaction: any) {
   const owner = await ownerAccount();
   if (!owner) return undefined;
-  const rules = (await getAccessRulesByOwner(owner.id)).filter((rule: any) => rule.active && rule.hostedScriptId && ((rule.kind === "user" && rule.discordId === interaction.user.id) || (rule.kind === "role" && memberHasRole(interaction, rule.discordId))));
+  let member = interaction.member;
+  if (interaction.guild?.members?.fetch) {
+    try { member = await interaction.guild.members.fetch(interaction.user.id); } catch (error) { console.warn("[Discord Bot] Could not fetch member roles for whitelist", error); }
+  }
+  const roleIds = Array.isArray(member?.roles) ? member.roles : Array.from(member?.roles?.cache?.keys?.() ?? []);
+  const rules = (await getAccessRulesByOwner(owner.id)).filter((rule: any) => matchesWhitelistRule(rule, interaction.user.id, roleIds));
   for (const rule of rules) {
     const script = await getHostedScriptById(Number(rule.hostedScriptId));
     if (script) return { owner, script };

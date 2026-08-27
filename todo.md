@@ -496,3 +496,7 @@
 - [x] Corregir la aplicación runtime de whitelist por rol para que los miembros autorizados reciban una key automática vinculada al script, en lugar de intentar ejecutar sin identidad
 
 - [x] Hacer que los miembros con rol whitelisted reciban o recuperen automáticamente una key vinculada al script mediante Get Key
+
+- [x] Persistir la vinculación Discord/API key para que sobreviva al reinicio del bot y de Discord — confirmada en users.apiKey y recuperación por discordUserId
+- [x] Corregir la resolución de roles reales en whitelist y Get Key
+- [x] Permitir borrar scripts autorizados sin que el panel falle por permisos o referencias

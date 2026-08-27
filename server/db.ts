@@ -201,7 +201,12 @@ export async function updateHostedScript(ownerId: number, id: number, input: Par
 export async function deleteHostedScript(ownerId: number, id: number) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
+  const script = await db.select({ id: hostedScripts.id }).from(hostedScripts).where(and(eq(hostedScripts.id, id), eq(hostedScripts.userId, ownerId))).limit(1);
+  if (!script[0]) return false;
+  await db.delete(licenses).where(and(eq(licenses.ownerId, ownerId), eq(licenses.hostedScriptId, id)));
+  await db.delete(accessRules).where(and(eq(accessRules.ownerId, ownerId), eq(accessRules.hostedScriptId, id)));
   await db.delete(hostedScripts).where(and(eq(hostedScripts.id, id), eq(hostedScripts.userId, ownerId)));
+  return true;
 }
 
 export async function getHostedScriptBySlug(slug: string) {

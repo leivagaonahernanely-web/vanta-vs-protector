@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createReconnectGate, discordCommands, GET_SCRIPT_COPY_BUTTON_LABEL, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, isGuildOwner, mobileViewScriptMessage, panelMessage, parseDuration, respond, scriptRuntimeLoader, targetChoices } from "./discordBot";
+import { createReconnectGate, discordCommands, GET_SCRIPT_COPY_BUTTON_LABEL, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, isGuildOwner, matchesWhitelistRule, mobileViewScriptMessage, panelMessage, parseDuration, respond, scriptRuntimeLoader, targetChoices } from "./discordBot";
 
 describe("Discord access panel", () => {
   it("parses key durations in days, months and years", () => {
@@ -171,6 +171,13 @@ describe("Discord access panel", () => {
     expect(isGuildOwner({ actorId: "guild-owner", guildOwnerId: "guild-owner" })).toBe(true);
     expect(isGuildOwner({ actorId: "other-user", guildOwnerId: "guild-owner" })).toBe(false);
     expect(isGuildOwner({ actorId: "guild-owner", guildOwnerId: null })).toBe(false);
+  });
+
+  it("matches active whitelist rules against the member Discord identity and roles", () => {
+    expect(matchesWhitelistRule({ kind: "user", discordId: "u1", hostedScriptId: 7, active: 1 }, "u1", [])).toBe(true);
+    expect(matchesWhitelistRule({ kind: "role", discordId: "r1", hostedScriptId: 7, active: 1 }, "u2", ["r1"])).toBe(true);
+    expect(matchesWhitelistRule({ kind: "role", discordId: "r1", hostedScriptId: 7, active: 1 }, "u2", ["r2"])).toBe(false);
+    expect(matchesWhitelistRule({ kind: "role", discordId: "r1", hostedScriptId: 7, active: 0 }, "u2", ["r1"])).toBe(false);
   });
 
   it("allows key management only to the owner, an administrator or the configured role", () => {
