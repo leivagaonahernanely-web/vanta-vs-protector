@@ -186,16 +186,16 @@ describe("Discord access panel", () => {
 
   it("autocompletes guild users and roles based on the selected kind", async () => {
     const members = new Map([
-      ["u1", { user: { id: "u1", username: "hernan" }, displayName: "Hernán" }],
-      ["u2", { user: { id: "u2", username: "other" }, displayName: "Other" }],
+      ["1501316920975036611", { user: { id: "1501316920975036611", username: "hernan" }, displayName: "Hernán" }],
+      ["1501316920975036612", { user: { id: "1501316920975036612", username: "other" }, displayName: "Other" }],
     ]);
     const roles = new Map([
-      ["r1", { id: "r1", name: "Premium" }],
-      ["r2", { id: "r2", name: "Staff" }],
+      ["1501316920975036613", { id: "1501316920975036613", name: "Premium" }],
+      ["1501316920975036614", { id: "1501316920975036614", name: "Staff" }],
     ]);
-    const make = (kind: string, focused: string) => ({ guildId: "guild", options: { getString: () => kind, getFocused: () => ({ name: "target", value: focused }) }, guild: { members: { cache: members }, roles: { cache: roles } } });
-    expect(await targetChoices(make("user", "hern"))).toEqual([{ name: "User · Hernán", value: "user:u1" }]);
-    expect(await targetChoices(make("role", "prem"))).toEqual([{ name: "Role · Premium", value: "role:r1" }]);
+    const make = (kind: string, focused: string) => ({ guildId: "1501316920975036615", options: { getString: () => kind, getFocused: () => ({ name: "target", value: focused }) }, guild: { members: { cache: members }, roles: { cache: roles } } });
+    expect(await targetChoices(make("user", "hern"))).toEqual([{ name: "User · Hernán", value: "user:1501316920975036611" }]);
+    expect(await targetChoices(make("role", "prem"))).toEqual([{ name: "Role · Premium", value: "role:1501316920975036613" }]);
   });
 
   it("recognizes the Discord guild owner independently from the linked database identity", () => {
@@ -205,10 +205,17 @@ describe("Discord access panel", () => {
   });
 
   it("matches active whitelist rules against the member Discord identity and roles", () => {
-    expect(matchesWhitelistRule({ kind: "user", discordId: "u1", hostedScriptId: 7, active: 1 }, "u1", [])).toBe(true);
-    expect(matchesWhitelistRule({ kind: "role", discordId: "r1", hostedScriptId: 7, active: 1 }, "u2", ["r1"])).toBe(true);
-    expect(matchesWhitelistRule({ kind: "role", discordId: "r1", hostedScriptId: 7, active: 1 }, "u2", ["r2"])).toBe(false);
-    expect(matchesWhitelistRule({ kind: "role", discordId: "r1", hostedScriptId: 7, active: 0 }, "u2", ["r1"])).toBe(false);
+    expect(matchesWhitelistRule({ kind: "user", discordId: "1501316920975036611", hostedScriptId: 7, active: 1 }, "1501316920975036611", [])).toBe(true);
+    expect(matchesWhitelistRule({ kind: "role", discordId: "1501316920975036613", hostedScriptId: 7, active: 1 }, "1501316920975036612", ["1501316920975036613"])).toBe(true);
+    expect(matchesWhitelistRule({ kind: "role", discordId: "1501316920975036613", hostedScriptId: 7, active: 1 }, "1501316920975036612", ["1501316920975036614"])).toBe(false);
+    expect(matchesWhitelistRule({ kind: "role", discordId: "1501316920975036613", hostedScriptId: 7, active: 0 }, "1501316920975036612", ["1501316920975036613"])).toBe(false);
+    expect(matchesWhitelistRule({ kind: "user", discordId: "1501316920975036611", hostedScriptId: 7, active: 1 }, "1501316920975036611", [])).toBe(true);
+  });
+
+  it("keeps panel buttons scoped to the owning account and script", () => {
+    const message = panelMessage({ ownerId: 42, hostedScriptId: 7 });
+    const ids = message.components.flatMap((row: any) => row.components.map((button: any) => button.data.custom_id));
+    expect(ids).toEqual(["vanta:redeem:42:7", "vanta:script:42:7", "vanta:role:42:7", "vanta:hwid:42:7", "vanta:stats:42:7"]);
   });
 
   it("recognizes the linked owner identity using normalized Discord IDs", () => {

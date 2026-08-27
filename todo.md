@@ -537,3 +537,10 @@
 - [x] Permitir que cada usuario genere keys para sus propios scripts desde la web — Generate / Manage visible para cuentas autenticadas y limitado a scripts propios
 - [x] Mantener Plan Keys/Owner Key y key panel exclusivos del owner — la generación keyKind=plan conserva la comprobación owner/admin
 - [x] Aislar scripts y keys para impedir acceso cruzado entre usuarios — se verifica hostedScript.userId antes de crear una licencia y las mutaciones siguen owner-scoped
+
+- [x] Corregir whitelist para que guarde usuarios y roles seleccionados y los reconozca en Get Key — IDs Discord normalizados, reglas ligadas al script del owner y consulta de roles actualizados
+- [x] Verificar que las reglas whitelist se muestran después de crearlas y que Unwhitelist elimina la regla correcta — operaciones acotadas por ownerId y hostedScriptId
+
+- [x] Garantizar una API key diferente y persistente para cada usuario Discord, sin reutilización entre cuentas — provisión durante OAuth y recuperación por discordUserId
+- [x] Aislar scripts, paneles, licencias, whitelist y logs por propietario real de la cuenta — paneles llevan owner/script context y licencias/consultas usan owner-scoped filters
+- [x] Añadir pruebas multiusuario contra filtraciones o administración cruzada — tests de scripts ajenos, reglas normalizadas y botones con owner/script context

@@ -34,7 +34,7 @@ vi.mock("drizzle-orm/mysql2", () => ({
   })),
 }));
 
-import { createDiscordPanel, createProtection, ensureUserApiKey, getDiscordPanelsByOwner, getProtectionsByUser, resetLicenseHwidByDiscordUserId, updateDiscordChannelId } from "./db";
+import { createDiscordPanel, createProtection, ensureUserApiKey, getDiscordPanelsByOwner, getProtectionsByUser, redeemLicense, resetLicenseHwidByDiscordUserId, updateDiscordChannelId } from "./db";
 
 const saved = {
   id: 4,
@@ -67,6 +67,14 @@ describe("database persistence helpers", () => {
     const update = database.updateSet.mock.calls.at(-1)?.[0] as { apiKey?: string };
     expect(update.apiKey).toMatch(/^VANTA-[A-Za-z0-9_-]{32,40}$/);
     expect(database.updateWhere).toHaveBeenCalled();
+  });
+
+  it("restricts panel license redemption to the panel owner and hosted script", async () => {
+    database.selectLimit.mockResolvedValueOnce([{ id: 22, ownerId: 9, hostedScriptId: 12, keyCode: "license-key-123", status: "active", discordUserId: null, expiresAt: null }]);
+    const result = await redeemLicense("license-key-123", "discord-user", { ownerId: 9, hostedScriptId: 12 });
+    expect(result?.discordUserId).toBe("discord-user");
+    expect(database.selectWhere).toHaveBeenCalled();
+    expect(database.updateSet).toHaveBeenCalledWith({ discordUserId: "discord-user" });
   });
 
   it("blocks a repeated user HWID reset during the 24-hour cooldown", async () => {

@@ -4,6 +4,7 @@ import type { TrpcContext } from "./_core/context";
 
 const dbMocks = vi.hoisted(() => ({
   getDiscordPanelsByOwner: vi.fn(),
+  getHostedScriptByName: vi.fn().mockResolvedValue({ id: 4, userId: 7, name: "main.lua" }),
   createDiscordPanel: vi.fn(),
   deleteDiscordPanel: vi.fn(),
 }));
@@ -24,7 +25,7 @@ beforeEach(() => { vi.clearAllMocks(); dbMocks.getDiscordPanelsByOwner.mockImple
 describe("discord panel management", () => {
   it("republishes an owner panel with its saved configuration", async () => {
     const result = await appRouter.createCaller(context).discord.republishPanel({ id: panel.id });
-    expect(botMocks.publishDiscordPanel).toHaveBeenCalledWith(panel.channelId, { name: panel.name, description: panel.description, script: panel.targetScript, hwidHours: panel.hwidHours });
+    expect(botMocks.publishDiscordPanel).toHaveBeenCalledWith(panel.channelId, { name: panel.name, description: panel.description, script: panel.targetScript, hwidHours: panel.hwidHours, ownerId: user.id, hostedScriptId: 4 });
     expect(result.messageId).toBe("new-message");
   });
 

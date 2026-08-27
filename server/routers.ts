@@ -5,7 +5,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { notifyOwner } from "./_core/notification";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createAccessRule, createBlacklist, createDiscordPanel, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getDiscordPanelsByOwner, getHostedScriptSourceByUser, getHostedScriptsByUser, getHostedScriptById, updateHostedScript, deleteHostedScript, getWorkspaceUsage, getKeyAuditLogsByOwner, deleteKeyAuditLogsByOwner, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, redeemPlanKey, updateDiscordChannelId, ensureUserApiKey } from "./db";
+import { createAccessRule, createBlacklist, createDiscordPanel, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getDiscordPanelsByOwner, getHostedScriptSourceByUser, getHostedScriptsByUser, getHostedScriptByName, getHostedScriptById, getHostedScriptByOwnerId, updateHostedScript, deleteHostedScript, getWorkspaceUsage, getKeyAuditLogsByOwner, deleteKeyAuditLogsByOwner, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, redeemPlanKey, updateDiscordChannelId, ensureUserApiKey } from "./db";
 import { nanoid } from "nanoid";
 import { randomBytes, randomInt } from "node:crypto";
 import { gunzipSync } from "node:zlib";
@@ -60,14 +60,14 @@ const licenseInput = z.object({
   type: z.literal("license").default("license"),
   plan: z.enum(["free", "pro", "premium"]).default("free"),
   hostedScriptId: z.number().int().positive().optional(),
-  discordUserId: z.string().regex(/^\d{15,22}$/).optional(),
+  discordUserId: z.string().trim().regex(/^\d{15,22}$/).optional(),
   trialDays: z.number().int().min(1).max(3650).default(3),
   durationValue: z.number().int().min(1).max(3650).optional(),
   durationUnit: z.enum(["days", "months", "years"]).default("days"),
   keyKind: z.enum(["normal", "plan"]).default("normal"),
 });
-const accessRuleInput = z.object({ kind: z.enum(["user", "role"]), discordId: z.string().regex(/^\d{15,22}$/), hostedScriptId: z.number().int().positive().optional(), label: z.string().trim().max(128).optional() });
-const blacklistInput = z.object({ discordUserId: z.string().regex(/^\d{15,22}$/), reason: z.string().trim().max(500).optional() });
+const accessRuleInput = z.object({ kind: z.enum(["user", "role"]), discordId: z.string().trim().regex(/^\d{15,22}$/), hostedScriptId: z.number().int().positive(), label: z.string().trim().max(128).optional() });
+const blacklistInput = z.object({ discordUserId: z.string().trim().regex(/^\d{15,22}$/), reason: z.string().trim().max(500).optional() });
 
 async function assertWorkspaceQuota(userId: number, plan: PlanTier | undefined, metric: "obfuscations" | "scripts" | "keys") {
   const selected = PLAN_DEFINITIONS.find((item) => item.id === (plan ?? "free")) ?? PLAN_DEFINITIONS[0];
@@ -119,10 +119,10 @@ export const appRouter = router({
       return identity ? { online: false, state: "connecting" as const, username: identity.username } : { online: false, state: gateway.configured ? "offline" as const : "not_configured" as const, username: null };
     }),
     updateChannel: protectedProcedure.input(z.object({ discordChannelId: z.string().regex(/^\d{15,22}$/).nullable() })).mutation(async ({ ctx, input }) => { if (input.discordChannelId) { const check = await checkDiscordChannel(input.discordChannelId); if (!check.ok) { await updateDiscordChannelId(ctx.user.id, null); return { ok: false as const, status: check.status ?? null, message: check.message }; } } await updateDiscordChannelId(ctx.user.id, input.discordChannelId); return { ok: true as const, channelId: input.discordChannelId }; }),
-    createPanel: protectedProcedure.input(z.object({ name: z.string().trim().min(1).max(255), description: z.string().trim().max(1000).optional(), channelId: z.string().regex(/^\d{15,22}$/), targetScript: z.string().trim().min(1).max(255), hwidHours: z.number().int().min(0).max(720).default(24) })).mutation(async ({ ctx, input }) => { const check = await checkDiscordChannel(input.channelId); if (!check.ok) throw new TRPCError({ code: "BAD_REQUEST", message: check.message }); const result = await publishDiscordPanel(input.channelId, { name: input.name, description: input.description, script: input.targetScript, hwidHours: input.hwidHours }); await updateDiscordChannelId(ctx.user.id, input.channelId); return createDiscordPanel({ ownerId: ctx.user.id, name: input.name, description: input.description ?? null, channelId: input.channelId, targetScript: input.targetScript, hwidHours: input.hwidHours, messageId: result.messageId }); }),
+    createPanel: protectedProcedure.input(z.object({ name: z.string().trim().min(1).max(255), description: z.string().trim().max(1000).optional(), channelId: z.string().regex(/^\d{15,22}$/), targetScript: z.string().trim().min(1).max(255), hwidHours: z.number().int().min(0).max(720).default(24) })).mutation(async ({ ctx, input }) => { const check = await checkDiscordChannel(input.channelId); if (!check.ok) throw new TRPCError({ code: "BAD_REQUEST", message: check.message }); const script = await getHostedScriptByName(ctx.user.id, input.targetScript); if (!script) throw new TRPCError({ code: "NOT_FOUND", message: "Selecciona un script hosteado de tu workspace." }); const result = await publishDiscordPanel(input.channelId, { name: input.name, description: input.description, script: script.name, hwidHours: input.hwidHours, ownerId: ctx.user.id, hostedScriptId: script.id }); await updateDiscordChannelId(ctx.user.id, input.channelId); return createDiscordPanel({ ownerId: ctx.user.id, name: input.name, description: input.description ?? null, channelId: input.channelId, targetScript: script.name, hwidHours: input.hwidHours, messageId: result.messageId }); }),
     listPanels: protectedProcedure.query(({ ctx }) => getDiscordPanelsByOwner(ctx.user.id)),
     deletePanel: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const rows = await getDiscordPanelsByOwner(ctx.user.id); const panel = rows.find((item) => item.id === input.id); if (!panel) throw new TRPCError({ code: "NOT_FOUND", message: "Panel no encontrado." }); if (panel.messageId) await deletePublishedPanel(panel.channelId, panel.messageId); const { deleteDiscordPanel } = await import("./db"); await deleteDiscordPanel(ctx.user.id, panel.id); return { success: true as const }; }),
-    republishPanel: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const rows = await getDiscordPanelsByOwner(ctx.user.id); const panel = rows.find((item) => item.id === input.id); if (!panel) throw new TRPCError({ code: "NOT_FOUND", message: "Panel no encontrado." }); const result = await publishDiscordPanel(panel.channelId, { name: panel.name, description: panel.description ?? undefined, script: panel.targetScript, hwidHours: panel.hwidHours }); return result; }),
+    republishPanel: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { const rows = await getDiscordPanelsByOwner(ctx.user.id); const panel = rows.find((item) => item.id === input.id); if (!panel) throw new TRPCError({ code: "NOT_FOUND", message: "Panel no encontrado." }); const script = await getHostedScriptByName(ctx.user.id, panel.targetScript); if (!script) throw new TRPCError({ code: "NOT_FOUND", message: "El script de este panel ya no pertenece a tu workspace." }); const result = await publishDiscordPanel(panel.channelId, { name: panel.name, description: panel.description ?? undefined, script: script.name, hwidHours: panel.hwidHours, ownerId: ctx.user.id, hostedScriptId: script.id }); return result; }),
     publishPrices: protectedProcedure.input(z.object({ title: z.string().trim().min(1).max(120), description: z.string().trim().min(1).max(4000), channelId: z.string().regex(/^\d{15,22}$/) })).mutation(async ({ ctx, input }) => { const channelId = input.channelId; const check = await checkDiscordChannel(channelId); if (!check.ok) throw new TRPCError({ code: "BAD_REQUEST", message: check.message }); return publishPricesMessage(channelId, { title: input.title, description: input.description }); }),
     publishUpdates: protectedProcedure.input(z.object({ title: z.string().trim().min(1).max(120), description: z.string().trim().min(1).max(4000), channelId: z.string().regex(/^\d{15,22}$/) })).mutation(async ({ ctx, input }) => { const channelId = input.channelId; const check = await checkDiscordChannel(channelId); if (!check.ok) throw new TRPCError({ code: "BAD_REQUEST", message: check.message }); return publishUpdatesMessage(channelId, { title: input.title, description: input.description }); }),
   }),
@@ -237,7 +237,7 @@ export const appRouter = router({
       }
       if (input.keyKind === "normal" && !input.hostedScriptId) throw new TRPCError({ code: "BAD_REQUEST", message: "Selecciona el script hosteado para esta key." });
       if (input.keyKind === "normal") {
-        const script = await getHostedScriptById(input.hostedScriptId!);
+        const script = await getHostedScriptByOwnerId(ctx.user.id, input.hostedScriptId!);
         if (!script || script.userId !== ctx.user.id) throw new TRPCError({ code: "NOT_FOUND", message: "Ese script no pertenece a tu cuenta." });
       }
       await assertWorkspaceQuota(ctx.user.id, (ctx.user as typeof ctx.user & { plan?: PlanTier }).plan, "keys");
@@ -272,7 +272,11 @@ export const appRouter = router({
     }),
     whitelist: router({
       list: protectedProcedure.query(({ ctx }) => getAccessRulesByOwner(ctx.user.id)),
-      add: protectedProcedure.input(accessRuleInput).mutation(({ ctx, input }) => createAccessRule({ ownerId: ctx.user.id, hostedScriptId: input.hostedScriptId ?? null, kind: input.kind, discordId: input.discordId, label: input.label ?? null, active: 1 })),
+      add: protectedProcedure.input(accessRuleInput).mutation(async ({ ctx, input }) => {
+        const script = await getHostedScriptByOwnerId(ctx.user.id, input.hostedScriptId);
+        if (!script) throw new TRPCError({ code: "NOT_FOUND", message: "Ese script no pertenece a tu cuenta." });
+        return createAccessRule({ ownerId: ctx.user.id, hostedScriptId: script.id, kind: input.kind, discordId: input.discordId, label: input.label ?? null, active: 1 });
+      }),
       remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => deleteAccessRule(ctx.user.id, input.id)),
     }),
     logs: router({

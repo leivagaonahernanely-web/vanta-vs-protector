@@ -78,6 +78,13 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
 }
 
+export async function getUserById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  return rows[0];
+}
+
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (!db) {
@@ -190,6 +197,13 @@ export async function getHostedScriptById(id: number) {
   return rows[0];
 }
 
+export async function getHostedScriptByOwnerId(ownerId: number, id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(hostedScripts).where(and(eq(hostedScripts.id, id), eq(hostedScripts.userId, ownerId))).limit(1);
+  return rows[0];
+}
+
 export async function updateHostedScript(ownerId: number, id: number, input: Partial<InsertHostedScript>) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
@@ -257,10 +271,12 @@ export async function getLicensesByOwner(ownerId: number) {
   return db.select().from(licenses).where(eq(licenses.ownerId, ownerId)).orderBy(desc(licenses.createdAt)).limit(100);
 }
 
-export async function getActiveLicensesByDiscordUserId(discordUserId: string) {
+export async function getActiveLicensesByDiscordUserId(discordUserId: string, ownerId?: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(licenses).where(and(eq(licenses.discordUserId, discordUserId), eq(licenses.status, "active"))).orderBy(desc(licenses.createdAt)).limit(100);
+  const filters = [eq(licenses.discordUserId, discordUserId), eq(licenses.status, "active")];
+  if (ownerId !== undefined) filters.push(eq(licenses.ownerId, ownerId));
+  return db.select().from(licenses).where(and(...filters)).orderBy(desc(licenses.createdAt)).limit(100);
 }
 
 export async function revokeLicense(ownerId: number, id: number) {
@@ -358,10 +374,13 @@ export async function setKeyManagerRole(ownerId: number, discordRoleId: string) 
   return discordRoleId;
 }
 
-export async function redeemLicense(keyCode: string, discordUserId: string) {
+export async function redeemLicense(keyCode: string, discordUserId: string, scope?: { ownerId?: number; hostedScriptId?: number }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const rows = await db.select().from(licenses).where(eq(licenses.keyCode, keyCode)).limit(1);
+  const filters = [eq(licenses.keyCode, keyCode)];
+  if (scope?.ownerId !== undefined) filters.push(eq(licenses.ownerId, scope.ownerId));
+  if (scope?.hostedScriptId !== undefined) filters.push(eq(licenses.hostedScriptId, scope.hostedScriptId));
+  const rows = await db.select().from(licenses).where(and(...filters)).limit(1);
   const license = rows[0];
   if (!license || license.status !== "active" || (license.expiresAt && license.expiresAt.getTime() <= Date.now())) return undefined;
   if (license.discordUserId && license.discordUserId !== discordUserId) return undefined;
@@ -388,10 +407,13 @@ export async function deleteLicenseByKeyCode(ownerId: number, keyCode: string) {
   return Number(result[0]?.affectedRows ?? 0) > 0;
 }
 
-export async function resetLicenseHwidByDiscordUserId(discordUserId: string, bypassCooldown = false) {
+export async function resetLicenseHwidByDiscordUserId(discordUserId: string, bypassCooldown = false, scope?: { ownerId?: number; hostedScriptId?: number }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const rows = await db.select({ id: licenses.id, hwidResetAt: licenses.hwidResetAt }).from(licenses).where(and(eq(licenses.discordUserId, discordUserId), eq(licenses.status, "active"))).limit(100);
+  const selectFilters = [eq(licenses.discordUserId, discordUserId), eq(licenses.status, "active")];
+  if (scope?.ownerId !== undefined) selectFilters.push(eq(licenses.ownerId, scope.ownerId));
+  if (scope?.hostedScriptId !== undefined) selectFilters.push(eq(licenses.hostedScriptId, scope.hostedScriptId));
+  const rows = await db.select({ id: licenses.id, hwidResetAt: licenses.hwidResetAt }).from(licenses).where(and(...selectFilters)).limit(100);
   if (rows.length === 0) return { reset: false as const, reason: "not_found" as const };
   const cooldownMs = 24 * 60 * 60 * 1000;
   const now = Date.now();
@@ -400,6 +422,8 @@ export async function resetLicenseHwidByDiscordUserId(discordUserId: string, byp
     if (blocked?.hwidResetAt) return { reset: false as const, reason: "cooldown" as const, retryAt: new Date(blocked.hwidResetAt.getTime() + cooldownMs) };
   }
   const filters = [eq(licenses.discordUserId, discordUserId), eq(licenses.status, "active")];
+  if (scope?.ownerId !== undefined) filters.push(eq(licenses.ownerId, scope.ownerId));
+  if (scope?.hostedScriptId !== undefined) filters.push(eq(licenses.hostedScriptId, scope.hostedScriptId));
   if (!bypassCooldown) filters.push(or(isNull(licenses.hwidResetAt), lt(licenses.hwidResetAt, new Date(now - cooldownMs)))!);
   await db.update(licenses).set({ hwid: null, hwidResetAt: new Date(now) }).where(and(...filters));
   return { reset: true as const, resetAt: new Date(now), count: rows.length };

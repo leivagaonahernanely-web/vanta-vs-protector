@@ -34,6 +34,7 @@ import {
   getKeyManagerRoleId,
   getHostedScriptByName,
   getHostedScriptById,
+  getHostedScriptByOwnerId,
   getHostedScriptsByUser,
   getLicensesByOwner,
   getActiveLicensesByDiscordUserId,
@@ -43,6 +44,7 @@ import {
   getBuyerRoleId,
   setBuyerRoleId,
   getUserByDiscordUserId,
+  getUserById,
   getUserByOpenId,
   redeemLicense,
   resetLicenseHwidByDiscordUserId,
@@ -117,9 +119,17 @@ export function hasKeyManagementAccess(input: { actorId: string; ownerId?: strin
   const ownerId = String(input.ownerId ?? "").trim();
   return Boolean(ownerId && (actorId === ownerId || input.isAdministrator || input.hasManagerRole));
 }
+function normalizeDiscordId(value: unknown) {
+  const id = String(value ?? "").trim();
+  return /^\d{15,22}$/.test(id) ? id : null;
+}
+
 export function matchesWhitelistRule(rule: { kind: "user" | "role"; discordId: string; active?: number | null; hostedScriptId?: number | null }, discordUserId: string, roleIds: string[]) {
-  if (rule.active === 0 || !rule.hostedScriptId) return false;
-  return rule.kind === "user" ? rule.discordId === discordUserId : roleIds.includes(rule.discordId);
+  if (Number(rule.active) === 0 || !rule.hostedScriptId) return false;
+  const memberId = normalizeDiscordId(discordUserId);
+  const ruleId = normalizeDiscordId(rule.discordId);
+  if (!memberId || !ruleId) return false;
+  return rule.kind === "user" ? ruleId === memberId : roleIds.some((roleId) => normalizeDiscordId(roleId) === ruleId);
 }
 export function isGuildOwner(input: { actorId: string; guildOwnerId?: string | null }) {
   return Boolean(input.guildOwnerId && input.actorId === input.guildOwnerId);
@@ -133,7 +143,24 @@ export function isConfiguredOwnerId(input: { actorId: unknown; linkedDiscordUser
   const linkedDiscordUserId = normalizeDiscordIdentity(input.linkedDiscordUserId);
   return Boolean(actorId && linkedDiscordUserId && actorId === linkedDiscordUserId);
 }
+function getPanelContext(interaction: any) {
+  const parts = String(interaction?.customId ?? "").split(":");
+  if (parts[0] !== "vanta" || !["redeem", "redeem-modal", "script", "role", "hwid", "stats", "copy-loader"].includes(parts[1])) return undefined;
+  const ownerId = Number(parts[2]);
+  if (!Number.isInteger(ownerId) || ownerId <= 0) return undefined;
+  const hostedScriptId = Number(parts[3]);
+  return { ownerId, hostedScriptId: Number.isInteger(hostedScriptId) && hostedScriptId > 0 ? hostedScriptId : undefined };
+}
+function panelActionId(action: string, ownerId?: number, hostedScriptId?: number) {
+  return ownerId ? `vanta:${action}:${ownerId}${hostedScriptId ? `:${hostedScriptId}` : ""}` : `vanta:${action}`;
+}
+
 async function ownerAccount(interaction?: any) {
+  const panelContext = getPanelContext(interaction);
+  if (panelContext) {
+    const panelOwner = await getUserById(panelContext.ownerId);
+    if (panelOwner) return panelOwner;
+  }
   const configuredOwner = ENV.ownerOpenId ? await getUserByOpenId(ENV.ownerOpenId) : undefined;
   if (configuredOwner) return configuredOwner;
   const actorId = normalizeDiscordIdentity(interaction?.user?.id);
@@ -187,7 +214,7 @@ async function prepareInteraction(interaction: any) {
   // Autocomplete must answer with respond(), and redeem opens a modal; neither
   // can be deferred. Every other interaction gets an acknowledgement before DB
   // and Discord API work so Discord never displays “The application did not respond”.
-  if (interaction.isAutocomplete?.() || (interaction.isButton?.() && interaction.customId === "vanta:redeem")) return;
+  if (interaction.isAutocomplete?.() || (interaction.isButton?.() && String(interaction.customId ?? "").startsWith("vanta:redeem"))) return;
   const ephemeral = interaction.isModalSubmit?.() || interaction.isButton?.() || interaction.commandName !== "panel" && interaction.commandName !== "prices" && interaction.commandName !== "updates" && interaction.commandName !== "dropkey";
   await interaction.deferReply({ ephemeral });
 }
@@ -209,7 +236,7 @@ export function scriptRuntimeLoader(script: any, accessKey?: string, licenseId?:
   return !script.ffaMode && runtimeKey ? `script_key = "${runtimeKey}"\n${load}` : load;
 }
 
-export function panelMessage() {
+export function panelMessage(context?: { ownerId?: number; hostedScriptId?: number }) {
   const embed = new EmbedBuilder()
     .setColor(0x5865f2)
     .setTitle("Vanta.vs Protector · Access Panel")
@@ -217,13 +244,13 @@ export function panelMessage() {
     .setFooter({ text: "Vanta.vs Protector · Panel de acceso" })
     .setTimestamp();
   const rowOne = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId("vanta:redeem").setLabel("🔑 Redeem Key").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId("vanta:script").setLabel("📜 Get Script").setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId("vanta:role").setLabel("👤 Get Role").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(panelActionId("redeem", context?.ownerId, context?.hostedScriptId)).setLabel("🔑 Redeem Key").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(panelActionId("script", context?.ownerId, context?.hostedScriptId)).setLabel("📜 Get Script").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(panelActionId("role", context?.ownerId, context?.hostedScriptId)).setLabel("👤 Get Role").setStyle(ButtonStyle.Primary),
   );
   const rowTwo = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId("vanta:hwid").setLabel("⚙️ Reset HWID").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("vanta:stats").setLabel("📊 Get Stats").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(panelActionId("hwid", context?.ownerId, context?.hostedScriptId)).setLabel("⚙️ Reset HWID").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(panelActionId("stats", context?.ownerId, context?.hostedScriptId)).setLabel("📊 Get Stats").setStyle(ButtonStyle.Secondary),
   );
   return { embeds: [embed], components: [rowOne, rowTwo] };
 }
@@ -264,11 +291,11 @@ export async function publishPricesMessage(channelId: string, config: { title: s
   return { channelId, title, messageId: sent.id };
 }
 
-export async function publishDiscordPanel(channelId: string, config?: { name?: string; description?: string; script?: string; hwidHours?: number }) {
+export async function publishDiscordPanel(channelId: string, config?: { name?: string; description?: string; script?: string; hwidHours?: number; ownerId?: number; hostedScriptId?: number }) {
   if (!client || !gatewayOnline) throw new Error("El Gateway Discord no está conectado.");
   const channel = await client.channels.fetch(channelId);
   if (!channel?.isTextBased() || !("send" in channel)) throw new Error("El canal Discord no permite mensajes.");
-  const base = panelMessage();
+  const base = panelMessage({ ownerId: config?.ownerId, hostedScriptId: config?.hostedScriptId });
   const embed = new EmbedBuilder().setColor(0x5865f2).setTitle(config?.name?.trim() || "Vanta.vs Protector · Access Panel").setDescription(config?.description?.trim() || "Este panel permite canjear tu key, obtener el script autorizado y conseguir tu rol.").setFooter({ text: config?.script ? `Script: ${config.script}` : "Vanta.vs Protector · Panel de acceso" }).setTimestamp();
   const sent = await channel.send({ embeds: [embed], components: base.components });
   return { channelId, title: config?.name?.trim() || "Vanta.vs Protector · Access Panel", messageId: sent.id };
@@ -414,9 +441,9 @@ async function apiKeyForUser(interaction: any) {
   return respond(interaction, { content: `🔐 **Tu API key de Vanta.vs Protector**\n\`${result.apiKey}\`\n\nEsta key identifica tu cuenta vinculada.`, components: [copyRow], ephemeral: true });
 }
 
-async function getUserLicenses(discordUserId: string) {
+async function getUserLicenses(discordUserId: string, ownerId?: number, hostedScriptId?: number) {
   const user = await getUserByDiscordUserId(discordUserId);
-  const licenses = (await getActiveLicensesByDiscordUserId(discordUserId)).filter((license: any) => !license.expiresAt || license.expiresAt.getTime() > Date.now());
+  const licenses = (await getActiveLicensesByDiscordUserId(discordUserId, ownerId)).filter((license: any) => (!hostedScriptId || Number(license.hostedScriptId) === hostedScriptId) && (!license.expiresAt || license.expiresAt.getTime() > Date.now()));
   const ownerIds = Array.from(new Set(licenses.map((license: any) => Number(license.ownerId)).filter((id) => Number.isInteger(id) && id > 0)));
   const scriptRows = await Promise.all(ownerIds.map((ownerId) => getHostedScriptsByUser(ownerId)));
   const scripts = scriptRows.flat();
@@ -431,9 +458,10 @@ async function getWhitelistScriptForMember(interaction: any) {
     try { member = await interaction.guild.members.fetch(interaction.user.id); } catch (error) { console.warn("[Discord Bot] Could not fetch member roles for whitelist", error); }
   }
   const roleIds = Array.isArray(member?.roles) ? member.roles : Array.from(member?.roles?.cache?.keys?.() ?? []);
-  const rules = (await getAccessRulesByOwner(owner.id)).filter((rule: any) => matchesWhitelistRule(rule, interaction.user.id, roleIds));
+  const panelScriptId = getPanelContext(interaction)?.hostedScriptId;
+  const rules = (await getAccessRulesByOwner(owner.id)).filter((rule: any) => (!panelScriptId || Number(rule.hostedScriptId) === panelScriptId) && matchesWhitelistRule(rule, interaction.user.id, roleIds));
   for (const rule of rules) {
-    const script = await getHostedScriptById(Number(rule.hostedScriptId));
+    const script = await getHostedScriptByOwnerId(owner.id, Number(rule.hostedScriptId));
     if (script) return { owner, script };
   }
   return undefined;
@@ -449,23 +477,27 @@ async function getKeyForWhitelistedUser(interaction: any) {
 }
 
 async function getScriptForUser(interaction: any) {
-  const access = await getUserLicenses(interaction.user.id);
+  const owner = await ownerAccount(interaction);
+  const panelContext = getPanelContext(interaction);
+  const access = await getUserLicenses(interaction.user.id, owner?.id, panelContext?.hostedScriptId);
   const license = access.licenses[0];
-  if (!license) return respond(interaction, { content: "❌ No tienes una key activa. Pulsa Redeem Key y canjea una key válida antes de solicitar el script.", ephemeral: true });
-  const script = license.hostedScriptId ? await getHostedScriptById(license.hostedScriptId) : access.scripts[0];
+  if (!license) return respond(interaction, { content: "❌ No tienes una key activa para este workspace/script. Pulsa Redeem Key y canjea una key válida antes de solicitar el script.", ephemeral: true });
+  const script = license.hostedScriptId ? await getHostedScriptByOwnerId(owner?.id ?? Number(license.ownerId), license.hostedScriptId) : access.scripts[0];
   if (!script) return respond(interaction, { content: "❌ Tu key está activa, pero todavía no hay un script asignado.", ephemeral: true });
   const loader = scriptRuntimeLoader(script, license.keyCode, license.id);
   const copyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId("vanta:copy-loader").setLabel(GET_SCRIPT_COPY_BUTTON_LABEL).setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(panelActionId("copy-loader", owner?.id, panelContext?.hostedScriptId || (script as any).id)).setLabel(GET_SCRIPT_COPY_BUTTON_LABEL).setStyle(ButtonStyle.Secondary),
   );
   return respond(interaction, { content: `📜 **${script.name}**\n\n\`\`\`lua\n${loader}\n\`\`\``, components: [copyRow], ephemeral: true });
 }
 
 async function copyScriptForUser(interaction: any) {
-  const access = await getUserLicenses(interaction.user.id);
+  const owner = await ownerAccount(interaction);
+  const panelContext = getPanelContext(interaction);
+  const access = await getUserLicenses(interaction.user.id, owner?.id, panelContext?.hostedScriptId);
   const license = access.licenses[0];
-  if (!license) return respond(interaction, { content: "❌ No tienes una key activa.", ephemeral: true });
-  const script = license.hostedScriptId ? await getHostedScriptById(license.hostedScriptId) : access.scripts[0];
+  if (!license) return respond(interaction, { content: "❌ No tienes una key activa para este workspace/script.", ephemeral: true });
+  const script = license.hostedScriptId ? await getHostedScriptByOwnerId(owner?.id ?? Number(license.ownerId), license.hostedScriptId) : access.scripts[0];
   if (!script) return respond(interaction, { content: "❌ Tu key no tiene un script asignado.", ephemeral: true });
   return respond(interaction, { content: mobileViewScriptMessage(script, license.keyCode, license.id), ephemeral: true });
 }
@@ -478,9 +510,10 @@ async function configureBuyerRole(interaction: any, role: { id: string }) {
 }
 
 async function getRoleForUser(interaction: any) {
-  const access = await getUserLicenses(interaction.user.id);
-  if (!access.licenses[0]) return respond(interaction, { content: "👤 No tienes una key activa. Canjea una key válida primero.", ephemeral: true });
-  const owner = access.user ? await getUserByOpenId(ENV.ownerOpenId) : await ownerAccount();
+  const owner = await ownerAccount(interaction);
+  const panelContext = getPanelContext(interaction);
+  const access = await getUserLicenses(interaction.user.id, owner?.id, panelContext?.hostedScriptId);
+  if (!access.licenses[0]) return respond(interaction, { content: "👤 No tienes una key activa para este workspace/script. Canjea una key válida primero.", ephemeral: true });
   const roleId = owner ? await getBuyerRoleId(owner.id) : undefined;
   if (!roleId) return respond(interaction, { content: "👤 Tu key está activa, pero el owner todavía no ha configurado el rol comprador con /getrole.", ephemeral: true });
   if (!interaction.guild?.members?.fetch) return respond(interaction, { content: "❌ Este botón solo puede usarse dentro del servidor de Discord.", ephemeral: true });
@@ -495,17 +528,19 @@ async function getRoleForUser(interaction: any) {
 }
 
 async function handleButton(interaction: ButtonInteraction) {
-  if (interaction.customId === "vanta:redeem") {
-    const modal = new ModalBuilder().setCustomId("vanta:redeem-modal").setTitle("Redeem Key");
+  const panelAction = String(interaction.customId).split(":").slice(0, 2).join(":");
+  if (panelAction === "vanta:redeem") {
+    const panelContext = getPanelContext(interaction);
+    const modal = new ModalBuilder().setCustomId(panelActionId("redeem-modal", panelContext?.ownerId, panelContext?.hostedScriptId)).setTitle("Redeem Key");
     const input = new TextInputBuilder().setCustomId("key").setLabel("Key alfanumérica").setStyle(TextInputStyle.Short).setMinLength(32).setMaxLength(64).setRequired(true);
     modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
     return interaction.showModal(modal);
   }
   if (interaction.customId === "vanta:get-key") return getKeyForWhitelistedUser(interaction);
-  if (interaction.customId === "vanta:script") return getScriptForUser(interaction);
-  if (interaction.customId === "vanta:copy-loader") {
+  if (panelAction === "vanta:script") return getScriptForUser(interaction);
+  if (panelAction === "vanta:copy-loader") {
     const updatedRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId("vanta:copy-loader").setLabel(GET_SCRIPT_COPY_BUTTON_LABEL).setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(interaction.customId).setLabel(GET_SCRIPT_COPY_BUTTON_LABEL).setStyle(ButtonStyle.Secondary),
     );
     if (interaction.message?.edit) await interaction.message.edit({ components: [updatedRow] }).catch(() => undefined);
     return copyScriptForUser(interaction);
@@ -520,15 +555,19 @@ async function handleButton(interaction: ButtonInteraction) {
     if (!/^VANTA-[A-Za-z0-9_-]{20,64}$/.test(key)) return respond(interaction, { content: "❌ Esta API key ya no es válida.", ephemeral: true });
     return respond(interaction, { content: `\`${key}\``, ephemeral: true });
   }
-  if (interaction.customId === "vanta:role") return getRoleForUser(interaction);
-  if (interaction.customId === "vanta:hwid") {
-    const reset = await resetLicenseHwidByDiscordUserId(interaction.user.id);
+  if (panelAction === "vanta:role") return getRoleForUser(interaction);
+  if (panelAction === "vanta:hwid") {
+    const owner = await ownerAccount(interaction);
+    const panelContext = getPanelContext(interaction);
+    const reset = await resetLicenseHwidByDiscordUserId(interaction.user.id, false, { ownerId: owner?.id, hostedScriptId: panelContext?.hostedScriptId });
     if (reset.reason === "not_found") return respond(interaction, { content: "❌ No tienes una key activa vinculada a tu Discord.", ephemeral: true });
     if (reset.reason === "cooldown") return respond(interaction, { content: `⏳ El HWID ya fue reiniciado. Podrás volver a hacerlo <t:${Math.floor(reset.retryAt.getTime() / 1000)}:R>.`, ephemeral: true });
     return respond(interaction, { content: "✅ HWID reiniciado correctamente. El próximo reset estará disponible en 24 horas.", ephemeral: true });
   }
-  if (interaction.customId === "vanta:stats") {
-    const access = await getUserLicenses(interaction.user.id);
+  if (panelAction === "vanta:stats") {
+    const owner = await ownerAccount(interaction);
+    const panelContext = getPanelContext(interaction);
+    const access = await getUserLicenses(interaction.user.id, owner?.id, panelContext?.hostedScriptId);
     const license = access.licenses[0];
     if (!license) return respond(interaction, { content: "📊 No tienes una key activa. Usa Redeem Key para comenzar.", ephemeral: true });
     const expires = license.expiresAt ? `<t:${Math.floor(license.expiresAt.getTime() / 1000)}:R>` : "never";
@@ -536,10 +575,10 @@ async function handleButton(interaction: ButtonInteraction) {
   }
 }
 async function handleModal(interaction: any) {
-  if (interaction.customId === "vanta:redeem-modal") return redeem(interaction, interaction.fields.getTextInputValue("key"));
+  if (interaction.customId === "vanta:redeem-modal" || String(interaction.customId).startsWith("vanta:redeem-modal:")) return redeem(interaction, interaction.fields.getTextInputValue("key"), getPanelContext(interaction));
 }
-async function redeem(interaction: any, rawKey: string) {
-  const license = await redeemLicense(rawKey.trim(), interaction.user.id);
+async function redeem(interaction: any, rawKey: string, panelContext?: { ownerId?: number; hostedScriptId?: number }) {
+  const license = await redeemLicense(rawKey.trim(), interaction.user.id, panelContext);
   return respond(interaction, license ? { content: `✅ Key canjeada correctamente: **${license.keyCode}**.`, ephemeral: true } : { content: "❌ Key inválida, expirada o ya vinculada a otra cuenta.", ephemeral: true });
 }
 async function configureKeyRole(interaction: any, role: { id: string }) {
@@ -653,17 +692,19 @@ async function blacklistCommand(interaction: any) {
 
 function selectedTarget(interaction: any) {
   const raw = interaction.options.getString("target");
-  if (raw?.includes(":")) { const [kind, id] = raw.split(":", 2); if ((kind === "user" || kind === "role") && id) return { kind, id }; }
+  if (raw?.includes(":")) { const [kind, rawId] = raw.split(":", 2); const id = normalizeDiscordId(rawId); if ((kind === "user" || kind === "role") && id) return { kind, id }; }
   const targetUser = interaction.options.getUser?.("user");
   const targetRole = interaction.options.getRole?.("role");
-  if (targetUser) return { kind: "user", id: targetUser.id };
-  if (targetRole) return { kind: "role", id: targetRole.id };
+  const userId = normalizeDiscordId(targetUser?.id);
+  const roleId = normalizeDiscordId(targetRole?.id);
+  if (userId) return { kind: "user", id: userId };
+  if (roleId) return { kind: "role", id: roleId };
   return undefined;
 }
 async function whitelistCommand(interaction: any) {
   const target = selectedTarget(interaction);
   const selectedKind = interaction.options.getString("kind");
-  const scriptName = interaction.options.getString("script", true);
+  const scriptName = interaction.options.getString("script", true).trim();
   if (!target) return respond(interaction, { content: "❌ Selecciona un usuario o rol en el desplegable de target.", ephemeral: true });
   if (selectedKind && target.kind !== selectedKind) return respond(interaction, { content: "❌ El target no coincide con el tipo seleccionado. Vuelve a elegirlo en el desplegable.", ephemeral: true });
   return whitelist(interaction, target.id, target.kind, scriptName);
@@ -671,7 +712,7 @@ async function whitelistCommand(interaction: any) {
 async function unwhitelistCommand(interaction: any) {
   const target = selectedTarget(interaction);
   const selectedKind = interaction.options.getString("kind");
-  const scriptName = interaction.options.getString("script", true);
+  const scriptName = interaction.options.getString("script", true).trim();
   if (!target) return respond(interaction, { content: "❌ Selecciona un usuario o rol en el desplegable de target.", ephemeral: true });
   if (selectedKind && target.kind !== selectedKind) return respond(interaction, { content: "❌ El target no coincide con el tipo seleccionado. Vuelve a elegirlo en el desplegable.", ephemeral: true });
   return unwhitelist(interaction, target.id, scriptName);

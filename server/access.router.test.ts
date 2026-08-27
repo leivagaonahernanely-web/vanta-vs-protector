@@ -7,6 +7,8 @@ const dbMocks = vi.hoisted(() => ({
   getWorkspaceUsage: vi.fn().mockResolvedValue({ protections: 0, scripts: 0, keys: 0 }),
   getLicensesByOwner: vi.fn().mockResolvedValue([]),
   getHostedScriptById: vi.fn().mockResolvedValue({ id: 4, userId: 7 }),
+  getHostedScriptByOwnerId: vi.fn().mockResolvedValue({ id: 4, userId: 7 }),
+  getHostedScriptByName: vi.fn().mockResolvedValue({ id: 4, userId: 7, name: "main.lua" }),
   createBlacklist: vi.fn(),
   getBlacklistsByOwner: vi.fn().mockResolvedValue([]),
   createAccessRule: vi.fn(),
@@ -66,9 +68,9 @@ describe("access management", () => {
   });
 
   it("allows a regular authenticated user to generate a normal key for their own script", async () => {
-    const regularUser = { ...user, openId: "another-user", role: "user" as const };
+    const regularUser = { ...user, id: 8, openId: "another-user", role: "user" as const };
     dbMocks.getWorkspaceUsage.mockResolvedValue({ protections: 0, scripts: 0, keys: 0 });
-    dbMocks.getHostedScriptById.mockResolvedValue({ id: 4, userId: regularUser.id });
+    dbMocks.getHostedScriptByOwnerId.mockResolvedValue({ id: 4, userId: regularUser.id });
     dbMocks.createLicense.mockResolvedValue({ id: 4, ownerId: regularUser.id, keyCode: "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6", hostedScriptId: 4, type: "license", status: "active" });
     const result = await appRouter.createCaller({ ...context, user: regularUser }).licenseKeys.generate({ type: "license", hostedScriptId: 4, trialDays: 3 });
     expect(result.keyCode).toMatch(/^[a-z0-9]{32}$/);
@@ -76,8 +78,8 @@ describe("access management", () => {
   });
 
   it("rejects generating a normal key for another user's script", async () => {
-    const regularUser = { ...user, openId: "another-user", role: "user" as const };
-    dbMocks.getHostedScriptById.mockResolvedValue({ id: 4, userId: 999 });
+    const regularUser = { ...user, id: 8, openId: "another-user", role: "user" as const };
+    dbMocks.getHostedScriptByOwnerId.mockResolvedValue({ id: 4, userId: 999 });
     await expect(appRouter.createCaller({ ...context, user: regularUser }).licenseKeys.generate({ type: "license", hostedScriptId: 4, trialDays: 3 })).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
