@@ -128,11 +128,12 @@ describe("Discord OAuth callback", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await routes.get("/api/discord/callback")?.(
-      { query: { code: "real-code", state }, headers: { cookie: `__Host-discord_oauth_state=${nonce}` } },
+      { query: { code: "real-code", state }, protocol: "https", hostname: "vanta-prot-hfw5hmym.manus.space", headers: { cookie: `__Host-discord_oauth_state=${nonce}` }, get: () => "vanta-prot-hfw5hmym.manus.space" },
       response,
     );
 
     expect(mocks.linkDiscordIdentity).toHaveBeenCalledWith(7, "111222333444555666", "Vanta User", "Vanta User", null);
+    expect(response.cookie).toHaveBeenCalledWith("app_session_id", expect.any(String), expect.objectContaining({ secure: true, sameSite: "none", httpOnly: true, path: "/" }));
     expect(response.redirectTarget).toBe("/?discord=connected");
     expect(response.clearCookie).toHaveBeenCalledWith("__Host-discord_oauth_state", expect.objectContaining({ sameSite: "none", path: "/" }));
     vi.unstubAllGlobals();

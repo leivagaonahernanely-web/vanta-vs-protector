@@ -9,16 +9,19 @@ function isIpAddress(host: string) {
 }
 
 function isSecureRequest(req: Request) {
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  if (forwardedProto) {
+    const protoList = Array.isArray(forwardedProto) ? forwardedProto : forwardedProto.split(",");
+    if (protoList.some(proto => proto.trim().toLowerCase() === "https")) return true;
+  }
+
   if (req.protocol === "https") return true;
 
-  const forwardedProto = req.headers["x-forwarded-proto"];
-  if (!forwardedProto) return false;
-
-  const protoList = Array.isArray(forwardedProto)
-    ? forwardedProto
-    : forwardedProto.split(",");
-
-  return protoList.some(proto => proto.trim().toLowerCase() === "https");
+  // Some managed proxies leave req.protocol as http and omit the forwarded
+  // header. Public Manus domains are HTTPS-only, so infer Secure from a real
+  // non-local hostname; otherwise SameSite=None cookies are rejected by Chrome.
+  const hostname = String(req.hostname || req.get?.("host") || "").split(":")[0].toLowerCase();
+  return Boolean(hostname && !LOCAL_HOSTS.has(hostname) && !isIpAddress(hostname));
 }
 
 export function getSessionCookieOptions(
@@ -39,10 +42,11 @@ export function getSessionCookieOptions(
   //       ? hostname
   //       : undefined;
 
+  const secure = isSecureRequest(req);
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req),
+    sameSite: secure ? "none" : "lax",
+    secure,
   };
 }

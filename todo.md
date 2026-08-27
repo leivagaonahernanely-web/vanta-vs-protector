@@ -524,3 +524,6 @@
 
 - [x] Quitar el botón Get Key del panel Discord publicado — el panel ahora conserva cinco acciones: Redeem Key, Get Script, Get Role, Reset HWID y Get Stats
 - [x] Añadir en la web un botón Invitar bot al servidor con enlace oficial de Discord separado del OAuth callback — ruta `/api/discord/invite` con permisos mínimos y scopes bot + applications.commands
+
+- [x] Corregir el ciclo de login Discord que vuelve a la pantalla inicial después de autorizar — cookie de sesión persistente con Secure/SameSite compatibles con dominio público HTTPS
+- [x] Verificar que la cookie de sesión se cree con dominio, ruta y seguridad compatibles con el dominio publicado y móvil — inferencia segura para hosts públicos detrás de proxy y pruebas de callback exitoso
