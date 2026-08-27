@@ -456,3 +456,5 @@
 - [x] Reemplazar “Copiar loadstring entero” por “Mobile View Script” con copiado automático para móvil
 
 - [x] Mover “Mobile View Script” al resultado de Get Script y copiar desde ahí el bloque completo del loader
+
+- [x] Eliminar el botón anterior “Copiar loadstring completo” de Get Script y dejar solo “Mobile View Script”
