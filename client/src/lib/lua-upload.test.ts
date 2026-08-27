@@ -10,8 +10,10 @@ describe("Lua file upload", () => {
     await expect(readLuaFile({ name: "script.lua", size: 12, text: () => Promise.resolve("print('ok')") } as unknown as File)).resolves.toBe("print('ok')");
   });
 
-  it("rejects non-Lua files and oversized files", () => {
-    expect(validateLuaFile({ name: "script.txt", size: 10 })).toBe("Selecciona un archivo .lua");
+  it("accepts Lua text files and rejects unsupported or oversized files", () => {
+    expect(validateLuaFile({ name: "source.txt", size: 10 })).toBeNull();
+    expect(validateLuaFile({ name: "source.luau", size: 10 })).toBeNull();
+    expect(validateLuaFile({ name: "source.exe", size: 10 })).toBe("Selecciona un archivo .lua, .luau o .txt");
     expect(validateLuaFile({ name: "script.lua", size: LUA_SOURCE_LIMIT + 1 })).toBe("El archivo supera el límite de 150 KB");
   });
 });

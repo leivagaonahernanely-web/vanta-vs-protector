@@ -443,3 +443,9 @@
 - [x] Reparar selección y carga de archivos Lua desde móvil y escritorio con botón táctil e input ampliado
 - [x] Hacer cumplir el cooldown persistente de reset HWID en backend, bloqueando repeticiones durante 24 horas y manteniendo bypass administrativo
 - [x] Añadir pruebas de carga Lua y reset HWID bloqueado/permitido durante cooldown
+
+- [x] Corregir definitivamente el selector y la importación de fuentes Lua desde archivos con botón táctil y contenedor no anidado
+- [x] Aceptar archivos `.lua`, `.luau` y `.txt` como fuentes de script
+- [x] Añadir pruebas de importación TXT/Lua y validación de extensiones
+
+- [x] Renombrar el botón de edición solicitado a “Modificar” sin cambiar su acción
