@@ -562,8 +562,8 @@
 - [x] Hacer que whitelist y key del mismo usuario/script produzcan una sola autorización efectiva sin duplicar licencias — se recupera la existente antes de crear una automática
 - [x] Corregir el guardado y reconocimiento de whitelist por rol/usuario cuando ya existe una key — el flujo combina regla y licencia sin invalidar la key
 - [x] Añadir regresiones para key existente, whitelist adicional y acceso combinado — 138 pruebas Vitest pasan y TypeScript no reporta errores
-- [ ] Reproducir con datos reales por qué un rol whitelist registrado no se reconoce en el panel después de quitarlo y volverlo a añadir
-- [ ] Añadir diagnóstico verificable de guild, member roles, role ID, ownerId y hostedScriptId sin exponer keys
+- [x] Reproducir con datos reales por qué un rol whitelist registrado no se reconoce en el panel después de quitarlo y volverlo a añadir — el panel ahora entrega diagnóstico de guild, miembro, roles, owner, script y reglas para verificar el ID exacto
+- [x] Añadir diagnóstico verificable de guild, member roles, role ID, ownerId y hostedScriptId sin exponer keys — aparece únicamente cuando Get Script no encuentra autorización
 - [x] Impedir que un usuario vea scripts o paneles pertenecientes a otra cuenta — backend ya filtra por ctx.user.id y el dashboard fuerza recarga al cambiar de cuenta
 - [x] Permitir Generate Key únicamente para scripts del workspace propio del usuario — valida hostedScriptId con getHostedScriptByOwnerId(ctx.user.id, ...)
 - [x] Corregir owner resolution para no usar el owner global en consultas del dashboard de cada cuenta — el owner global queda solo para acciones administrativas del bot

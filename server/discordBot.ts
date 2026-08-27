@@ -453,21 +453,40 @@ async function getUserLicenses(discordUserId: string, ownerId?: number, hostedSc
   return { user, licenses, scripts };
 }
 
-async function getWhitelistScriptForMember(interaction: any) {
-  const owner = await ownerAccount(interaction);
-  if (!owner) return undefined;
+async function whitelistMemberContext(interaction: any) {
   let member = interaction.member;
   if (interaction.guild?.members?.fetch) {
     try { member = await interaction.guild.members.fetch({ user: interaction.user.id, force: true }); } catch (error) { console.warn("[Discord Bot] Could not fetch member roles for whitelist", error); }
   }
   const roleIds = Array.isArray(member?.roles) ? member.roles : Array.from(member?.roles?.cache?.keys?.() ?? []);
+  return { member, roleIds: roleIds.map((roleId: unknown) => String(roleId).trim()).filter(Boolean) };
+}
+
+export function formatWhitelistDiagnostic(input: { guildId?: string | null; memberId: string; roleIds: string[]; ownerId?: number; panelScriptId?: number; activeRuleIds: string[] }) {
+  return `Diagnóstico · guild=${input.guildId || "none"} · member=${input.memberId} · roles=${input.roleIds.length ? input.roleIds.join(",") : "none"} · owner=${input.ownerId ?? "none"} · script=${input.panelScriptId ?? "none"} · rules=${input.activeRuleIds.length ? input.activeRuleIds.join(",") : "none"}`;
+}
+
+async function getWhitelistScriptForMember(interaction: any) {
+  const owner = await ownerAccount(interaction);
+  if (!owner) return undefined;
+  const { roleIds } = await whitelistMemberContext(interaction);
   const panelScriptId = getPanelContext(interaction)?.hostedScriptId;
-  const rules = (await getAccessRulesByOwner(owner.id)).filter((rule: any) => (!panelScriptId || Number(rule.hostedScriptId) === panelScriptId) && matchesWhitelistRule(rule, interaction.user.id, roleIds));
-  for (const rule of rules) {
+  const allRules = await getAccessRulesByOwner(owner.id);
+  const scopedRules = allRules.filter((rule: any) => (!panelScriptId || Number(rule.hostedScriptId) === panelScriptId) && matchesWhitelistRule(rule, interaction.user.id, roleIds));
+  for (const rule of scopedRules) {
     const script = await getHostedScriptByOwnerId(owner.id, Number(rule.hostedScriptId));
     if (script) return { owner, script };
   }
   return undefined;
+}
+
+async function whitelistDiagnostic(interaction: any) {
+  const owner = await ownerAccount(interaction);
+  const { roleIds } = await whitelistMemberContext(interaction);
+  const panelScriptId = getPanelContext(interaction)?.hostedScriptId;
+  const rules = owner ? await getAccessRulesByOwner(owner.id) : [];
+  const activeRuleIds = rules.filter((rule: any) => Number(rule.active) !== 0 && (!panelScriptId || Number(rule.hostedScriptId) === panelScriptId)).map((rule: any) => `${rule.kind}:${rule.discordId}@${rule.hostedScriptId ?? "none"}`);
+  return formatWhitelistDiagnostic({ guildId: interaction.guildId, memberId: String(interaction.user?.id ?? "unknown"), roleIds, ownerId: owner?.id, panelScriptId, activeRuleIds });
 }
 
 async function getKeyForWhitelistedUser(interaction: any) {
@@ -504,7 +523,7 @@ async function panelAccess(interaction: any) {
 
 async function getScriptForUser(interaction: any) {
   const panel = await panelAccess(interaction);
-  if (!panel.license) return respond(interaction, { content: "❌ Tu usuario o rol no está en la whitelist de este script. Pide al owner que te añada y vuelve a pulsar Get Script.", ephemeral: true });
+  if (!panel.license) return respond(interaction, { content: `❌ Tu usuario o rol no está en la whitelist de este script. Pide al owner que te añada y vuelve a pulsar Get Script.\n\n\`${await whitelistDiagnostic(interaction)}\``, ephemeral: true });
   if (!panel.script) return respond(interaction, { content: "❌ Tu acceso está activo, pero todavía no hay un script asignado.", ephemeral: true });
   const loader = scriptRuntimeLoader(panel.script, panel.license.keyCode, panel.license.id);
   const copyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createReconnectGate, discordCommands, GET_SCRIPT_COPY_BUTTON_LABEL, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, isConfiguredOwnerId, isGuildOwner, matchesWhitelistRule, mobileViewScriptMessage, panelMessage, parseDuration, respond, scriptRuntimeLoader, targetChoices } from "./discordBot";
+import { createReconnectGate, discordCommands, formatWhitelistDiagnostic, GET_SCRIPT_COPY_BUTTON_LABEL, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, isConfiguredOwnerId, isGuildOwner, matchesWhitelistRule, mobileViewScriptMessage, panelMessage, parseDuration, respond, scriptRuntimeLoader, targetChoices } from "./discordBot";
 import * as db from "./db";
 
 describe("Discord access panel", () => {
@@ -203,6 +203,14 @@ describe("Discord access panel", () => {
     expect(isGuildOwner({ actorId: "guild-owner", guildOwnerId: "guild-owner" })).toBe(true);
     expect(isGuildOwner({ actorId: "other-user", guildOwnerId: "guild-owner" })).toBe(false);
     expect(isGuildOwner({ actorId: "guild-owner", guildOwnerId: null })).toBe(false);
+  });
+
+  it("formats a safe whitelist diagnostic with guild, member, roles and script context", () => {
+    const diagnostic = formatWhitelistDiagnostic({ guildId: "1500000000000000001", memberId: "1500000000000000002", roleIds: ["1500000000000000003"], ownerId: 7, panelScriptId: 9, activeRuleIds: ["role:1500000000000000003@9"] });
+    expect(diagnostic).toContain("guild=1500000000000000001");
+    expect(diagnostic).toContain("roles=1500000000000000003");
+    expect(diagnostic).toContain("script=9");
+    expect(diagnostic).not.toContain("keyCode");
   });
 
   it("matches active whitelist rules against the member Discord identity and roles", () => {
