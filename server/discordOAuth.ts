@@ -1,9 +1,12 @@
 import crypto from "node:crypto";
 import type { Express, Request, Response } from "express";
 import { parse as parseCookie } from "cookie";
-import { linkDiscordIdentity } from "./db";
+import { getUserByDiscordUserId, getUserByOpenId, linkDiscordIdentity, upsertUser } from "./db";
 import { createContext } from "./_core/context";
 import { ENV } from "./_core/env";
+import { getSessionCookieOptions } from "./_core/cookies";
+import { sdk } from "./_core/sdk";
+import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const";
 
 const STATE_COOKIE = "__Host-discord_oauth_state";
 const CALLBACK_PATH = "/api/discord/callback";
@@ -97,14 +100,19 @@ export function registerDiscordOAuthRoutes(app: Express) {
       const discordUser = await userResponse.json() as DiscordUser;
       if (!discordUser.id || !discordUser.username) throw new Error("Discord identity missing");
 
-      const currentUser = (await createContext({ req, res } as never)).user;
+      let currentUser: any = (await createContext({ req, res } as never)).user;
+      if (!currentUser) currentUser = await getUserByDiscordUserId(discordUser.id);
       if (!currentUser) {
-        res.redirect("/?discord=login-required");
-        return;
+        const openId = `discord:${discordUser.id}`;
+        await upsertUser({ openId, name: discordUser.global_name || discordUser.username, email: null, loginMethod: "discord", lastSignedIn: new Date() });
+        currentUser = await getUserByOpenId(openId);
       }
+      if (!currentUser) throw new Error("No se pudo crear la cuenta Discord");
       const displayName = discordUser.global_name || discordUser.username;
       const avatarUrl = discordUser.avatar ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png?size=128` : null;
       await linkDiscordIdentity(currentUser.id, discordUser.id, displayName, discordUser.global_name || null, avatarUrl);
+      const sessionToken = await sdk.createSessionToken(currentUser.openId, { name: displayName, expiresInMs: ONE_YEAR_MS });
+      res.cookie(COOKIE_NAME, sessionToken, { ...getSessionCookieOptions(req), maxAge: ONE_YEAR_MS });
       res.redirect("/?discord=connected");
     } catch (error) {
       console.error("[Discord OAuth] Callback failed", error);

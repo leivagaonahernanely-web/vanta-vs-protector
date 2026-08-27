@@ -435,3 +435,7 @@
 - [x] Generar loader visible compacto de dos líneas con URL opaca, sin exponer el parámetro HWID en el snippet
 - [x] Mantener validación server-side de key y HWID mediante una segunda etapa del loader
 - [x] Añadir pruebas del nuevo loader compacto, FFA, key inválida y HWID bloqueado
+
+- [x] Corregir el loader compacto para que funcione en el executor real sin volver al snippet grande mediante endpoint de segunda etapa firmado
+- [x] Cambiar el acceso principal de la web a Discord OAuth y conservar la vinculación de cuenta
+- [x] Añadir pruebas del loader compacto funcional y del login principal por Discord

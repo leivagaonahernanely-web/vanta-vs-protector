@@ -2,10 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   linkDiscordIdentity: vi.fn().mockResolvedValue(undefined),
-  createContext: vi.fn().mockResolvedValue({ user: { id: 7 } }),
+  getUserByDiscordUserId: vi.fn(),
+  getUserByOpenId: vi.fn(),
+  upsertUser: vi.fn().mockResolvedValue(undefined),
+  createContext: vi.fn().mockResolvedValue({ user: { id: 7, openId: "existing-user" } }),
 }));
 
-vi.mock("./db", () => ({ linkDiscordIdentity: mocks.linkDiscordIdentity }));
+vi.mock("./db", () => ({ linkDiscordIdentity: mocks.linkDiscordIdentity, getUserByDiscordUserId: mocks.getUserByDiscordUserId, getUserByOpenId: mocks.getUserByOpenId, upsertUser: mocks.upsertUser }));
 vi.mock("./_core/context", () => ({ createContext: mocks.createContext }));
 
 import { registerDiscordOAuthRoutes } from "./discordOAuth";
@@ -68,6 +71,26 @@ describe("Discord OAuth callback", () => {
     await routes.get("/api/discord/callback")?.({ query: { code: "real-code", state }, headers: { cookie: `__Host-discord_oauth_state=${nonce}` } }, callbackResponse);
     expect(callbackResponse.statusCode).toBe(200);
     expect(callbackResponse.redirectTarget).toBe("/?discord=connected");
+    vi.unstubAllGlobals();
+  });
+
+  it("creates a web session directly when Discord is the first login", async () => {
+    const routes = registeredRoutes();
+    const nonce = "nonce-direct-login";
+    const redirectUri = "https://example.com/api/discord/callback";
+    const state = Buffer.from(JSON.stringify({ nonce, redirectUri }), "utf8").toString("base64url");
+    mocks.createContext.mockResolvedValueOnce({ user: null });
+    mocks.getUserByDiscordUserId.mockResolvedValueOnce(undefined);
+    mocks.getUserByOpenId.mockResolvedValueOnce({ id: 8, openId: "discord:111222333444555666" });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "access-token" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "111222333444555666", username: "discord-user", global_name: "Discord User" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const response = responseMock();
+    await routes.get("/api/discord/callback")?.({ query: { code: "real-code", state }, headers: { cookie: `__Host-discord_oauth_state=${nonce}` } }, response);
+    expect(mocks.upsertUser).toHaveBeenCalledWith(expect.objectContaining({ openId: "discord:111222333444555666", loginMethod: "discord" }));
+    expect(response.cookie).toHaveBeenCalled();
+    expect(response.redirectTarget).toBe("/?discord=connected");
     vi.unstubAllGlobals();
   });
 
