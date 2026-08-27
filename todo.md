@@ -478,3 +478,5 @@
 - [x] Corregir el 403 HTML al crear scripts, especialmente con sources grandes, sin afectar la privacidad ni el loader — backend alineado a 2 MB y error HTML normalizado
 
 - [x] Hacer cumplir el cooldown de reset HWID por licencia y bloquear resets repetidos antes del intervalo permitido
+
+- [x] Unificar web, botón Discord y `/resethwid` para impedir resets repetidos y dejar bypass solo en la acción administrativa explícita — el cooldown ahora es obligatorio en todas las rutas

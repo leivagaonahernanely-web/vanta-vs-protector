@@ -481,9 +481,10 @@ async function resetHwidCommand(interaction: any) {
   const target = interaction.options.getUser("user", true);
   const result = await canManageKeys(interaction);
   if (!result.allowed) return respond(interaction, { content: "⛔ Solo el propietario, un administrador o el rol delegado puede reiniciar HWID.", ephemeral: true });
-  const reset = await resetLicenseHwidByDiscordUserId(target.id, true);
+  const reset = await resetLicenseHwidByDiscordUserId(target.id);
   if (reset.reason === "not_found") return respond(interaction, { content: "❌ No se encontraron keys activas para ese usuario.", ephemeral: true });
-  return respond(interaction, { content: `✅ HWID reiniciado para <@${target.id}> en el script indicado.`, ephemeral: true });
+  if (reset.reason === "cooldown") return respond(interaction, { content: `⏳ Ese usuario ya reinició su HWID. Podrá volver a hacerlo <t:${Math.floor(reset.retryAt.getTime() / 1000)}:R>.`, ephemeral: true });
+  return respond(interaction, { content: `✅ HWID reiniciado para <@${target.id}> en el script indicado. El próximo reset estará disponible en 24 horas.`, ephemeral: true });
 }
 
 async function addTime(interaction: any, key: string, rawDuration: string) {
