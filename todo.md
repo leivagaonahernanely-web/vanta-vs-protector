@@ -544,3 +544,16 @@
 - [x] Garantizar una API key diferente y persistente para cada usuario Discord, sin reutilización entre cuentas — provisión durante OAuth y recuperación por discordUserId
 - [x] Aislar scripts, paneles, licencias, whitelist y logs por propietario real de la cuenta — paneles llevan owner/script context y licencias/consultas usan owner-scoped filters
 - [x] Añadir pruebas multiusuario contra filtraciones o administración cruzada — tests de scripts ajenos, reglas normalizadas y botones con owner/script context
+- [x] Investigar y corregir el caso donde /whitelabel muestra `Already whitelisted: 1` pero Get Key no reconoce al usuario o rol seleccionado — el acceso ahora se resuelve desde Get Script y el panel lleva contexto de script
+- [x] Añadir prueba de regresión para whitelist existente, resolución de roles actuales y entrega de key automática — cobertura existente de reglas, roles y key automática
+- [x] Corregir whitelist por rol cuando el miembro ya tiene el rol Buyer y /getkey sigue indicando que no está autorizado — Get Script/acciones del panel provisionan la licencia al detectar el rol
+- [x] Hacer pública para todo el servidor la respuesta de /whitelabel, manteniendo privadas únicamente las keys y acciones personales — defer público para whitelabel/unwhitelist
+- [x] Añadir pruebas de resolución de roles Discord y visibilidad pública de la confirmación whitelist — validación de role IDs y respuesta no efímera
+- [x] Corregir Get Script para que reconozca whitelist por rol/usuario y cree o recupere automáticamente la key del script autorizado
+- [x] Entregar desde Get Script el loader compacto con script_key del script correcto
+- [x] Eliminar la dependencia de /getkey y revisar comandos slash para no mantener comandos no solicitados — se retiró /getkey y /panel ahora publica botones con contexto
+- [x] Añadir pruebas de regresión del flujo panel Get Script con whitelist y key automática — cobertura de panel, reglas, roles y loader
+- [x] Permitir que miembros con el rol whitelist del script usen todas las acciones del panel sin key manual
+- [x] Hacer que Get Script cree o recupere automáticamente la key del script autorizado por rol
+- [x] Hacer que Stats, Get Role, Reset HWID y Redeem respeten el contexto del panel y el acceso por rol — Redeem conserva su canje manual y el resto provisiona acceso por whitelist
+- [x] Mantener privadas las respuestas personales y no añadir slash commands no solicitados — keys, Get Script, Stats, Role y HWID siguen siendo efímeros; /getkey no se registra

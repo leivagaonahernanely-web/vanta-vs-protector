@@ -136,9 +136,10 @@ describe("Discord access panel", () => {
 
   it("registers slash commands for every panel action", () => {
     const names = discordCommands.map((command: any) => command.name);
-    expect(names).toEqual(["ping", "panel", "stats", "apikey", "getscript", "getkey", "getrole", "redeem", "generatekey", "deletekey", "whitelabel", "unwhitelist", "blacklist", "resethwid", "addtime", "warn", "dropkey", "prices", "updates", "generatekeyrol"]);
+    expect(names).toEqual(["ping", "panel", "stats", "apikey", "getscript", "getrole", "redeem", "generatekey", "deletekey", "whitelabel", "unwhitelist", "blacklist", "resethwid", "addtime", "warn", "dropkey", "prices", "updates", "generatekeyrol"]);
     expect(new Set(names).size).toBe(names.length);
     expect(names).toContain("getscript");
+    expect(names).not.toContain("getkey");
     expect(names).toContain("getrole");
     expect(names).toContain("stats");
     expect(names).toContain("apikey");

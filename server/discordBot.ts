@@ -60,7 +60,6 @@ export const discordCommands = [
   new SlashCommandBuilder().setName("stats").setDescription("Muestra el estado del acceso").toJSON(),
   new SlashCommandBuilder().setName("apikey").setDescription("Muestra la API key de tu cuenta vinculada").toJSON(),
   new SlashCommandBuilder().setName("getscript").setDescription("Obtiene el enlace de acceso al script").toJSON(),
-  new SlashCommandBuilder().setName("getkey").setDescription("Entrega la key automática si estás en la whitelist").toJSON(),
   new SlashCommandBuilder().setName("getrole").setDescription("Configura el rol que recibirá un usuario con key activa").addRoleOption(o => o.setName("role").setDescription("Rol comprador").setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("redeem").setDescription("Canjea una key de acceso").addStringOption(o => o.setName("key").setDescription("Key alfanumérica de mínimo 32 caracteres").setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("generatekey").setDescription("Genera una key aleatoria para un script hosteado").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addStringOption(o => o.setName("duration").setDescription("Duración; vacío = forever").setRequired(false)).toJSON(),
@@ -215,7 +214,8 @@ async function prepareInteraction(interaction: any) {
   // can be deferred. Every other interaction gets an acknowledgement before DB
   // and Discord API work so Discord never displays “The application did not respond”.
   if (interaction.isAutocomplete?.() || (interaction.isButton?.() && String(interaction.customId ?? "").startsWith("vanta:redeem"))) return;
-  const ephemeral = interaction.isModalSubmit?.() || interaction.isButton?.() || interaction.commandName !== "panel" && interaction.commandName !== "prices" && interaction.commandName !== "updates" && interaction.commandName !== "dropkey";
+  const publicCommand = ["panel", "prices", "updates", "dropkey", "whitelabel", "unwhitelist"].includes(String(interaction.commandName ?? ""));
+  const ephemeral = interaction.isModalSubmit?.() || interaction.isButton?.() || !publicCommand;
   await interaction.deferReply({ ephemeral });
 }
 export function mobileViewScriptMessage(script: any, accessKey: string, licenseId: number) {
@@ -388,14 +388,17 @@ export async function handleInteraction(interaction: any) {
     if (interaction.commandName === "ping") return respond(interaction, { content: `Pong · ${Math.round(client?.ws.ping ?? 0)}ms`, ephemeral: true });
     if (interaction.commandName === "panel") {
       if (!(await isConfiguredOwner(interaction))) return respond(interaction, { content: "⛔ Solo el owner vinculado desde la web puede publicar el panel.", ephemeral: true });
-      return respond(interaction, panelMessage());
+      const owner = await ownerAccount(interaction);
+      const scripts = owner ? await getHostedScriptsByUser(owner.id) : [];
+      const script = scripts[0];
+      if (!owner || !script) return respond(interaction, { content: "❌ No hay un script hosteado para asociar a este panel. Créalo primero desde la web.", ephemeral: true });
+      return respond(interaction, panelMessage({ ownerId: owner.id, hostedScriptId: script.id }));
     }
     if (interaction.commandName === "prices") return prices(interaction);
     if (interaction.commandName === "updates") return updates(interaction);
     if (interaction.commandName === "stats") return respond(interaction, { content: "Vanta.vs Protector está conectado. Usa el dashboard web para consultar scripts, licencias y actividad.", ephemeral: true });
     if (interaction.commandName === "apikey") return apiKeyForUser(interaction);
     if (interaction.commandName === "getscript") return getScriptForUser(interaction);
-    if (interaction.commandName === "getkey") return getKeyForWhitelistedUser(interaction);
     if (interaction.commandName === "getrole") return configureBuyerRole(interaction, interaction.options.getRole("role", true));
     if (interaction.commandName === "redeem") return redeem(interaction, interaction.options.getString("key", true));
     if (interaction.commandName === "resethwid") return resetHwidCommand(interaction);
@@ -455,7 +458,7 @@ async function getWhitelistScriptForMember(interaction: any) {
   if (!owner) return undefined;
   let member = interaction.member;
   if (interaction.guild?.members?.fetch) {
-    try { member = await interaction.guild.members.fetch(interaction.user.id); } catch (error) { console.warn("[Discord Bot] Could not fetch member roles for whitelist", error); }
+    try { member = await interaction.guild.members.fetch({ user: interaction.user.id, force: true }); } catch (error) { console.warn("[Discord Bot] Could not fetch member roles for whitelist", error); }
   }
   const roleIds = Array.isArray(member?.roles) ? member.roles : Array.from(member?.roles?.cache?.keys?.() ?? []);
   const panelScriptId = getPanelContext(interaction)?.hostedScriptId;
@@ -476,30 +479,39 @@ async function getKeyForWhitelistedUser(interaction: any) {
   return respond(interaction, { content: `✅ **Whitelist verificada** para **${match.script.name}**.\n\nTu key automática:\n\`${license.keyCode}\`\n\nEsta key queda vinculada a tu cuenta de Discord y al script autorizado.`, ephemeral: true });
 }
 
-async function getScriptForUser(interaction: any) {
+async function panelAccess(interaction: any) {
   const owner = await ownerAccount(interaction);
   const panelContext = getPanelContext(interaction);
-  const access = await getUserLicenses(interaction.user.id, owner?.id, panelContext?.hostedScriptId);
-  const license = access.licenses[0];
-  if (!license) return respond(interaction, { content: "❌ No tienes una key activa para este workspace/script. Pulsa Redeem Key y canjea una key válida antes de solicitar el script.", ephemeral: true });
-  const script = license.hostedScriptId ? await getHostedScriptByOwnerId(owner?.id ?? Number(license.ownerId), license.hostedScriptId) : access.scripts[0];
-  if (!script) return respond(interaction, { content: "❌ Tu key está activa, pero todavía no hay un script asignado.", ephemeral: true });
-  const loader = scriptRuntimeLoader(script, license.keyCode, license.id);
+  if (!owner || !panelContext?.hostedScriptId) return { owner, script: undefined, license: undefined };
+  const access = await getUserLicenses(interaction.user.id, owner.id, panelContext.hostedScriptId);
+  let license = access.licenses[0];
+  let script = license?.hostedScriptId ? await getHostedScriptByOwnerId(owner.id, license.hostedScriptId) : undefined;
+  if (!license) {
+    const match = await getWhitelistScriptForMember(interaction);
+    if (match) {
+      script = match.script;
+      license = await createLicense({ ownerId: match.owner.id, hostedScriptId: match.script.id, keyCode: keyCode(), type: "license", status: "active", discordUserId: interaction.user.id, hwid: null, expiresAt: null });
+    }
+  }
+  return { owner, script, license };
+}
+
+async function getScriptForUser(interaction: any) {
+  const panel = await panelAccess(interaction);
+  if (!panel.license) return respond(interaction, { content: "❌ Tu usuario o rol no está en la whitelist de este script. Pide al owner que te añada y vuelve a pulsar Get Script.", ephemeral: true });
+  if (!panel.script) return respond(interaction, { content: "❌ Tu acceso está activo, pero todavía no hay un script asignado.", ephemeral: true });
+  const loader = scriptRuntimeLoader(panel.script, panel.license.keyCode, panel.license.id);
   const copyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(panelActionId("copy-loader", owner?.id, panelContext?.hostedScriptId || (script as any).id)).setLabel(GET_SCRIPT_COPY_BUTTON_LABEL).setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(panelActionId("copy-loader", panel.owner?.id, panel.script.id)).setLabel(GET_SCRIPT_COPY_BUTTON_LABEL).setStyle(ButtonStyle.Secondary),
   );
-  return respond(interaction, { content: `📜 **${script.name}**\n\n\`\`\`lua\n${loader}\n\`\`\``, components: [copyRow], ephemeral: true });
+  return respond(interaction, { content: `📜 **${panel.script.name}**\n\n\`\`\`lua\n${loader}\n\`\`\``, components: [copyRow], ephemeral: true });
 }
 
 async function copyScriptForUser(interaction: any) {
-  const owner = await ownerAccount(interaction);
-  const panelContext = getPanelContext(interaction);
-  const access = await getUserLicenses(interaction.user.id, owner?.id, panelContext?.hostedScriptId);
-  const license = access.licenses[0];
-  if (!license) return respond(interaction, { content: "❌ No tienes una key activa para este workspace/script.", ephemeral: true });
-  const script = license.hostedScriptId ? await getHostedScriptByOwnerId(owner?.id ?? Number(license.ownerId), license.hostedScriptId) : access.scripts[0];
-  if (!script) return respond(interaction, { content: "❌ Tu key no tiene un script asignado.", ephemeral: true });
-  return respond(interaction, { content: mobileViewScriptMessage(script, license.keyCode, license.id), ephemeral: true });
+  const panel = await panelAccess(interaction);
+  if (!panel.license) return respond(interaction, { content: "❌ Tu usuario o rol no está en la whitelist de este script.", ephemeral: true });
+  if (!panel.script) return respond(interaction, { content: "❌ Tu acceso está activo, pero no hay un script asignado.", ephemeral: true });
+  return respond(interaction, { content: mobileViewScriptMessage(panel.script, panel.license.keyCode, panel.license.id), ephemeral: true });
 }
 
 async function configureBuyerRole(interaction: any, role: { id: string }) {
@@ -510,11 +522,9 @@ async function configureBuyerRole(interaction: any, role: { id: string }) {
 }
 
 async function getRoleForUser(interaction: any) {
-  const owner = await ownerAccount(interaction);
-  const panelContext = getPanelContext(interaction);
-  const access = await getUserLicenses(interaction.user.id, owner?.id, panelContext?.hostedScriptId);
-  if (!access.licenses[0]) return respond(interaction, { content: "👤 No tienes una key activa para este workspace/script. Canjea una key válida primero.", ephemeral: true });
-  const roleId = owner ? await getBuyerRoleId(owner.id) : undefined;
+  const panel = await panelAccess(interaction);
+  if (!panel.license) return respond(interaction, { content: "👤 Tu usuario o rol no está en la whitelist de este script.", ephemeral: true });
+  const roleId = panel.owner ? await getBuyerRoleId(panel.owner.id) : undefined;
   if (!roleId) return respond(interaction, { content: "👤 Tu key está activa, pero el owner todavía no ha configurado el rol comprador con /getrole.", ephemeral: true });
   if (!interaction.guild?.members?.fetch) return respond(interaction, { content: "❌ Este botón solo puede usarse dentro del servidor de Discord.", ephemeral: true });
   try {
@@ -557,19 +567,17 @@ async function handleButton(interaction: ButtonInteraction) {
   }
   if (panelAction === "vanta:role") return getRoleForUser(interaction);
   if (panelAction === "vanta:hwid") {
-    const owner = await ownerAccount(interaction);
-    const panelContext = getPanelContext(interaction);
-    const reset = await resetLicenseHwidByDiscordUserId(interaction.user.id, false, { ownerId: owner?.id, hostedScriptId: panelContext?.hostedScriptId });
+    const panel = await panelAccess(interaction);
+    if (!panel.license) return respond(interaction, { content: "❌ Tu usuario o rol no está en la whitelist de este script.", ephemeral: true });
+    const reset = await resetLicenseHwidByDiscordUserId(interaction.user.id, false, { ownerId: panel.owner?.id, hostedScriptId: panel.script?.id });
     if (reset.reason === "not_found") return respond(interaction, { content: "❌ No tienes una key activa vinculada a tu Discord.", ephemeral: true });
     if (reset.reason === "cooldown") return respond(interaction, { content: `⏳ El HWID ya fue reiniciado. Podrás volver a hacerlo <t:${Math.floor(reset.retryAt.getTime() / 1000)}:R>.`, ephemeral: true });
     return respond(interaction, { content: "✅ HWID reiniciado correctamente. El próximo reset estará disponible en 24 horas.", ephemeral: true });
   }
   if (panelAction === "vanta:stats") {
-    const owner = await ownerAccount(interaction);
-    const panelContext = getPanelContext(interaction);
-    const access = await getUserLicenses(interaction.user.id, owner?.id, panelContext?.hostedScriptId);
-    const license = access.licenses[0];
-    if (!license) return respond(interaction, { content: "📊 No tienes una key activa. Usa Redeem Key para comenzar.", ephemeral: true });
+    const panel = await panelAccess(interaction);
+    const license = panel.license;
+    if (!license) return respond(interaction, { content: "📊 Tu usuario o rol no está en la whitelist de este script.", ephemeral: true });
     const expires = license.expiresAt ? `<t:${Math.floor(license.expiresAt.getTime() / 1000)}:R>` : "never";
     return respond(interaction, { content: `📊 **Access Stats**\nKey: \`${license.keyCode}\`\nExpires: ${expires}\nHWID bound: ${license.hwid ? "yes" : "no (unbound)"}\nNext user reset: gestionado por el cooldown del panel.`, ephemeral: true });
   }
