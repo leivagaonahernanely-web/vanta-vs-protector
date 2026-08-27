@@ -459,7 +459,7 @@
 
 - [x] Eliminar el botón anterior “Copiar loadstring completo” de Get Script y dejar solo “Mobile View Script”
 
-- [ ] Corregir el error “El Gateway Discord no está conectado” y validar la reconexión del bot
+- [x] Corregir el error “El Gateway Discord no está conectado” y validar la reconexión del bot — restaurado el modo original y confirmado Gateway online con comandos slash sincronizados
 
 - [x] Comparar los dos videos y adaptar el flujo al recorrido más cómodo del segundo
 
