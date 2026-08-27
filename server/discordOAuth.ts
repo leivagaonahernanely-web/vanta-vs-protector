@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import type { Express, Request, Response } from "express";
 import { parse as parseCookie } from "cookie";
-import { getUserByDiscordUserId, getUserByOpenId, linkDiscordIdentity, upsertUser } from "./db";
+import { ensureUserApiKey, getUserByDiscordUserId, getUserByOpenId, linkDiscordIdentity, upsertUser } from "./db";
 import { createContext } from "./_core/context";
 import { ENV } from "./_core/env";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -134,6 +134,9 @@ export function registerDiscordOAuthRoutes(app: Express) {
       const displayName = discordUser.global_name || discordUser.username;
       const avatarUrl = discordUser.avatar ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png?size=128` : null;
       await linkDiscordIdentity(currentUser.id, discordUser.id, displayName, discordUser.global_name || null, avatarUrl);
+      // Provision the user's persistent API key as part of Discord login so every
+      // account receives it immediately, even before the first dashboard query.
+      await ensureUserApiKey(currentUser.id);
       const sessionToken = await sdk.createSessionToken(currentUser.openId, { name: displayName, expiresInMs: ONE_YEAR_MS });
       res.cookie(COOKIE_NAME, sessionToken, { ...getSessionCookieOptions(req), maxAge: ONE_YEAR_MS });
       res.redirect("/?discord=connected");

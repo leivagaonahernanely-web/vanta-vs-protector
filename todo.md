@@ -529,3 +529,11 @@
 - [x] Verificar que la cookie de sesión se cree con dominio, ruta y seguridad compatibles con el dominio publicado y móvil — inferencia segura para hosts públicos detrás de proxy y pruebas de callback exitoso
 
 - [x] Corregir la expiración de la cookie temporal Discord OAuth: 600 ms debe ser 10 minutos (600000 ms) — ahora emite Max-Age=600 y conserva el state durante 10 minutos
+
+- [ ] Diagnosticar por qué la invitación del bot no permite añadirlo a otros servidores
+- [ ] Verificar scopes, permisos y configuración de instalación de la aplicación Discord
+
+- [x] Entregar una API key persistente automáticamente a cada usuario que inicia sesión con Discord — se provisiona durante el callback y también se recupera desde auth.me
+- [x] Permitir que cada usuario genere keys para sus propios scripts desde la web — Generate / Manage visible para cuentas autenticadas y limitado a scripts propios
+- [x] Mantener Plan Keys/Owner Key y key panel exclusivos del owner — la generación keyKind=plan conserva la comprobación owner/admin
+- [x] Aislar scripts y keys para impedir acceso cruzado entre usuarios — se verifica hostedScript.userId antes de crear una licencia y las mutaciones siguen owner-scoped

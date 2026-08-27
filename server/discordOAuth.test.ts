@@ -5,10 +5,11 @@ const mocks = vi.hoisted(() => ({
   getUserByDiscordUserId: vi.fn(),
   getUserByOpenId: vi.fn(),
   upsertUser: vi.fn().mockResolvedValue(undefined),
+  ensureUserApiKey: vi.fn().mockResolvedValue("VANTA-test-api-key"),
   createContext: vi.fn().mockResolvedValue({ user: { id: 7, openId: "existing-user" } }),
 }));
 
-vi.mock("./db", () => ({ linkDiscordIdentity: mocks.linkDiscordIdentity, getUserByDiscordUserId: mocks.getUserByDiscordUserId, getUserByOpenId: mocks.getUserByOpenId, upsertUser: mocks.upsertUser }));
+vi.mock("./db", () => ({ linkDiscordIdentity: mocks.linkDiscordIdentity, getUserByDiscordUserId: mocks.getUserByDiscordUserId, getUserByOpenId: mocks.getUserByOpenId, upsertUser: mocks.upsertUser, ensureUserApiKey: mocks.ensureUserApiKey }));
 vi.mock("./_core/context", () => ({ createContext: mocks.createContext }));
 
 import { registerDiscordOAuthRoutes } from "./discordOAuth";

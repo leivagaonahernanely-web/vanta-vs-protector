@@ -6,6 +6,7 @@ const dbMocks = vi.hoisted(() => ({
   createLicense: vi.fn(),
   getWorkspaceUsage: vi.fn().mockResolvedValue({ protections: 0, scripts: 0, keys: 0 }),
   getLicensesByOwner: vi.fn().mockResolvedValue([]),
+  getHostedScriptById: vi.fn().mockResolvedValue({ id: 4, userId: 7 }),
   createBlacklist: vi.fn(),
   getBlacklistsByOwner: vi.fn().mockResolvedValue([]),
   createAccessRule: vi.fn(),
@@ -41,10 +42,10 @@ describe("access management", () => {
     expect(dbMocks.createLicense).toHaveBeenCalledWith(expect.objectContaining({ keyCode: expect.stringMatching(/^PREMIUM-[a-z0-9]{16}$/) }));
   });
 
-  it("persists the selected plan for an automatic key", async () => {
-    dbMocks.createLicense.mockResolvedValue({ id: 2, ownerId: 7, plan: "premium", keyCode: "1234567890", type: "license", status: "active", hostedScriptId: null, discordUserId: null, hwid: null, expiresAt: null, createdAt: new Date(), updatedAt: new Date() });
-    await appRouter.createCaller(context).licenseKeys.generate({ type: "license", plan: "premium", hostedScriptId: 4, durationValue: 1, durationUnit: "years" });
-    expect(dbMocks.createLicense).toHaveBeenCalledWith(expect.objectContaining({ plan: "premium" }));
+  it("uses the free tier for an automatic script key", async () => {
+    dbMocks.createLicense.mockResolvedValue({ id: 2, ownerId: 7, plan: "free", keyCode: "1234567890", type: "license", status: "active", hostedScriptId: 4, discordUserId: null, hwid: null, expiresAt: null, createdAt: new Date(), updatedAt: new Date() });
+    await appRouter.createCaller(context).licenseKeys.generate({ type: "license", hostedScriptId: 4, durationValue: 1, durationUnit: "years" });
+    expect(dbMocks.createLicense).toHaveBeenCalledWith(expect.objectContaining({ plan: "free", hostedScriptId: 4 }));
   });
 
   it("redeems a plan key and returns the activated plan", async () => {
@@ -64,14 +65,30 @@ describe("access management", () => {
     await expect(appRouter.createCaller(context).licenseKeys.generate({ type: "license", plan: "free", hostedScriptId: 4, durationValue: 1, durationUnit: "days" })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
-  it("rejects an administrator whose identity is not the configured owner", async () => {
-    const otherAdmin = { ...user, openId: "another-admin" };
-    await expect(appRouter.createCaller({ ...context, user: otherAdmin }).licenseKeys.generate({ type: "license", plan: "free", trialDays: 3 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  it("allows a regular authenticated user to generate a normal key for their own script", async () => {
+    const regularUser = { ...user, openId: "another-user", role: "user" as const };
+    dbMocks.getWorkspaceUsage.mockResolvedValue({ protections: 0, scripts: 0, keys: 0 });
+    dbMocks.getHostedScriptById.mockResolvedValue({ id: 4, userId: regularUser.id });
+    dbMocks.createLicense.mockResolvedValue({ id: 4, ownerId: regularUser.id, keyCode: "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6", hostedScriptId: 4, type: "license", status: "active" });
+    const result = await appRouter.createCaller({ ...context, user: regularUser }).licenseKeys.generate({ type: "license", hostedScriptId: 4, trialDays: 3 });
+    expect(result.keyCode).toMatch(/^[a-z0-9]{32}$/);
+    expect(dbMocks.createLicense).toHaveBeenCalledWith(expect.objectContaining({ ownerId: regularUser.id, hostedScriptId: 4, plan: "free" }));
   });
 
-  it("rejects non-admin key generation", async () => {
+  it("rejects generating a normal key for another user's script", async () => {
+    const regularUser = { ...user, openId: "another-user", role: "user" as const };
+    dbMocks.getHostedScriptById.mockResolvedValue({ id: 4, userId: 999 });
+    await expect(appRouter.createCaller({ ...context, user: regularUser }).licenseKeys.generate({ type: "license", hostedScriptId: 4, trialDays: 3 })).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("keeps Plan Key generation restricted to the configured owner", async () => {
+    const otherAdmin = { ...user, openId: "another-admin" };
+    await expect(appRouter.createCaller({ ...context, user: otherAdmin }).licenseKeys.generate({ type: "license", plan: "premium", keyKind: "plan", trialDays: 3 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("rejects Plan Key generation for a regular user", async () => {
     const regularUser = { ...user, role: "user" as const };
-    await expect(appRouter.createCaller({ ...context, user: regularUser }).licenseKeys.generate({ type: "license", plan: "free", trialDays: 3 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(appRouter.createCaller({ ...context, user: regularUser }).licenseKeys.generate({ type: "license", plan: "premium", keyKind: "plan", trialDays: 3 })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("requires authentication for license management", async () => {

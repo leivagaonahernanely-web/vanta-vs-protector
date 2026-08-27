@@ -227,22 +227,29 @@ export const appRouter = router({
   }),
 
   licenseKeys: router({
-    list: ownerProcedure.query(async ({ ctx }) => {
+    list: protectedProcedure.query(async ({ ctx }) => {
       const rows = await getLicensesByOwner(ctx.user.id);
       return rows.filter((row) => !/^(?:PRO|PREMIUM)-/i.test(row.keyCode));
     }),
-    generate: ownerProcedure.input(licenseInput).mutation(async ({ ctx, input }) => {
+    generate: protectedProcedure.input(licenseInput).mutation(async ({ ctx, input }) => {
+      if (input.keyKind === "plan" && !(ENV.ownerOpenId && ctx.user.openId === ENV.ownerOpenId && ctx.user.role === "admin")) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Solo el owner puede generar Plan Keys." });
+      }
       if (input.keyKind === "normal" && !input.hostedScriptId) throw new TRPCError({ code: "BAD_REQUEST", message: "Selecciona el script hosteado para esta key." });
+      if (input.keyKind === "normal") {
+        const script = await getHostedScriptById(input.hostedScriptId!);
+        if (!script || script.userId !== ctx.user.id) throw new TRPCError({ code: "NOT_FOUND", message: "Ese script no pertenece a tu cuenta." });
+      }
       await assertWorkspaceQuota(ctx.user.id, (ctx.user as typeof ctx.user & { plan?: PlanTier }).plan, "keys");
       const durationDays = input.durationValue ? durationToDays(input.durationValue, input.durationUnit as DurationUnit) : undefined;
       const expiresAt = durationDays ? new Date(Date.now() + durationDays * 86_400_000) : null;
-      const row = await createLicense({ ownerId: ctx.user.id, plan: input.plan, hostedScriptId: input.hostedScriptId ?? null, keyCode: input.keyKind === "plan" ? generatePlanKeyCode(input.plan) : generateNormalKeyCode(), type: input.type, status: "active", discordUserId: input.discordUserId ?? null, hwid: null, expiresAt });
+      const row = await createLicense({ ownerId: ctx.user.id, plan: input.keyKind === "plan" ? input.plan : "free", hostedScriptId: input.hostedScriptId ?? null, keyCode: input.keyKind === "plan" ? generatePlanKeyCode(input.plan) : generateNormalKeyCode(), type: input.type, status: "active", discordUserId: input.discordUserId ?? null, hwid: null, expiresAt });
       if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No se pudo generar la licencia." });
       return row;
     }),
-    revoke: ownerProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => revokeLicense(ctx.user.id, input.id)),
-    remove: ownerProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => deleteLicense(ctx.user.id, input.id)),
-    resetHwid: ownerProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    revoke: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => revokeLicense(ctx.user.id, input.id)),
+    remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => deleteLicense(ctx.user.id, input.id)),
+    resetHwid: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const result = await resetLicenseHwid(ctx.user.id, input.id);
       if (!result.reset && result.reason === "cooldown") {
         throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `El HWID ya fue reiniciado. Podrás volver a hacerlo el ${result.retryAt.toLocaleString()}.` });
