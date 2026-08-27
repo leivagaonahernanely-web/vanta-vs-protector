@@ -64,8 +64,8 @@ export const discordCommands = [
   new SlashCommandBuilder().setName("redeem").setDescription("Canjea una key de acceso").addStringOption(o => o.setName("key").setDescription("Key alfanumérica de mínimo 32 caracteres").setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("generatekey").setDescription("Genera una key aleatoria para un script hosteado").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addStringOption(o => o.setName("duration").setDescription("Duración; vacío = forever").setRequired(false)).toJSON(),
   new SlashCommandBuilder().setName("deletekey").setDescription("Elimina una key").addStringOption(o => o.setName("key").setDescription("Key a eliminar").setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario opcional").setRequired(false)).addRoleOption(o => o.setName("role").setDescription("Rol opcional").setRequired(false)).toJSON(),
-  new SlashCommandBuilder().setName("whitelabel").setDescription("Añade un usuario o rol a la whitelist").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addStringOption(o => o.setName("kind").setDescription("User o Role").addChoices({ name: "User", value: "user" }, { name: "Role", value: "role" }).setRequired(true)).addStringOption(o => o.setName("target").setDescription("Selecciona el usuario o rol").setAutocomplete(true).setRequired(true)).toJSON(),
-  new SlashCommandBuilder().setName("unwhitelist").setDescription("Retira un usuario o rol de la whitelist").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addStringOption(o => o.setName("kind").setDescription("User o Role").addChoices({ name: "User", value: "user" }, { name: "Role", value: "role" }).setRequired(true)).addStringOption(o => o.setName("target").setDescription("Selecciona el usuario o rol").setAutocomplete(true).setRequired(true)).toJSON(),
+  new SlashCommandBuilder().setName("whitelabel").setDescription("Añade un usuario o rol a la whitelist").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario del servidor").setRequired(false)).addRoleOption(o => o.setName("role").setDescription("Rol del servidor").setRequired(false)).toJSON(),
+  new SlashCommandBuilder().setName("unwhitelist").setDescription("Retira un usuario o rol de la whitelist").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario del servidor").setRequired(false)).addRoleOption(o => o.setName("role").setDescription("Rol del servidor").setRequired(false)).toJSON(),
   new SlashCommandBuilder().setName("blacklist").setDescription("Bloquea un usuario para un script").addStringOption(o => o.setName("script").setDescription("Script objetivo").setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario obligatorio").setRequired(true)).addStringOption(o => o.setName("reason").setDescription("Razón").setRequired(false)).toJSON(),
   new SlashCommandBuilder().setName("resethwid").setDescription("Reinicia el HWID de un usuario").addStringOption(o => o.setName("script").setDescription("Script objetivo").setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario obligatorio").setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("addtime").setDescription("Añade tiempo a una key").addStringOption(o => o.setName("key").setDescription("Key obligatoria").setRequired(true)).addStringOption(o => o.setName("duration").setDescription("Tiempo a añadir").setRequired(true)).toJSON(),
@@ -160,12 +160,13 @@ async function ownerAccount(interaction?: any) {
     const panelOwner = await getUserById(panelContext.ownerId);
     if (panelOwner) return panelOwner;
   }
-  const configuredOwner = ENV.ownerOpenId ? await getUserByOpenId(ENV.ownerOpenId) : undefined;
-  if (configuredOwner) return configuredOwner;
   const actorId = normalizeDiscordIdentity(interaction?.user?.id);
-  if (!actorId) return undefined;
-  const linkedAdmin = await getUserByDiscordUserId(actorId);
-  return linkedAdmin?.role === "admin" ? linkedAdmin : undefined;
+  if (actorId) {
+    const linkedUser = await getUserByDiscordUserId(actorId);
+    if (linkedUser) return linkedUser;
+  }
+  const configuredOwner = ENV.ownerOpenId ? await getUserByOpenId(ENV.ownerOpenId) : undefined;
+  return configuredOwner;
 }
 async function warmScriptChoiceCache() {
   try {
@@ -757,20 +758,26 @@ function selectedTarget(interaction: any) {
   if (roleId) return { kind: "role", id: roleId };
   return undefined;
 }
+function nativeWhitelistTarget(interaction: any) {
+  const user = interaction.options.getUser?.("user");
+  const role = interaction.options.getRole?.("role");
+  if (user && role) return { error: "❌ Selecciona solo un destino: usuario o rol, no ambos." };
+  if (user) return { kind: "user" as const, id: normalizeDiscordId(user.id), label: `<@${user.id}>` };
+  if (role) return { kind: "role" as const, id: normalizeDiscordId(role.id), label: `<@&${role.id}>` };
+  return { error: "❌ Selecciona un usuario o un rol del servidor en las opciones nativas." };
+}
 async function whitelistCommand(interaction: any) {
-  const target = selectedTarget(interaction);
-  const selectedKind = interaction.options.getString("kind");
+  const target = nativeWhitelistTarget(interaction);
   const scriptName = interaction.options.getString("script", true).trim();
-  if (!target) return respond(interaction, { content: "❌ Selecciona un usuario o rol en el desplegable de target.", ephemeral: true });
-  if (selectedKind && target.kind !== selectedKind) return respond(interaction, { content: "❌ El target no coincide con el tipo seleccionado. Vuelve a elegirlo en el desplegable.", ephemeral: true });
+  if ("error" in target) return respond(interaction, { content: target.error, ephemeral: true });
+  if (!target.id) return respond(interaction, { content: "❌ El destino seleccionado no tiene un ID Discord válido.", ephemeral: true });
   return whitelist(interaction, target.id, target.kind, scriptName);
 }
 async function unwhitelistCommand(interaction: any) {
-  const target = selectedTarget(interaction);
-  const selectedKind = interaction.options.getString("kind");
+  const target = nativeWhitelistTarget(interaction);
   const scriptName = interaction.options.getString("script", true).trim();
-  if (!target) return respond(interaction, { content: "❌ Selecciona un usuario o rol en el desplegable de target.", ephemeral: true });
-  if (selectedKind && target.kind !== selectedKind) return respond(interaction, { content: "❌ El target no coincide con el tipo seleccionado. Vuelve a elegirlo en el desplegable.", ephemeral: true });
+  if ("error" in target) return respond(interaction, { content: target.error, ephemeral: true });
+  if (!target.id) return respond(interaction, { content: "❌ El destino seleccionado no tiene un ID Discord válido.", ephemeral: true });
   return unwhitelist(interaction, target.id, scriptName);
 }
 

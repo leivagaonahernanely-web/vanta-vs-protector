@@ -577,3 +577,12 @@
 - [x] Hacer que target muestre y acepte menciones visibles de roles y usuarios del servidor — muestra `@Rol` y `@Usuario`, conservando el identificador técnico internamente
 - [x] Diferenciar el mensaje de usuario sin key del mensaje de usuario sin whitelist — Get Script mantiene la autorización por key y reporta whitelist solo cuando no hay licencia
 - [x] Añadir pruebas para whitelist en script 240002 y selección target role/user — 140 pruebas Vitest pasan y TypeScript no reporta errores
+- [x] Reemplazar /whitelist por script + user opcional + role opcional con opciones nativas de Discord
+- [x] Reemplazar /unwhitelist por el mismo formato separado de user y role
+- [x] Impedir que user y role se mezclen y exigir al menos uno de los dos destinos — el dispatcher rechaza ambos o ninguno
+- [x] Publicar el resultado con Whitelisted, conteos, duración, Role ID, Script ID y canal — embed público conserva conteos y contexto
+- [x] Añadir pruebas del contrato nuevo y eliminar la dependencia de kind + target — 140 pruebas Vitest pasan
+- [x] Corregir el autocomplete de /generatekey para que muestre los scripts propios de cada usuario — ownerAccount prioriza la cuenta Discord vinculada
+- [x] Verificar que Generate Key permita crear keys reales solo para scripts del workspace autenticado — mantiene filtro por owner y script exacto
+- [x] Impedir que una cuenta vea scripts o paneles de otra cuenta en Discord y web — consultas y caché usan la identidad vinculada
+- [x] Completar y probar el nuevo contrato nativo de whitelist y unwhitelist — bot reiniciado y comandos sincronizados
