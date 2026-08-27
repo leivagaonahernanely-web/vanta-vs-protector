@@ -490,3 +490,5 @@
 
 - [x] Eliminar cualquier límite residual de 150 KB y aceptar hasta 2 MB medidos en bytes UTF-8
 - [x] Preservar emojis y Unicode durante carga, compresión, decodificación y guardado de sources
+
+- [x] Aumentar la capacidad de `hostedScripts.code` y `sourceCode` para almacenar artefactos de hasta 2 MB con emojis

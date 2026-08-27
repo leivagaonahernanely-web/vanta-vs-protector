@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { int, mediumtext, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -60,8 +60,8 @@ export const hostedScripts = mysqlTable("hostedScripts", {
   description: varchar("description", { length: 500 }),
   ffaMode: int("ffaMode").default(0).notNull(),
   scriptKey: varchar("scriptKey", { length: 128 }),
-  code: text("code").notNull(),
-  sourceCode: text("sourceCode"),
+  code: mediumtext("code").notNull(),
+  sourceCode: mediumtext("sourceCode"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
