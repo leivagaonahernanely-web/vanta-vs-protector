@@ -516,3 +516,5 @@
 - [x] Corregir el fallo del bot que deja los comandos slash sin respuesta aunque el Gateway aparezca en línea — respuestas diferidas, fallback para comandos obsoletos y cierre seguro de errores
 
 - [x] Mantener compatibilidad con Autoscale sin cambiar el modo de hosting y mejorar la reconexión/respuesta del bot mientras la instancia esté activa — se conserva Autoscale y se evita bloquear las interacciones
+
+- [x] Corregir Invalid Discord OAuth state en el callback publicado y mantener el state seguro entre móvil y Discord — cookie temporal con SameSite=None y política request-aware

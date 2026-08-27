@@ -41,7 +41,7 @@ describe("Discord OAuth callback", () => {
     const response = responseMock();
     await routes.get("/api/discord/start")?.({ query: {}, protocol: "https", headers: {}, get: () => "example.com" }, response);
     expect(String(response.redirectTarget)).toContain(encodeURIComponent("https://example.com/api/discord/callback"));
-    expect(response.cookie).toHaveBeenCalledWith("__Host-discord_oauth_state", expect.any(String), expect.objectContaining({ sameSite: "lax", secure: true }));
+    expect(response.cookie).toHaveBeenCalledWith("__Host-discord_oauth_state", expect.any(String), expect.objectContaining({ sameSite: "none", secure: true, httpOnly: true, path: "/" }));
   });
 
   it("generates the same canonical callback for preview and published hosts", async () => {
@@ -123,7 +123,7 @@ describe("Discord OAuth callback", () => {
 
     expect(mocks.linkDiscordIdentity).toHaveBeenCalledWith(7, "111222333444555666", "Vanta User", "Vanta User", null);
     expect(response.redirectTarget).toBe("/?discord=connected");
-    expect(response.clearCookie).toHaveBeenCalled();
+    expect(response.clearCookie).toHaveBeenCalledWith("__Host-discord_oauth_state", expect.objectContaining({ sameSite: "none", path: "/" }));
     vi.unstubAllGlobals();
   });
 });
