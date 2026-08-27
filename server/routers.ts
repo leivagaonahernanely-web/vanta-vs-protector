@@ -7,7 +7,8 @@ import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { createAccessRule, createBlacklist, createDiscordPanel, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getDiscordPanelsByOwner, getHostedScriptSourceByUser, getHostedScriptsByUser, getHostedScriptById, updateHostedScript, deleteHostedScript, getWorkspaceUsage, getKeyAuditLogsByOwner, deleteKeyAuditLogsByOwner, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, redeemPlanKey, updateDiscordChannelId, ensureUserApiKey } from "./db";
 import { nanoid } from "nanoid";
-import { randomInt } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
+import { gunzipSync } from "node:zlib";
 import { checkDiscordChannel, getDiscordBotIdentity, sendDiscordChannelMessage } from "./discord";
 import { deletePublishedPanel, getDiscordGatewayStatus, publishDiscordPanel, publishPricesMessage, publishUpdatesMessage } from "./discordBot";
 import { getProtectionAdapterStatus, getProviderStatus, protectWithAdapter } from "./protection";
@@ -25,17 +26,20 @@ const hostedScriptInput = z.object({
   description: z.string().trim().max(500).optional(),
   source: z.string().min(1).max(2_000_000).optional(),
   sourceBase64: z.string().min(1).max(2_800_000).optional(),
+  sourceGzipBase64: z.string().min(1).max(2_800_000).optional(),
   ffaMode: z.boolean().default(false),
   scriptKey: z.string().trim().regex(/^(?:FREE|PRO|PREMIUM)-[a-z0-9]{16}$/i).optional(),
   obfuscateSource: z.boolean().default(true),
-}).refine((input) => Boolean(input.source || input.sourceBase64), { message: "La source es obligatoria." });
+}).refine((input) => Boolean(input.source || input.sourceBase64 || input.sourceGzipBase64), { message: "La source es obligatoria." });
 
-function decodeHostedSource(input: { source?: string; sourceBase64?: string }) {
+function decodeHostedSource(input: { source?: string; sourceBase64?: string; sourceGzipBase64?: string }) {
   if (input.source) return input.source;
-  if (!input.sourceBase64) throw new TRPCError({ code: "BAD_REQUEST", message: "La source es obligatoria." });
+  if (!input.sourceBase64 && !input.sourceGzipBase64) throw new TRPCError({ code: "BAD_REQUEST", message: "La source es obligatoria." });
   let source: string;
   try {
-    source = Buffer.from(input.sourceBase64, "base64").toString("utf8");
+    const encoded = input.sourceGzipBase64 || input.sourceBase64!;
+    const bytes = Buffer.from(encoded, "base64");
+    source = input.sourceGzipBase64 ? gunzipSync(bytes).toString("utf8") : bytes.toString("utf8");
   } catch {
     throw new TRPCError({ code: "BAD_REQUEST", message: "La source codificada no es válida." });
   }

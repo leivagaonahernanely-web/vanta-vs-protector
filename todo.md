@@ -485,3 +485,5 @@
 - [x] Cambiar la etiqueta real de Get Script de “Copiar loadstring completo” a “Mobile View Script”
 
 - [x] Eliminar definitivamente `Unexpected token '<'` en la mutación que sigue devolviendo HTML en vez de JSON — source enviada en base64 y decodificada server-side
+
+- [x] Verificar y corregir el 403 HTML que continúa en la versión publicada al alojar una source — payload gzip+base64 para reducir el body
