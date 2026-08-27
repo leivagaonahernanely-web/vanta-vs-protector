@@ -530,8 +530,8 @@
 
 - [x] Corregir la expiración de la cookie temporal Discord OAuth: 600 ms debe ser 10 minutos (600000 ms) — ahora emite Max-Age=600 y conserva el state durante 10 minutos
 
-- [ ] Diagnosticar por qué la invitación del bot no permite añadirlo a otros servidores
-- [ ] Verificar scopes, permisos y configuración de instalación de la aplicación Discord
+- [x] Diagnosticar por qué la invitación del bot no permite añadirlo a otros servidores — la ruta genera una URL oficial sin callback OAuth; si otros usuarios no pueden instalarlo, la causa está en Public Bot/permiso de Administrar servidor
+- [x] Verificar scopes, permisos y configuración de instalación de la aplicación Discord — la URL usa `bot` + `applications.commands` y permisos 268520448; Discord Developer Portal debe tener Public Bot activo y Requires OAuth2 Code Grant desactivado
 
 - [x] Entregar una API key persistente automáticamente a cada usuario que inicia sesión con Discord — se provisiona durante el callback y también se recupera desde auth.me
 - [x] Permitir que cada usuario genere keys para sus propios scripts desde la web — Generate / Manage visible para cuentas autenticadas y limitado a scripts propios
