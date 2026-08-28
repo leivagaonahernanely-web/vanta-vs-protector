@@ -90,6 +90,16 @@ describe("Home authenticated dashboard render", () => {
     expect(updatesMutate).toHaveBeenCalledWith({ title: "Nueva versión", description: "Correcciones y mejoras.", channelId: "123456789012345678" });
   });
 
+  it("renders Plans with usage, plan cards and separated redeem area", () => {
+    const html = renderToStaticMarkup(<Home initialSection="Plans" />);
+    expect(html).toContain("Planes y beneficios");
+    expect(html).toContain("Free Plan");
+    expect(html).toContain("Pro Plan");
+    expect(html).toContain("Premium Plan");
+    expect(html).toContain("Activar plan");
+    expect(html).not.toContain("Accepted Payments");
+  });
+
   it("renders the informative Overview with one navigation entry per destination and bot status", () => {
     const html = renderToStaticMarkup(<Home />);
     expect(html).toContain("Workspace / Overview");

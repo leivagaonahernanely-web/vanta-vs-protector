@@ -218,7 +218,7 @@ async function prepareInteraction(interaction: any) {
   // can be deferred. Every other interaction gets an acknowledgement before DB
   // and Discord API work so Discord never displays “The application did not respond”.
   if (interaction.isAutocomplete?.() || (interaction.isButton?.() && String(interaction.customId ?? "").startsWith("vanta:redeem"))) return;
-  const publicCommand = ["panel", "prices", "updates", "dropkey", "whitelabel", "unwhitelist"].includes(String(interaction.commandName ?? ""));
+  const publicCommand = ["panel", "prices", "updates", "dropkey", "warn", "whitelabel", "unwhitelist"].includes(String(interaction.commandName ?? ""));
   const ephemeral = interaction.isModalSubmit?.() || interaction.isButton?.() || !publicCommand;
   await interaction.deferReply({ ephemeral });
 }

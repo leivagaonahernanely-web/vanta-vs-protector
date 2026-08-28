@@ -261,7 +261,7 @@ export default function Home(props: any = {}) {
   const activePlan = PLAN_DEFINITIONS.find((plan) => plan.id === selectedPlan) ?? PLAN_DEFINITIONS[0];
   const workspaceUsage = workspaceUsageQuery.data;
   const workspacePlan = PLAN_DEFINITIONS.find((plan) => plan.id === (workspaceUsage?.plan ?? user?.plan ?? "free")) ?? PLAN_DEFINITIONS[0];
-  const remaining = (limit: number | "unlimited", used: number) => limit === "unlimited" ? "Ilimitadas" : String(Math.max(0, limit - used));
+  const remaining = (limit: number | "unlimited", used: number) => { if (limit === "unlimited") return "Ilimitadas"; const safeUsed = Number.isFinite(Number(used)) ? Number(used) : 0; return String(Math.max(0, Number(limit) - safeUsed)); };
   const overviewCopy = getOverviewCopy();
   return <div className="app-shell">
     <aside className={`sidebar ${mobileOpen ? "open" : ""}`}>

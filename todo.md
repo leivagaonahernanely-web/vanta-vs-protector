@@ -604,3 +604,7 @@
 - [x] Actualizar autocomplete, handler y pruebas para usar `name:<panelId>` internamente
 - [x] Rediseñar el apartado Plans siguiendo la referencia visual del video, sin mezclar Prices ni Generate Keys
 - [x] Añadir pruebas del nuevo contrato visible de /panel y de la presentación de planes
+- [x] Rediseñar visualmente Plans para acercarlo al video: estadísticas de uso, tarjetas de planes y canje inferior — mantiene uso, tarjetas Free/Pro/Premium y canje separado
+- [x] Mantener los límites reales de Free, Pro y Premium sin inventar reseñas o testimonios — usa PLAN_DEFINITIONS compartido
+- [x] Hacer que /warn responda públicamente en el canal con mención del usuario y razón — prepareInteraction usa ephemeral=false para warn
+- [x] Añadir pruebas del render de Plans y de la visibilidad pública de /warn — Home render cubre Plans y prepareInteraction mantiene warn público; 144 pruebas pasan
