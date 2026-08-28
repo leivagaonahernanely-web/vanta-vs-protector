@@ -150,6 +150,8 @@ describe("Discord access panel", () => {
   it("exposes the requested required and optional slash options", () => {
     const command = (name: string) => discordCommands.find((item: any) => item.name === name) as any;
     const options = (name: string) => command(name).options;
+    expect(options("panel").find((item: any) => item.name === "panel").required).toBe(true);
+    expect(options("panel").find((item: any) => item.name === "panel").autocomplete).toBe(true);
     expect(options("generatekey").find((item: any) => item.name === "script").required).toBe(true);
     expect(options("generatekey").find((item: any) => item.name === "duration").required).toBe(false);
     expect(options("getrole")).toHaveLength(1);
@@ -176,6 +178,13 @@ describe("Discord access panel", () => {
     expect(options("addtime").every((item: any) => item.required)).toBe(true);
     expect(options("warn").every((item: any) => item.required)).toBe(true);
     expect(options("dropkey").find((item: any) => item.name === "amount").required).toBe(true);
+  });
+
+  it("autocompletes existing panels for the linked workspace", async () => {
+    vi.spyOn(db, "getUserByDiscordUserId").mockResolvedValue({ id: 7, discordUserId: "owner-id" } as any);
+    vi.spyOn(db, "getDiscordPanelsByOwner").mockResolvedValue([{ id: 21, name: "Panel principal", targetScript: "Vanta Script", channelId: "123456789012345678" }] as any);
+    const interaction = { options: { getFocused: () => ({ name: "panel", value: "principal" }) }, user: { id: "owner-id" } };
+    await expect(targetChoices(interaction)).resolves.toEqual([{ name: "Panel principal · Vanta Script", value: "panel:21" }]);
   });
 
   it("autocompletes hosted scripts for the owner with cache support", async () => {

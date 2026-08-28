@@ -19,6 +19,8 @@ export const users = mysqlTable("users", {
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   plan: mysqlEnum("plan", ["free", "pro", "premium"]).default("free").notNull(),
   discordChannelId: varchar("discordChannelId", { length: 32 }),
+  pricesChannelId: varchar("pricesChannelId", { length: 32 }),
+  updatesChannelId: varchar("updatesChannelId", { length: 32 }),
   discordUserId: varchar("discordUserId", { length: 32 }),
   discordUsername: varchar("discordUsername", { length: 128 }),
   discordNickname: varchar("discordNickname", { length: 128 }),

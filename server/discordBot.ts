@@ -36,6 +36,7 @@ import {
   getHostedScriptById,
   getHostedScriptByOwnerId,
   getHostedScriptsByUser,
+  getDiscordPanelsByOwner,
   getLicensesByOwner,
   getActiveLicensesByDiscordUserId,
   getApiKeyByDiscordUserId,
@@ -56,7 +57,7 @@ const PANEL_URL = "https://vanta-prot-hfw5hmym.manus.space";
 export const GET_SCRIPT_COPY_BUTTON_LABEL = "Mobile View Script";
 export const discordCommands = [
   new SlashCommandBuilder().setName("ping").setDescription("Verifica la latencia del bot").toJSON(),
-  new SlashCommandBuilder().setName("panel").setDescription("Publica el panel de Vanta.vs Protector").toJSON(),
+  new SlashCommandBuilder().setName("panel").setDescription("Publica un panel existente de Vanta.vs Protector").addStringOption(o => o.setName("panel").setDescription("Panel existente").setAutocomplete(true).setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("stats").setDescription("Muestra el estado del acceso").toJSON(),
   new SlashCommandBuilder().setName("apikey").setDescription("Muestra la API key de tu cuenta vinculada").toJSON(),
   new SlashCommandBuilder().setName("getscript").setDescription("Obtiene el enlace de acceso al script").toJSON(),
@@ -346,6 +347,12 @@ export function startDiscordBot() {
 export async function targetChoices(interaction: any) {
   const focused = interaction.options.getFocused?.(true);
   const query = String(focused?.value ?? "").toLowerCase();
+  if (focused?.name === "panel") {
+    const owner = await ownerAccount(interaction);
+    if (!owner) return [];
+    const panels = await getDiscordPanelsByOwner(owner.id);
+    return panels.filter((panel: any) => !query || `${panel.name} ${panel.channelId} ${panel.targetScript}`.toLowerCase().includes(query)).slice(0, 25).map((panel: any) => ({ name: `${panel.name} · ${panel.targetScript}`.slice(0, 100), value: `panel:${panel.id}` }));
+  }
   if (focused?.name === "script") {
     const owner = await ownerAccount(interaction);
     if (!owner) return [];
@@ -394,10 +401,14 @@ export async function handleInteraction(interaction: any) {
     if (interaction.commandName === "panel") {
       if (!(await isConfiguredOwner(interaction))) return respond(interaction, { content: "⛔ Solo el owner vinculado desde la web puede publicar el panel.", ephemeral: true });
       const owner = await ownerAccount(interaction);
-      const scripts = owner ? await getHostedScriptsByUser(owner.id) : [];
-      const script = scripts[0];
-      if (!owner || !script) return respond(interaction, { content: "❌ No hay un script hosteado para asociar a este panel. Créalo primero desde la web.", ephemeral: true });
-      return respond(interaction, panelMessage({ ownerId: owner.id, hostedScriptId: script.id }));
+      const selected = interaction.options.getString("panel", true);
+      const panelId = Number(selected.replace(/^panel:/, ""));
+      const panels = owner ? await getDiscordPanelsByOwner(owner.id) : [];
+      const panel = panels.find((item: any) => item.id === panelId);
+      if (!owner || !panel) return respond(interaction, { content: "❌ Selecciona un panel existente de tu workspace.", ephemeral: true });
+      const script = await getHostedScriptByName(owner.id, panel.targetScript);
+      if (!script) return respond(interaction, { content: "❌ El script asociado a ese panel ya no pertenece a tu workspace.", ephemeral: true });
+      return respond(interaction, { content: `✅ Panel **${panel.name}** colocado con **${script.name}**.`, ephemeral: false, ...panelMessage({ ownerId: owner.id, hostedScriptId: script.id }) });
     }
     if (interaction.commandName === "prices") return prices(interaction);
     if (interaction.commandName === "updates") return updates(interaction);

@@ -594,3 +594,9 @@
 - [x] Evitar consultas duplicadas de roles, scripts y licencias en cada interacción del panel — caché breve de roles y reglas/script en paralelo
 - [x] Mejorar jerarquía visual, estados de carga y feedback del dashboard manteniendo secciones separadas — microinteracciones, foco visible y estados táctiles consistentes
 - [x] Validar rendimiento en móvil y escritorio con pruebas y capturas antes del checkpoint — TypeScript correcto, 140 pruebas Vitest pasando y preview reiniciado
+- [x] Hacer que /panel liste y permita elegir únicamente paneles Discord ya creados — autocomplete por workspace y opción obligatoria panel existente
+- [x] Impedir que /panel cree o publique en un panel/canal fuera de los paneles registrados — resuelve panelId contra la lista del owner
+- [x] Añadir canal independiente configurable para Prices — columna persistente, validación Discord y campo manual
+- [x] Añadir canal independiente configurable para Updates — columna persistente, validación Discord y campo manual
+- [x] Mejorar visualmente la UI de selección y configuración manteniendo cada función separada — Prices/Updates dejaron de reutilizar selectores de panel
+- [x] Añadir pruebas de aislamiento de canales y selección de panel existente — 143 pruebas Vitest pasan

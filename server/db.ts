@@ -158,6 +158,12 @@ export async function updateDiscordChannelId(userId: number, discordChannelId: s
   await db.update(users).set({ discordChannelId }).where(eq(users.id, userId));
 }
 
+export async function updateDiscordContentChannels(userId: number, channels: { pricesChannelId?: string | null; updatesChannelId?: string | null }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(users).set(channels).where(eq(users.id, userId));
+}
+
 export async function linkDiscordIdentity(userId: number, discordUserId: string, discordUsername: string, discordNickname?: string | null, discordAvatarUrl?: string | null) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");

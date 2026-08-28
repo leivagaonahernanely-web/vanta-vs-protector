@@ -74,7 +74,7 @@ describe("Home authenticated dashboard render", () => {
     fireEvent.change(screen.getByPlaceholderText("Nombre de tu script o marca"), { target: { value: "Vanta.vs APP" } });
     fireEvent.change(screen.getAllByPlaceholderText("Ej. Duels Script")[0], { target: { value: "Duels Script" } });
     fireEvent.change(screen.getAllByPlaceholderText("Una línea por plan o método de pago...")[0], { target: { value: "$7 USD" } });
-    fireEvent.change(screen.getByLabelText("Panel existente para publicar"), { target: { value: "123456789012345678" } });
+    fireEvent.change(screen.getByPlaceholderText("ID del canal de Prices (15–22 dígitos)"), { target: { value: "123456789012345678" } });
     fireEvent.click(screen.getByRole("button", { name: /Publicar Prices/i }));
     expect(pricesMutate).toHaveBeenCalledWith(expect.objectContaining({ title: "Vanta.vs APP", channelId: "123456789012345678" }));
     expect(pricesMutate.mock.calls[0][0].description).toContain("**Duels Script**\n$7 USD");
@@ -85,7 +85,7 @@ describe("Home authenticated dashboard render", () => {
     render(<Home initialSection="Updates" />);
     fireEvent.change(screen.getByPlaceholderText("Ej. Nueva versión disponible"), { target: { value: "Nueva versión" } });
     fireEvent.change(screen.getByPlaceholderText("Escribe los cambios, correcciones y avisos importantes..."), { target: { value: "Correcciones y mejoras." } });
-    fireEvent.change(screen.getByLabelText("Panel existente para publicar"), { target: { value: "123456789012345678" } });
+    fireEvent.change(screen.getByPlaceholderText("ID del canal de Updates (15–22 dígitos)"), { target: { value: "123456789012345678" } });
     fireEvent.click(screen.getByRole("button", { name: /Publicar actualización/i }));
     expect(updatesMutate).toHaveBeenCalledWith({ title: "Nueva versión", description: "Correcciones y mejoras.", channelId: "123456789012345678" });
   });

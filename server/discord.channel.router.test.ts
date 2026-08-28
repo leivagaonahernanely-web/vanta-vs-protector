@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TrpcContext } from "./_core/context";
 
-const dbMocks = vi.hoisted(() => ({ updateDiscordChannelId: vi.fn() }));
+const dbMocks = vi.hoisted(() => ({ updateDiscordChannelId: vi.fn(), updateDiscordContentChannels: vi.fn() }));
 const discordMocks = vi.hoisted(() => ({ checkDiscordChannel: vi.fn() }));
 
 vi.mock("./db", async () => ({ ...(await vi.importActual<typeof import("./db")>("./db")), ...dbMocks }));
@@ -34,5 +34,21 @@ describe("discord.updateChannel", () => {
     const result = await appRouter.createCaller(context).discord.updateChannel({ discordChannelId: "123456789012345678" });
     expect(result).toEqual({ ok: true, channelId: "123456789012345678" });
     expect(dbMocks.updateDiscordChannelId).toHaveBeenCalledWith(user.id, "123456789012345678");
+  });
+});
+
+describe("discord.updateContentChannels", () => {
+  it("validates and persists Prices and Updates independently", async () => {
+    discordMocks.checkDiscordChannel.mockResolvedValue({ ok: true, channelId: "123456789012345678" });
+    const result = await appRouter.createCaller(context).discord.updateContentChannels({ pricesChannelId: "123456789012345678", updatesChannelId: "123456789012345679" });
+    expect(result).toEqual({ ok: true, pricesChannelId: "123456789012345678", updatesChannelId: "123456789012345679" });
+    expect(dbMocks.updateDiscordContentChannels).toHaveBeenCalledWith(user.id, { pricesChannelId: "123456789012345678", updatesChannelId: "123456789012345679" });
+    expect(discordMocks.checkDiscordChannel).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not persist a rejected content channel", async () => {
+    discordMocks.checkDiscordChannel.mockResolvedValue({ ok: false, status: 404, message: "Canal no encontrado." });
+    await expect(appRouter.createCaller(context).discord.updateContentChannels({ pricesChannelId: "123456789012345678" })).rejects.toThrow("Canal no encontrado.");
+    expect(dbMocks.updateDiscordContentChannels).not.toHaveBeenCalled();
   });
 });
