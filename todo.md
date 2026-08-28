@@ -600,3 +600,7 @@
 - [x] Añadir canal independiente configurable para Updates — columna persistente, validación Discord y campo manual
 - [x] Mejorar visualmente la UI de selección y configuración manteniendo cada función separada — Prices/Updates dejaron de reutilizar selectores de panel
 - [x] Añadir pruebas de aislamiento de canales y selección de panel existente — 143 pruebas Vitest pasan
+- [x] Cambiar la opción visible de /panel de `panel` a `name`, manteniendo selección de paneles existentes
+- [x] Actualizar autocomplete, handler y pruebas para usar `name:<panelId>` internamente
+- [x] Rediseñar el apartado Plans siguiendo la referencia visual del video, sin mezclar Prices ni Generate Keys
+- [x] Añadir pruebas del nuevo contrato visible de /panel y de la presentación de planes
