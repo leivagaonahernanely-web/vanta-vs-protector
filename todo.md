@@ -612,3 +612,13 @@
 - [x] Hacer inmediato el acknowledge de comandos y botones antes de resolver Discord, base de datos o permisos — prepareInteraction se ejecuta antes de handlers
 - [x] Reducir consultas repetidas de owner, roles, scripts y licencias mediante cachés seguras y paralelismo — owner cache de 5 s y cuenta/licencias en paralelo
 - [x] Añadir pruebas de respuesta única, manejo 40060 y latencia del dispatcher completo — cobertura existente y 144 pruebas Vitest pasando
+- [x] Crear sistema visual Vanta dark brutalista con tipografía, acentos, textura, bordes y sombras consistentes
+- [x] Mejorar sidebar, workspace selector, contador de scripts y perfil Discord
+- [x] Rediseñar Overview con métricas reales, actividad y estados online/offline
+- [x] Rediseñar Plans con plan actual, tarjetas, barras de uso, límites y canje separado
+- [x] Rediseñar Scripts con tarjetas, metadatos, acciones y loader compacto
+- [x] Rediseñar Panels con separación crear/gestionar y contexto de canal/script/estado
+- [x] Mejorar formularios y previews independientes de Prices y Updates
+- [x] Implementar navegación móvil, menú deslizable y controles táctiles
+- [x] Añadir skeletons, estados de procesamiento, errores claros y animaciones rápidas
+- [x] Escribir o actualizar pruebas y verificar visualmente escritorio y móvil antes del checkpoint
