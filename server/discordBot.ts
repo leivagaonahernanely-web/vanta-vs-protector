@@ -105,6 +105,8 @@ const keyActionTimestamps = new Map<string, number>();
 const KEY_ACTION_COOLDOWN_MS = 10_000;
 const respondedInteractions = new WeakSet<object>();
 const processingInteractions = new WeakSet<object>();
+const ownerAccountCache = new Map<string, { expiresAt: number; user: any }>();
+const OWNER_ACCOUNT_CACHE_MS = 5_000;
 const scriptChoiceCache = new Map<number, { expiresAt: number; scripts: any[] }>();
 const SCRIPT_CHOICE_CACHE_MS = 15_000;
 const SCRIPT_CHOICE_TIMEOUT_MS = 2_500;
@@ -159,17 +161,16 @@ function panelActionId(action: string, ownerId?: number, hostedScriptId?: number
 
 async function ownerAccount(interaction?: any) {
   const panelContext = getPanelContext(interaction);
-  if (panelContext) {
-    const panelOwner = await getUserById(panelContext.ownerId);
-    if (panelOwner) return panelOwner;
-  }
   const actorId = normalizeDiscordIdentity(interaction?.user?.id);
-  if (actorId) {
-    const linkedUser = await getUserByDiscordUserId(actorId);
-    if (linkedUser) return linkedUser;
-  }
-  const configuredOwner = ENV.ownerOpenId ? await getUserByOpenId(ENV.ownerOpenId) : undefined;
-  return configuredOwner;
+  const cacheKey = panelContext ? `panel:${panelContext.ownerId}` : actorId ? `actor:${actorId}` : "configured";
+  const cached = ownerAccountCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.user;
+  let resolved;
+  if (panelContext) resolved = await getUserById(panelContext.ownerId);
+  if (!resolved && actorId) resolved = await getUserByDiscordUserId(actorId);
+  if (!resolved && ENV.ownerOpenId) resolved = await getUserByOpenId(ENV.ownerOpenId);
+  if (resolved) ownerAccountCache.set(cacheKey, { user: resolved, expiresAt: Date.now() + OWNER_ACCOUNT_CACHE_MS });
+  return resolved;
 }
 async function warmScriptChoiceCache() {
   try {
@@ -461,8 +462,11 @@ async function apiKeyForUser(interaction: any) {
 }
 
 async function getUserLicenses(discordUserId: string, ownerId?: number, hostedScriptId?: number) {
-  const user = await getUserByDiscordUserId(discordUserId);
-  const licenses = (await getActiveLicensesByDiscordUserId(discordUserId, ownerId)).filter((license: any) => (!hostedScriptId || Number(license.hostedScriptId) === hostedScriptId) && (!license.expiresAt || license.expiresAt.getTime() > Date.now()));
+  const [user, rawLicenses] = await Promise.all([
+    getUserByDiscordUserId(discordUserId),
+    getActiveLicensesByDiscordUserId(discordUserId, ownerId),
+  ]);
+  const licenses = rawLicenses.filter((license: any) => (!hostedScriptId || Number(license.hostedScriptId) === hostedScriptId) && (!license.expiresAt || license.expiresAt.getTime() > Date.now()));
   const ownerIds = Array.from(new Set(licenses.map((license: any) => Number(license.ownerId)).filter((id) => Number.isInteger(id) && id > 0)));
   const scriptRows = await Promise.all(ownerIds.map((ownerId) => getHostedScriptsByUser(ownerId)));
   const scripts = scriptRows.flat();

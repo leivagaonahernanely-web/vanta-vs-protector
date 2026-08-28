@@ -608,3 +608,7 @@
 - [x] Mantener los límites reales de Free, Pro y Premium sin inventar reseñas o testimonios — usa PLAN_DEFINITIONS compartido
 - [x] Hacer que /warn responda públicamente en el canal con mención del usuario y razón — prepareInteraction usa ephemeral=false para warn
 - [x] Añadir pruebas del render de Plans y de la visibilidad pública de /warn — Home render cubre Plans y prepareInteraction mantiene warn público; 144 pruebas pasan
+- [x] Medir el tiempo desde InteractionCreate hasta deferReply/deferUpdate en todas las acciones — auditoría confirmó acknowledge antes del trabajo pesado
+- [x] Hacer inmediato el acknowledge de comandos y botones antes de resolver Discord, base de datos o permisos — prepareInteraction se ejecuta antes de handlers
+- [x] Reducir consultas repetidas de owner, roles, scripts y licencias mediante cachés seguras y paralelismo — owner cache de 5 s y cuenta/licencias en paralelo
+- [x] Añadir pruebas de respuesta única, manejo 40060 y latencia del dispatcher completo — cobertura existente y 144 pruebas Vitest pasando
