@@ -590,3 +590,7 @@
 - [x] Evitar que paneles antiguos o incompletos consulten una whitelist global o devuelvan diagnóstico técnico al usuario — botones sin contexto se detienen antes de consultar acceso
 - [x] Mostrar un mensaje limpio para panel sin contexto y exigir republicación cuando sea necesario
 - [x] Añadir pruebas de customId completo, fallback visual y resolución de whitelist desde Get Script — suite completa pasa con 140 pruebas
+- [x] Medir y reducir la latencia de Get Script y comandos Discord sin sacrificar validaciones de seguridad — se eliminó la consulta diagnóstica en el camino normal y se mantienen las comprobaciones de licencia/whitelist
+- [x] Evitar consultas duplicadas de roles, scripts y licencias en cada interacción del panel — caché breve de roles y reglas/script en paralelo
+- [x] Mejorar jerarquía visual, estados de carga y feedback del dashboard manteniendo secciones separadas — microinteracciones, foco visible y estados táctiles consistentes
+- [x] Validar rendimiento en móvil y escritorio con pruebas y capturas antes del checkpoint — TypeScript correcto, 140 pruebas Vitest pasando y preview reiniciado
