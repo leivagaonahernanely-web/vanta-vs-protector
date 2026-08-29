@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createReconnectGate, discordCommands, formatWhitelistDiagnostic, GET_SCRIPT_COPY_BUTTON_LABEL, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, isConfiguredOwnerId, isGuildOwner, matchesWhitelistRule, mobileViewScriptMessage, panelMessage, parseDuration, respond, resolveScriptSelection, scriptRuntimeLoader, targetChoices } from "./discordBot";
+import { createReconnectGate, discordCommands, formatWhitelistDiagnostic, GET_SCRIPT_COPY_BUTTON_LABEL, getScriptDisplayMessage, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, isConfiguredOwnerId, isGuildOwner, matchesWhitelistRule, mobileViewScriptMessage, panelMessage, parseDuration, respond, resolveScriptSelection, scriptRuntimeLoader, targetChoices } from "./discordBot";
 import * as db from "./db";
 
 describe("Discord access panel", () => {
@@ -29,6 +29,14 @@ describe("Discord access panel", () => {
     expect(loader).toContain("?key=86vC3ZULuEQpOImpm5VBB6oLROAQmPLe");
     expect(loader).not.toContain("internal-script-key");
     expect(loader).toContain("&hwid=\" .. hwid");
+  });
+
+  it("keeps Get Script visually formatted while Mobile View stays compact", () => {
+    const display = getScriptDisplayMessage({ name: "Vanta.vs", slug: "display-script", ffaMode: false }, "mbe2krjut4gdyiggoqc3t47zq3eaxnkl", 42);
+    expect(display).toContain("📜 **Vanta.vs**");
+    expect(display).toContain("```lua");
+    expect(display).toContain("loadstring(game:HttpGet(");
+    expect(display).toContain("\n```");
   });
 
   it("builds Mobile View Script as only the two loader lines", () => {

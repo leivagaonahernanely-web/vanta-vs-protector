@@ -227,6 +227,10 @@ export function mobileViewScriptMessage(script: any, accessKey: string, licenseI
   return scriptRuntimeLoader(script, accessKey, licenseId);
 }
 
+export function getScriptDisplayMessage(script: any, accessKey: string, licenseId: number) {
+  return "📜 **" + script.name + "**\n\n```lua\n" + scriptRuntimeLoader(script, accessKey, licenseId) + "\n```";
+}
+
 export function scriptRuntimeLoader(script: any, accessKey?: string, licenseId?: number) {
   const url = `${PANEL_URL}/scripts/hosted/${script.slug}`;
   const runtimeKey = script.ffaMode ? "trial" : (accessKey || script.scriptKey);
@@ -560,11 +564,10 @@ async function getScriptForUser(interaction: any) {
   const panel = await panelAccess(interaction);
   if (!panel.license) return respond(interaction, { content: "❌ No tienes una key activa ni una autorización whitelist válida para este script. Pide al owner que te autorice y vuelve a pulsar Get Script.", ephemeral: true });
   if (!panel.script) return respond(interaction, { content: "❌ Tu acceso está activo, pero todavía no hay un script asignado.", ephemeral: true });
-  const loader = scriptRuntimeLoader(panel.script, panel.license.keyCode, panel.license.id);
   const copyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(panelActionId("copy-loader", panel.owner?.id, panel.script.id)).setLabel(GET_SCRIPT_COPY_BUTTON_LABEL).setStyle(ButtonStyle.Secondary),
   );
-  return respond(interaction, { content: loader, components: [copyRow], ephemeral: true });
+  return respond(interaction, { content: getScriptDisplayMessage(panel.script, panel.license.keyCode, panel.license.id), components: [copyRow], ephemeral: true });
 }
 
 async function copyScriptForUser(interaction: any) {

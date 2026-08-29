@@ -666,3 +666,7 @@
 - [x] Hacer que solo Mobile View Script entregue las dos líneas sin texto adicional
 - [x] Actualizar pruebas separadas para Get Script y Mobile View
 - [x] Verificar y guardar checkpoint de la corrección
+- [x] Restaurar la presentación bonita de Get Script con su formato y botón anteriores
+- [x] Mantener Mobile View Script como salida exclusiva de dos líneas limpias
+- [x] Añadir pruebas separadas para evitar que ambos formatos vuelvan a mezclarse
+- [x] Verificar latencia, ejecutar pruebas y guardar checkpoint
