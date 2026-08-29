@@ -224,7 +224,7 @@ async function prepareInteraction(interaction: any) {
   await interaction.deferReply({ ephemeral });
 }
 export function mobileViewScriptMessage(script: any, accessKey: string, licenseId: number) {
-  return `📜 **${script.name}**\n\n\`\`\`\n${scriptRuntimeLoader(script, accessKey, licenseId)}\n\`\`\``;
+  return scriptRuntimeLoader(script, accessKey, licenseId);
 }
 
 export function scriptRuntimeLoader(script: any, accessKey?: string, licenseId?: number) {
@@ -538,20 +538,19 @@ async function panelAccess(interaction: any) {
   const owner = await ownerAccount(interaction);
   const panelContext = getPanelContext(interaction);
   if (!owner) return { owner, script: undefined, license: undefined };
-  // A valid redeemed key remains sufficient even without a whitelist. For
-  // legacy panels without encoded context, resolve the user's active key first
-  // and use its assigned script instead of forcing a new whitelist license.
-  const access = await getUserLicenses(interaction.user.id, owner.id);
+  // Keep the hot path small: Get Script only needs this member's active
+  // licenses and the single script bound to the selected panel.
+  const rawLicenses = await getActiveLicensesByDiscordUserId(interaction.user.id, owner.id);
+  const licenses = rawLicenses.filter((license: any) => !license.expiresAt || license.expiresAt.getTime() > Date.now());
   const license = panelContext?.hostedScriptId
-    ? access.licenses.find((item: any) => Number(item.hostedScriptId) === panelContext.hostedScriptId)
-    : access.licenses[0];
-  let script = license?.hostedScriptId ? await getHostedScriptByOwnerId(owner.id, license.hostedScriptId) : undefined;
+    ? licenses.find((item: any) => Number(item.hostedScriptId) === panelContext.hostedScriptId)
+    : licenses[0];
+  const script = license?.hostedScriptId ? await getHostedScriptByOwnerId(owner.id, license.hostedScriptId) : undefined;
   if (!license) {
     const match = await getWhitelistScriptForMember(interaction, owner);
     if (match) {
-      script = match.script;
       const created = await createLicense({ ownerId: match.owner.id, hostedScriptId: match.script.id, keyCode: keyCode(), type: "license", status: "active", discordUserId: interaction.user.id, hwid: null, expiresAt: null });
-      return { owner, script, license: created };
+      return { owner, script: match.script, license: created };
     }
   }
   return { owner, script, license };

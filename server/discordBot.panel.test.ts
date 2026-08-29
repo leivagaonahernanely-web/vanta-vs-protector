@@ -31,19 +31,18 @@ describe("Discord access panel", () => {
     expect(loader).toContain("&hwid=\" .. hwid");
   });
 
-  it("builds Mobile View Script as exactly two compact lines", () => {
+  it("builds Mobile View Script as only the two loader lines", () => {
     const loader = scriptRuntimeLoader({ slug: "mobile-script", ffaMode: false, scriptKey: "internal-key" }, "mbe2krjut4gdyiggoqc3t47zq3eaxnkl", 42);
     const message = mobileViewScriptMessage({ name: "Vanta.vs", slug: "mobile-script", ffaMode: false }, "mbe2krjut4gdyiggoqc3t47zq3eaxnkl", 42);
     expect(loader.split("\n")).toHaveLength(2);
     expect(loader).toContain('/scripts/loaders/');
     expect(loader).not.toContain("RbxAnalyticsService");
     expect(loader).not.toContain("/scripts/hosted/");
-    expect(message).toContain("📜 **Vanta.vs**");
-    expect(message).toContain("```\n");
-    expect(message).toContain("\n```");
-    expect(message).toContain(loader);
+    expect(message).toBe(loader);
+    expect(message.split("\n")).toHaveLength(2);
+    expect(message).not.toContain("Vanta.vs");
+    expect(message).not.toContain("```");
     expect(message).not.toContain("```lua");
-    expect(message).not.toContain("``lua");
   });
 
   it("builds the requested two-row action layout", () => {

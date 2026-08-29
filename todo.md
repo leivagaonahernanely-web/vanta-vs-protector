@@ -658,3 +658,11 @@
 - [x] Corregir el bug por el que el overlay oscurece la pantalla pero el sidebar móvil queda oculto
 - [x] Verificar apertura, cierre, z-index, foco y navegación táctil del menú
 - [x] Ejecutar pruebas y guardar checkpoint de la corrección móvil
+- [x] Hacer que Get Script y Mobile View Script devuelvan exactamente dos líneas sin texto adicional
+- [x] Optimizar el camino de respuesta del panel para reducir el estado “Vanta.vs está pensando”
+- [x] Mantener intactos permisos, whitelist, key, HWID y aislamiento por workspace
+- [x] Actualizar pruebas, verificar Discord y guardar checkpoint
+- [x] Mantener sin cambios el formato y contenido de Get Script
+- [x] Hacer que solo Mobile View Script entregue las dos líneas sin texto adicional
+- [x] Actualizar pruebas separadas para Get Script y Mobile View
+- [x] Verificar y guardar checkpoint de la corrección
