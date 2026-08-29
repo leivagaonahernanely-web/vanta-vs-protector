@@ -640,3 +640,8 @@
 - [x] Rediseñar Logs con filtros, estados, metadatos y jerarquía de eventos
 - [x] Añadir sombras, separadores, animaciones rápidas y estados hover/focus coherentes
 - [x] Verificar escritorio y móvil, actualizar pruebas y guardar checkpoint
+- [x] Crear una segunda iteración visual de alto impacto para Plans y Logs
+- [x] Mejorar lectura de cuotas, estados, acciones y jerarquía de las tarjetas de Plans
+- [x] Mejorar estructura, densidad y presentación de eventos en Logs
+- [x] Refinar el lenguaje visual global del dashboard y validar responsive
+- [x] Ejecutar pruebas y guardar checkpoint de la segunda iteración
