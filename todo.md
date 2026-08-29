@@ -622,3 +622,7 @@
 - [x] Implementar navegación móvil, menú deslizable y controles táctiles
 - [x] Añadir skeletons, estados de procesamiento, errores claros y animaciones rápidas
 - [x] Escribir o actualizar pruebas y verificar visualmente escritorio y móvil antes del checkpoint
+- [x] Mover Invite bot al Overview y retirarlo de la navegación lateral
+- [x] Hacer que Get Script y Mobile View entreguen únicamente el loader final con script_key
+- [x] Hacer que la copia automática use exactamente ese loader compacto, sin bloque Lua adicional
+- [x] Añadir pruebas de regresión para Invite bot, Get Script y Mobile View

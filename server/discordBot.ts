@@ -224,7 +224,7 @@ async function prepareInteraction(interaction: any) {
   await interaction.deferReply({ ephemeral });
 }
 export function mobileViewScriptMessage(script: any, accessKey: string, licenseId: number) {
-  return `📜 **${script.name}**\n\n\`\`lua\n${scriptRuntimeLoader(script, accessKey, licenseId)}\n\`\``;
+  return scriptRuntimeLoader(script, accessKey, licenseId);
 }
 
 export function scriptRuntimeLoader(script: any, accessKey?: string, licenseId?: number) {
@@ -565,7 +565,7 @@ async function getScriptForUser(interaction: any) {
   const copyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(panelActionId("copy-loader", panel.owner?.id, panel.script.id)).setLabel(GET_SCRIPT_COPY_BUTTON_LABEL).setStyle(ButtonStyle.Secondary),
   );
-  return respond(interaction, { content: `📜 **${panel.script.name}**\n\n\`\`\`lua\n${loader}\n\`\`\``, components: [copyRow], ephemeral: true });
+  return respond(interaction, { content: loader, components: [copyRow], ephemeral: true });
 }
 
 async function copyScriptForUser(interaction: any) {
