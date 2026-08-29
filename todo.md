@@ -645,3 +645,8 @@
 - [x] Mejorar estructura, densidad y presentación de eventos en Logs
 - [x] Refinar el lenguaje visual global del dashboard y validar responsive
 - [x] Ejecutar pruebas y guardar checkpoint de la segunda iteración
+- [x] Rediseñar de raíz la composición global para eliminar la apariencia básica
+- [x] Elevar navegación, cabeceras, bloques y jerarquía tipográfica a nivel premium
+- [x] Crear una experiencia visual más distintiva para Plans, Logs, Scripts y Panels
+- [x] Mejorar interacciones, estados, animaciones y responsive sin alterar la lógica
+- [x] Ejecutar pruebas, revisar capturas y guardar checkpoint de la remodelación superior
