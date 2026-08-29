@@ -632,3 +632,7 @@
 - [x] Verificar que el contenido mostrado y copiado siga siendo el loader funcional exacto
 - [x] Añadir o actualizar pruebas, revisar escritorio/móvil y guardar checkpoint
 - [x] Quitar únicamente la etiqueta `lua` del bloque de Mobile View y conservar los tres backticks
+- [x] Remodelación exhaustiva de tipografía, bloques, tarjetas, espaciado, navegación y estados visuales
+- [x] Revisar y corregir todos los puntos donde Mobile View pueda añadir o mostrar la etiqueta lua
+- [x] Añadir pruebas que exijan que el mensaje Mobile View no contenga `lua`
+- [x] Verificar la interfaz en escritorio y móvil y guardar un checkpoint nuevo
