@@ -38,10 +38,12 @@ describe("Discord access panel", () => {
     expect(loader).toContain('/scripts/loaders/');
     expect(loader).not.toContain("RbxAnalyticsService");
     expect(loader).not.toContain("/scripts/hosted/");
-    expect(message).toBe(loader);
-    expect(message.split("\n")).toHaveLength(2);
+    expect(message).toContain("📜 **Vanta.vs**");
+    expect(message).toContain("```\n");
+    expect(message).toContain("\n```");
+    expect(message).toContain(loader);
     expect(message).not.toContain("```lua");
-    expect(message).not.toContain("📜");
+    expect(message).not.toContain("``lua");
   });
 
   it("builds the requested two-row action layout", () => {

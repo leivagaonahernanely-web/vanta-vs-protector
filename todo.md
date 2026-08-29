@@ -626,3 +626,9 @@
 - [x] Hacer que Get Script y Mobile View entreguen únicamente el loader final con script_key
 - [x] Hacer que la copia automática use exactamente ese loader compacto, sin bloque Lua adicional
 - [x] Añadir pruebas de regresión para Invite bot, Get Script y Mobile View
+- [x] Elevar la UI global a un acabado más profesional sin mezclar funciones
+- [x] Mejorar jerarquía visual, densidad, estados y detalles de Overview, Plans, Scripts y Panels
+- [x] Corregir Mobile View Script para conservar el título y usar un bloque ```lua válido
+- [x] Verificar que el contenido mostrado y copiado siga siendo el loader funcional exacto
+- [x] Añadir o actualizar pruebas, revisar escritorio/móvil y guardar checkpoint
+- [x] Quitar únicamente la etiqueta `lua` del bloque de Mobile View y conservar los tres backticks

@@ -224,7 +224,7 @@ async function prepareInteraction(interaction: any) {
   await interaction.deferReply({ ephemeral });
 }
 export function mobileViewScriptMessage(script: any, accessKey: string, licenseId: number) {
-  return scriptRuntimeLoader(script, accessKey, licenseId);
+  return `📜 **${script.name}**\n\n\`\`\`\n${scriptRuntimeLoader(script, accessKey, licenseId)}\n\`\`\``;
 }
 
 export function scriptRuntimeLoader(script: any, accessKey?: string, licenseId?: number) {
