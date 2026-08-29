@@ -16,16 +16,17 @@ export function playUiChime(enabled: boolean) {
   const context = new AudioContextClass();
   const oscillator = context.createOscillator();
   const gain = context.createGain();
-  oscillator.type = "sine";
-  oscillator.frequency.setValueAtTime(520, context.currentTime);
-  oscillator.frequency.exponentialRampToValueAtTime(760, context.currentTime + 0.12);
-  gain.gain.setValueAtTime(0.0001, context.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.045, context.currentTime + 0.015);
-  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.16);
+  const now = context.currentTime;
+  oscillator.type = "triangle";
+  oscillator.frequency.setValueAtTime(280, now);
+  oscillator.frequency.exponentialRampToValueAtTime(360, now + 0.055);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.018, now + 0.008);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.075);
   oscillator.connect(gain);
   gain.connect(context.destination);
-  oscillator.start();
-  oscillator.stop(context.currentTime + 0.17);
-  void oscillator.addEventListener("ended", () => { void context.close(); });
+  oscillator.start(now);
+  oscillator.stop(now + 0.085);
+  oscillator.addEventListener("ended", () => { void context.close(); });
   return true;
 }

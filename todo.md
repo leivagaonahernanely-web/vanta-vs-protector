@@ -650,3 +650,8 @@
 - [x] Crear una experiencia visual más distintiva para Plans, Logs, Scripts y Panels
 - [x] Mejorar interacciones, estados, animaciones y responsive sin alterar la lógica
 - [x] Ejecutar pruebas, revisar capturas y guardar checkpoint de la remodelación superior
+- [x] Crear una versión visual claramente más profesional y diferenciada del dashboard
+- [x] Rediseñar superficies, navegación, bloques, cabeceras y estados con mayor impacto visual
+- [x] Reemplazar el sonido actual de cambio de sección por una señal breve y discreta
+- [x] Mantener respetadas las preferencias de sonido y accesibilidad
+- [x] Ejecutar pruebas, revisar escritorio/móvil y guardar checkpoint
