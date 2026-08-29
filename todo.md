@@ -655,3 +655,6 @@
 - [x] Reemplazar el sonido actual de cambio de sección por una señal breve y discreta
 - [x] Mantener respetadas las preferencias de sonido y accesibilidad
 - [x] Ejecutar pruebas, revisar escritorio/móvil y guardar checkpoint
+- [x] Corregir el bug por el que el overlay oscurece la pantalla pero el sidebar móvil queda oculto
+- [x] Verificar apertura, cierre, z-index, foco y navegación táctil del menú
+- [x] Ejecutar pruebas y guardar checkpoint de la corrección móvil

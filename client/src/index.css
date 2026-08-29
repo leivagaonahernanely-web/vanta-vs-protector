@@ -232,3 +232,15 @@ body { background: radial-gradient(circle at 74% -10%, rgba(240,68,80,.08), tran
 .manager-panel:not(.logs-panel), .hosted-panel, .source-panel { padding: 26px; }.hosted-panel .panel-header, .manager-panel .panel-header { padding-bottom: 18px; border-bottom: 1px solid rgba(255,255,255,.09); }.license-row { transition: background .18s var(--vanta-ease), transform .18s var(--vanta-ease), border-color .18s var(--vanta-ease); }.license-row:hover { background: rgba(255,255,255,.028); transform: translateX(3px); }
 @media (max-width: 900px) { .overview-stats { grid-template-columns: repeat(3,1fr); }.overview-invite-row { grid-column: 1 / -1; }.plans-page .plan-cards-grid { grid-template-columns: 1fr; }.plans-page .plan-card.plan-pro { transform: none; }.plans-page .plan-card.plan-pro:hover { transform: translateY(-5px); } }
 @media (max-width: 760px) { .page-heading { min-height: 96px; }.overview-stats { grid-template-columns: 1fr; }.overview-invite-row { grid-column: auto; }.overview-grid { grid-template-columns: 1fr; }.overview-panel, .plans-page > .panel, .logs-panel, .manager-panel:not(.logs-panel), .hosted-panel, .source-panel { padding: 18px; }.plans-page .plan-card { padding: 19px; }.logs-panel .panel-header > div:first-child { display: block; }.logs-panel .license-row { grid-template-columns: 1fr; }.logs-panel .license-status { justify-self: start; }.logs-panel .license-row::before { top: 21px; }.app-shell::before { background-size: 32px 32px; } }
+
+/* Mobile drawer fix: keep the sidebar above the backdrop */
+@media (max-width: 680px) {
+  .app-shell { position: relative; overflow-x: clip; }
+  .sidebar { position: fixed !important; top: 0; bottom: 0; left: 0; width: min(86vw, 320px) !important; flex-basis: auto !important; z-index: 100 !important; transform: translate3d(-105%, 0, 0); transition: transform .24s var(--vanta-ease), box-shadow .24s var(--vanta-ease); box-shadow: 24px 0 70px rgba(0,0,0,.55); }
+  .sidebar.open { transform: translate3d(0, 0, 0); box-shadow: 24px 0 70px rgba(0,0,0,.72), 0 0 0 1px rgba(240,68,80,.16); }
+  .mobile-backdrop { position: fixed !important; inset: 0; z-index: 90 !important; opacity: 1; background: rgba(0,0,0,.72); backdrop-filter: blur(4px); animation: backdrop-in .18s ease-out both; }
+  .dashboard-main { position: relative; z-index: 1; min-width: 0; }
+  .mobile-menu { position: relative; z-index: 2; }
+}
+@keyframes backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .mobile-backdrop, .sidebar { animation: none; transition: none; } }
