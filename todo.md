@@ -636,3 +636,7 @@
 - [x] Revisar y corregir todos los puntos donde Mobile View pueda añadir o mostrar la etiqueta lua
 - [x] Añadir pruebas que exijan que el mensaje Mobile View no contenga `lua`
 - [x] Verificar la interfaz en escritorio y móvil y guardar un checkpoint nuevo
+- [x] Rediseñar Plans con bloques de plan actual, cuotas, beneficios y canje claramente separados
+- [x] Rediseñar Logs con filtros, estados, metadatos y jerarquía de eventos
+- [x] Añadir sombras, separadores, animaciones rápidas y estados hover/focus coherentes
+- [x] Verificar escritorio y móvil, actualizar pruebas y guardar checkpoint
