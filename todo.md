@@ -670,3 +670,15 @@
 - [x] Mantener Mobile View Script como salida exclusiva de dos líneas limpias
 - [x] Añadir pruebas separadas para evitar que ambos formatos vuelvan a mezclarse
 - [x] Verificar latencia, ejecutar pruebas y guardar checkpoint
+- [ ] Revisar el enlace compartido y extraer mejoras visuales o funcionales aplicables
+- [ ] Comparar la referencia con el dashboard actual sin copiar contenido privado
+- [ ] Implementar las mejoras priorizadas y conservar permisos y aislamiento
+- [ ] Ejecutar pruebas, verificar escritorio/móvil y guardar checkpoint
+- [x] Hacer que Get Script devuelva únicamente las dos líneas compactas
+- [x] Hacer que Mobile View Script devuelva título y bloque de código bonito
+- [ ] Optimizar el camino de respuesta del bot para reducir la espera visible
+- [ ] Aplicar otra mejora visual sustancial al dashboard sin mezclar funciones
+- [ ] Actualizar pruebas, verificar escritorio/móvil y guardar checkpoint
+- [x] Confirmar y aplicar Get Script bonito con título y bloque de código
+- [x] Confirmar y aplicar Mobile View Script compacto con solo dos líneas
+- [x] Evitar que una acción reutilice el formato de la otra

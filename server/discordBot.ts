@@ -567,14 +567,14 @@ async function getScriptForUser(interaction: any) {
   const copyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(panelActionId("copy-loader", panel.owner?.id, panel.script.id)).setLabel(GET_SCRIPT_COPY_BUTTON_LABEL).setStyle(ButtonStyle.Secondary),
   );
-  return respond(interaction, { content: getScriptDisplayMessage(panel.script, panel.license.keyCode, panel.license.id), components: [copyRow], ephemeral: true });
+  return respond(interaction, { content: scriptRuntimeLoader(panel.script, panel.license.keyCode, panel.license.id), components: [copyRow], ephemeral: true });
 }
 
 async function copyScriptForUser(interaction: any) {
   const panel = await panelAccess(interaction);
   if (!panel.license) return respond(interaction, { content: "❌ Tu usuario o rol no está en la whitelist de este script.", ephemeral: true });
   if (!panel.script) return respond(interaction, { content: "❌ Tu acceso está activo, pero no hay un script asignado.", ephemeral: true });
-  return respond(interaction, { content: mobileViewScriptMessage(panel.script, panel.license.keyCode, panel.license.id), ephemeral: true });
+  return respond(interaction, { content: getScriptDisplayMessage(panel.script, panel.license.keyCode, panel.license.id), ephemeral: true });
 }
 
 async function configureBuyerRole(interaction: any, role: { id: string }) {
