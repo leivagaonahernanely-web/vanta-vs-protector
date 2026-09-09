@@ -19,6 +19,7 @@ describe("dashboard navigation contract", () => {
       "Manage Panels",
       "Prices",
       "Updates",
+      "Published TXT",
     ]);
   });
 

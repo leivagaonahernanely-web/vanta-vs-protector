@@ -244,3 +244,19 @@ body { background: radial-gradient(circle at 74% -10%, rgba(240,68,80,.08), tran
 }
 @keyframes backdrop-in { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .mobile-backdrop, .sidebar { animation: none; transition: none; } }
+
+/* Owner published TXT review */
+.owner-published-layout { display: grid; gap: 1rem; }
+.owner-published-panel { border-color: rgba(255, 77, 101, .42); box-shadow: 0 24px 70px rgba(0,0,0,.28), 0 0 42px rgba(255, 47, 78, .08); }
+.published-txt-list { display: grid; gap: .85rem; }
+.published-txt-card { padding: 1rem; border: 1px solid rgba(255,255,255,.09); background: linear-gradient(135deg, rgba(255,255,255,.045), rgba(255,255,255,.015)); border-radius: 14px; box-shadow: inset 0 1px rgba(255,255,255,.04), 0 14px 35px rgba(0,0,0,.16); transition: transform 180ms var(--ease-out), border-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out); }
+.published-txt-card:hover { transform: translateY(-2px); border-color: rgba(255,77,101,.45); box-shadow: 0 20px 45px rgba(0,0,0,.25), 0 0 30px rgba(255,47,78,.08); }
+.published-txt-card-head { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
+.published-txt-card h3 { margin: .2rem 0 .25rem; font-size: 1.12rem; }
+.published-txt-card p { margin: 0; color: #767676; font-size: .82rem; }
+.source-size { flex: 0 0 auto; color: #ff8798; font-family: ui-monospace, monospace; font-size: .72rem; letter-spacing: .06em; }
+.published-txt-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .55rem; margin: .85rem 0 .65rem; color: #767676; font: .7rem ui-monospace, monospace; }
+.published-txt-meta code { color: #9de7c1; }
+.published-txt-preview { max-height: 260px; overflow: auto; margin: 0; padding: .9rem; border: 1px solid rgba(255,255,255,.07); border-radius: 10px; background: rgba(0,0,0,.32); color: #d8dde7; font: .72rem/1.6 ui-monospace, monospace; white-space: pre-wrap; word-break: break-word; }
+.published-txt-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
+@media (max-width: 640px) { .published-txt-card-head { flex-direction: column; gap: .45rem; } .published-txt-preview { max-height: 220px; font-size: .68rem; } .published-txt-actions .text-button { width: 100%; justify-content: center; } }

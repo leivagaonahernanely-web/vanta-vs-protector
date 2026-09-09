@@ -682,3 +682,7 @@
 - [x] Confirmar y aplicar Get Script bonito con título y bloque de código
 - [x] Confirmar y aplicar Mobile View Script compacto con solo dos líneas
 - [x] Evitar que una acción reutilice el formato de la otra
+- [x] Añadir vista privada Owner para listar y descargar los TXT/sources publicados por usuarios
+- [x] Mantener la vista owner aislada y sin exponer sources a cuentas normales
+- [x] Añadir huella de integridad server-side para sources publicadas sin almacenar secretos del cliente
+- [x] Probar aislamiento, descarga, preview y permisos owner

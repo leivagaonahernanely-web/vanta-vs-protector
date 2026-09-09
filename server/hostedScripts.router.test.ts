@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getHostedScriptsByUser: vi.fn(),
   getHostedScriptSourceByUser: vi.fn(),
   getHostedScriptById: vi.fn(),
+  getPublishedScriptsForOwnerReview: vi.fn(),
   getWorkspaceUsage: vi.fn().mockResolvedValue({ protections: 0, scripts: 0, keys: 0 }),
   updateHostedScript: vi.fn(),
   deleteHostedScript: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock("./db", () => ({
   getHostedScriptsByUser: mocks.getHostedScriptsByUser,
   getHostedScriptSourceByUser: mocks.getHostedScriptSourceByUser,
   getHostedScriptById: mocks.getHostedScriptById,
+  getPublishedScriptsForOwnerReview: mocks.getPublishedScriptsForOwnerReview,
   getWorkspaceUsage: mocks.getWorkspaceUsage,
   updateHostedScript: mocks.updateHostedScript,
   deleteHostedScript: mocks.deleteHostedScript,
@@ -27,6 +29,7 @@ vi.mock("./db", () => ({
 vi.mock("./protection", () => ({ getProviderStatus: vi.fn(() => ({ configured: true })), protectWithAdapter: vi.fn(async (...args: Parameters<typeof mocks.buildProtectionArtifact>) => mocks.buildProtectionArtifact(...args)) }));
 
 import { appRouter } from "./routers";
+import { ENV } from "./_core/env";
 
 const user = { id: 12, openId: "host-user", name: "Host User", email: "host@example.com", loginMethod: "manus", role: "user" as const, discordChannelId: null, discordUserId: null, discordUsername: null, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() };
 function context(withUser = true, currentUser = user): TrpcContext {
@@ -97,6 +100,16 @@ describe("hostedScripts router", () => {
     const otherUser = { ...user, id: 99, openId: "other-user" };
     await expect(appRouter.createCaller(context(true, otherUser)).hostedScripts.source({ id: 3 })).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(mocks.getHostedScriptSourceByUser).toHaveBeenCalledWith(99, 3);
+  });
+
+  it("lists published TXT and source hash only for the configured owner", async () => {
+    const ownerUser = { ...user, openId: ENV.ownerOpenId || "owner-open-id", role: "admin" as const };
+    mocks.getPublishedScriptsForOwnerReview.mockResolvedValue([{ script: { ...hostedRow, sourceCode: "print('owner')" }, ownerName: "Owner", ownerOpenId: ownerUser.openId, discordUserId: "150000000000000001", discordUsername: "owner" }]);
+    const result = await appRouter.createCaller(context(true, ownerUser)).owner.publishedScripts();
+    expect(result[0]).toMatchObject({ name: "demo.lua", source: "print('owner')", sourceSize: 14, ownerName: "Owner" });
+    expect(result[0]?.sourceHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(mocks.getPublishedScriptsForOwnerReview).toHaveBeenCalledOnce();
+    await expect(appRouter.createCaller(context(true, user)).owner.publishedScripts()).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("rejects unauthenticated creation, listing and source access", async () => {

@@ -5,9 +5,9 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { notifyOwner } from "./_core/notification";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createAccessRule, createBlacklist, createDiscordPanel, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getDiscordPanelsByOwner, getHostedScriptSourceByUser, getHostedScriptsByUser, getHostedScriptByName, getHostedScriptById, getHostedScriptByOwnerId, updateHostedScript, deleteHostedScript, getWorkspaceUsage, getKeyAuditLogsByOwner, deleteKeyAuditLogsByOwner, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, redeemPlanKey, updateDiscordChannelId, updateDiscordContentChannels, ensureUserApiKey } from "./db";
+import { createAccessRule, createBlacklist, createDiscordPanel, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getDiscordPanelsByOwner, getHostedScriptSourceByUser, getHostedScriptsByUser, getHostedScriptByName, getHostedScriptById, getHostedScriptByOwnerId, updateHostedScript, deleteHostedScript, getWorkspaceUsage, getKeyAuditLogsByOwner, deleteKeyAuditLogsByOwner, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, redeemPlanKey, updateDiscordChannelId, updateDiscordContentChannels, ensureUserApiKey, getPublishedScriptsForOwnerReview } from "./db";
 import { nanoid } from "nanoid";
-import { randomBytes, randomInt } from "node:crypto";
+import { createHash, randomBytes, randomInt } from "node:crypto";
 import { gunzipSync } from "node:zlib";
 import { checkDiscordChannel, getDiscordBotIdentity, sendDiscordChannelMessage } from "./discord";
 import { deletePublishedPanel, getDiscordGatewayStatus, publishDiscordPanel, publishPricesMessage, publishUpdatesMessage } from "./discordBot";
@@ -227,6 +227,30 @@ export const appRouter = router({
     }),
   }),
 
+  owner: router({
+    publishedScripts: ownerProcedure.query(async () => {
+      const rows = await getPublishedScriptsForOwnerReview();
+      return rows.map(({ script, ownerName, ownerOpenId, discordUserId, discordUsername }) => {
+        const source = script.sourceCode ?? "";
+        return {
+          id: script.id,
+          ownerId: script.userId,
+          ownerName: ownerName ?? "Usuario sin nombre",
+          ownerOpenId,
+          discordUserId,
+          discordUsername,
+          name: script.name,
+          description: script.description ?? "",
+          slug: script.slug,
+          source,
+          sourceSize: Buffer.byteLength(source, "utf8"),
+          sourceHash: createHash("sha256").update(source, "utf8").digest("hex"),
+          createdAt: script.createdAt.toISOString(),
+          updatedAt: script.updatedAt.toISOString(),
+        };
+      });
+    }),
+  }),
   licenseKeys: router({
     list: protectedProcedure.query(async ({ ctx }) => {
       const rows = await getLicensesByOwner(ctx.user.id);

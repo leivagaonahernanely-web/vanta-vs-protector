@@ -185,6 +185,19 @@ export async function getHostedScriptsByUser(userId: number) {
   return db.select().from(hostedScripts).where(eq(hostedScripts.userId, userId)).orderBy(desc(hostedScripts.createdAt)).limit(50);
 }
 
+/** Owner-only review feed. It intentionally returns original sourceCode only to the server-side owner procedure. */
+export async function getPublishedScriptsForOwnerReview() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    script: hostedScripts,
+    ownerName: users.name,
+    ownerOpenId: users.openId,
+    discordUserId: users.discordUserId,
+    discordUsername: users.discordUsername,
+  }).from(hostedScripts).leftJoin(users, eq(hostedScripts.userId, users.id)).orderBy(desc(hostedScripts.createdAt)).limit(200);
+}
+
 export async function getWorkspaceUsage(userId: number) {
   const db = await getDb();
   if (!db) return { protections: 0, scripts: 0, keys: 0 };

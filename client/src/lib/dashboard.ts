@@ -1,6 +1,6 @@
 export type DashboardNavItem = {
-  group: "Workspace" | "Protection" | "Panels";
-  label: "Overview" | "Scripts" | "Obfuscator" | "API key" | "License keys" | "Plan keys" | "HWID bans" | "Logs" | "Plans" | "Create New Panel" | "Manage Panels" | "Prices" | "Updates";
+  group: "Workspace" | "Protection" | "Panels" | "Owner";
+  label: "Overview" | "Scripts" | "Obfuscator" | "API key" | "License keys" | "Plan keys" | "HWID bans" | "Logs" | "Plans" | "Create New Panel" | "Manage Panels" | "Prices" | "Updates" | "Published TXT";
   icon: "overview" | "scripts" | "obfuscator" | "keys" | "hwid" | "logs" | "plans" | "panel" | "prices" | "updates" | "settings";
   badge?: "scripts";
 };
@@ -19,6 +19,7 @@ export const dashboardNavItems: DashboardNavItem[] = [
   { group: "Panels", label: "Manage Panels", icon: "panel" },
   { group: "Panels", label: "Prices", icon: "prices" },
   { group: "Panels", label: "Updates", icon: "updates" },
+  { group: "Owner", label: "Published TXT", icon: "logs" },
 ];
 
 export function getDashboardNavLabels() {
