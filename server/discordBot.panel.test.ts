@@ -146,7 +146,7 @@ describe("Discord access panel", () => {
 
   it("registers slash commands for every panel action", () => {
     const names = discordCommands.map((command: any) => command.name);
-    expect(names).toEqual(["ping", "panel", "stats", "apikey", "getscript", "getrole", "redeem", "generatekey", "deletekey", "whitelabel", "unwhitelist", "blacklist", "resethwid", "addtime", "warn", "dropkey", "prices", "updates", "generatekeyrol"]);
+    expect(names).toEqual(["ping", "panel", "stats", "apikey", "getscript", "getrole", "redeem", "generatekey", "deletekey", "whitelist", "unwhitelist", "blacklist", "resethwid", "addtime", "warn", "dropkey", "prices", "updates", "generatekeyrol"]);
     expect(new Set(names).size).toBe(names.length);
     expect(names).toContain("getscript");
     expect(names).not.toContain("getkey");
@@ -170,13 +170,13 @@ describe("Discord access panel", () => {
     expect(options("getrole")[0].required).toBe(true);
     expect(options("deletekey").find((item: any) => item.name === "key").required).toBe(true);
     expect(options("deletekey").find((item: any) => item.name === "user").required).toBe(false);
-    expect(options("whitelabel")).toHaveLength(3);
-    expect(options("whitelabel").find((item: any) => item.name === "script").autocomplete).toBe(true);
-    expect(options("whitelabel").find((item: any) => item.name === "script").required).toBe(true);
-    expect(options("whitelabel").find((item: any) => item.name === "user").required).toBe(false);
-    expect(options("whitelabel").find((item: any) => item.name === "role").required).toBe(false);
-    expect(options("whitelabel")).not.toContainEqual(expect.objectContaining({ name: "kind" }));
-    expect(options("whitelabel")).not.toContainEqual(expect.objectContaining({ name: "target" }));
+    expect(options("whitelist")).toHaveLength(3);
+    expect(options("whitelist").find((item: any) => item.name === "script").autocomplete).toBe(true);
+    expect(options("whitelist").find((item: any) => item.name === "script").required).toBe(true);
+    expect(options("whitelist").find((item: any) => item.name === "user").required).toBe(false);
+    expect(options("whitelist").find((item: any) => item.name === "role").required).toBe(false);
+    expect(options("whitelist")).not.toContainEqual(expect.objectContaining({ name: "kind" }));
+    expect(options("whitelist")).not.toContainEqual(expect.objectContaining({ name: "target" }));
     expect(options("unwhitelist")).toHaveLength(3);
     expect(options("unwhitelist").find((item: any) => item.name === "script").autocomplete).toBe(true);
     expect(options("unwhitelist").find((item: any) => item.name === "user").required).toBe(false);

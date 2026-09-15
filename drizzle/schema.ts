@@ -135,6 +135,7 @@ export const warnings = mysqlTable("warnings", {
 export const blacklists = mysqlTable("blacklists", {
   id: int("id").autoincrement().primaryKey(),
   ownerId: int("ownerId").notNull().references(() => users.id),
+  hostedScriptId: int("hostedScriptId").references(() => hostedScripts.id),
   discordUserId: varchar("discordUserId", { length: 32 }).notNull(),
   reason: varchar("reason", { length: 500 }),
   active: int("active").default(1).notNull(),

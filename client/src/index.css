@@ -260,3 +260,6 @@ body { background: radial-gradient(circle at 74% -10%, rgba(240,68,80,.08), tran
 .published-txt-preview { max-height: 260px; overflow: auto; margin: 0; padding: .9rem; border: 1px solid rgba(255,255,255,.07); border-radius: 10px; background: rgba(0,0,0,.32); color: #d8dde7; font: .72rem/1.6 ui-monospace, monospace; white-space: pre-wrap; word-break: break-word; }
 .published-txt-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
 @media (max-width: 640px) { .published-txt-card-head { flex-direction: column; gap: .45rem; } .published-txt-preview { max-height: 220px; font-size: .68rem; } .published-txt-actions .text-button { width: 100%; justify-content: center; } }
+.plan-badge { display: inline-flex; width: max-content; margin-bottom: 5px; padding: 3px 6px; border: 1px solid rgba(255,255,255,.12); border-radius: 999px; color: #a9adb7; font: 700 .52rem/1 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
+.plan-badge.plan-pro { border-color: rgba(255,169,74,.42); background: rgba(255,169,74,.1); color: #ffc078; }
+.plan-badge.plan-premium { border-color: rgba(255,82,98,.5); background: rgba(255,59,72,.13); color: #ff9da3; box-shadow: 0 0 18px rgba(255,59,72,.12); }

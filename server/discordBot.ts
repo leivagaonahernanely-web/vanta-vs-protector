@@ -47,6 +47,7 @@ import {
   getUserByDiscordUserId,
   getUserById,
   getUserByOpenId,
+  isDiscordUserBlacklistedForScript,
   redeemLicense,
   resetLicenseHwidByDiscordUserId,
   setKeyManagerRole,
@@ -65,7 +66,7 @@ export const discordCommands = [
   new SlashCommandBuilder().setName("redeem").setDescription("Canjea una key de acceso").addStringOption(o => o.setName("key").setDescription("Key alfanumérica de mínimo 32 caracteres").setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("generatekey").setDescription("Genera una key aleatoria para un script hosteado").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addStringOption(o => o.setName("duration").setDescription("Duración; vacío = forever").setRequired(false)).toJSON(),
   new SlashCommandBuilder().setName("deletekey").setDescription("Elimina una key").addStringOption(o => o.setName("key").setDescription("Key a eliminar").setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario opcional").setRequired(false)).addRoleOption(o => o.setName("role").setDescription("Rol opcional").setRequired(false)).toJSON(),
-  new SlashCommandBuilder().setName("whitelabel").setDescription("Añade un usuario o rol a la whitelist").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario del servidor").setRequired(false)).addRoleOption(o => o.setName("role").setDescription("Rol del servidor").setRequired(false)).toJSON(),
+  new SlashCommandBuilder().setName("whitelist").setDescription("Añade un usuario o rol a la whitelist").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario del servidor").setRequired(false)).addRoleOption(o => o.setName("role").setDescription("Rol del servidor").setRequired(false)).toJSON(),
   new SlashCommandBuilder().setName("unwhitelist").setDescription("Retira un usuario o rol de la whitelist").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario del servidor").setRequired(false)).addRoleOption(o => o.setName("role").setDescription("Rol del servidor").setRequired(false)).toJSON(),
   new SlashCommandBuilder().setName("blacklist").setDescription("Bloquea un usuario para un script").addStringOption(o => o.setName("script").setDescription("Script objetivo").setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario obligatorio").setRequired(true)).addStringOption(o => o.setName("reason").setDescription("Razón").setRequired(false)).toJSON(),
   new SlashCommandBuilder().setName("resethwid").setDescription("Reinicia el HWID de un usuario").addStringOption(o => o.setName("script").setDescription("Script objetivo").setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario obligatorio").setRequired(true)).toJSON(),
@@ -106,7 +107,8 @@ const KEY_ACTION_COOLDOWN_MS = 10_000;
 const respondedInteractions = new WeakSet<object>();
 const processingInteractions = new WeakSet<object>();
 const ownerAccountCache = new Map<string, { expiresAt: number; user: any }>();
-const OWNER_ACCOUNT_CACHE_MS = 5_000;
+const OWNER_ACCOUNT_CACHE_MS = 15_000;
+const CONFIGURED_OWNER_DISCORD_ID = "1501316920975036611";
 const scriptChoiceCache = new Map<number, { expiresAt: number; scripts: any[] }>();
 const SCRIPT_CHOICE_CACHE_MS = 15_000;
 const SCRIPT_CHOICE_TIMEOUT_MS = 2_500;
@@ -186,24 +188,38 @@ async function warmScriptChoiceCache() {
 async function isConfiguredOwner(interaction: any) {
   const owner = await ownerAccount(interaction);
   if (!owner) return false;
-  if (isConfiguredOwnerId({ actorId: interaction.user?.id, linkedDiscordUserId: owner.discordUserId })) return true;
+  const actorId = normalizeDiscordIdentity(interaction.user?.id);
+  const linkedId = normalizeDiscordIdentity(owner.discordUserId);
+  if (actorId === CONFIGURED_OWNER_DISCORD_ID && (!linkedId || linkedId === CONFIGURED_OWNER_DISCORD_ID)) {
+    if (!linkedId) await linkDiscordIdentity(owner.id, CONFIGURED_OWNER_DISCORD_ID, interaction.user.globalName || interaction.user.username || "Discord owner", interaction.user.globalName || null, interaction.user.displayAvatarURL?.({ extension: "png", size: 128 }) ?? null);
+    return true;
+  }
+  if (isConfiguredOwnerId({ actorId, linkedDiscordUserId: linkedId })) return true;
   // Bootstrap only when the owner account has not been linked yet. This keeps
   // whitelist administration owner-only without allowing an arbitrary member.
-  if (!normalizeDiscordIdentity(owner.discordUserId) && isGuildOwner({ actorId: String(interaction.user?.id ?? ""), guildOwnerId: interaction.guild?.ownerId })) {
+  if (!linkedId && isGuildOwner({ actorId: String(interaction.user?.id ?? ""), guildOwnerId: interaction.guild?.ownerId })) {
     await linkDiscordIdentity(owner.id, String(interaction.user.id), interaction.user.globalName || interaction.user.username || "Discord owner", interaction.user.globalName || null, interaction.user.displayAvatarURL?.({ extension: "png", size: 128 }) ?? null);
     return true;
   }
   return false;
 }
 async function canManageKeys(interaction: any) {
-  const owner = await ownerAccount(interaction);
+  // Key administration always belongs to the configured workspace owner. A
+  // delegated manager usually has no web user row of their own, so resolving
+  // the actor first can accidentally select the wrong workspace or return no
+  // owner at all.
+  const panelOwner = getPanelContext(interaction)?.ownerId;
+  const configuredOwner = ENV.ownerOpenId ? await getUserByOpenId(ENV.ownerOpenId) : undefined;
+  const owner = panelOwner ? await getUserById(panelOwner) : (configuredOwner ?? await ownerAccount(interaction));
   if (!owner) return { allowed: false, owner: undefined };
   const managerRole = await getKeyManagerRoleId(owner.id);
+  const actorId = String(interaction.user?.id ?? "");
   const actorIsConfiguredOwner = await isConfiguredOwner(interaction);
-  const actorIsGuildOwner = isGuildOwner({ actorId: String(interaction.user?.id ?? ""), guildOwnerId: interaction.guild?.ownerId });
+  const actorIsGuildOwner = isGuildOwner({ actorId, guildOwnerId: interaction.guild?.ownerId });
   const isAdministrator = Boolean(interaction.memberPermissions?.has(PermissionFlagsBits.Administrator));
   const hasManagerRole = memberHasRole(interaction, managerRole);
-  return { allowed: actorIsConfiguredOwner || actorIsGuildOwner || hasKeyManagementAccess({ actorId: interaction.user?.id, ownerId: owner.discordUserId, isAdministrator, hasManagerRole }), owner };
+  const allowed = actorIsConfiguredOwner || actorIsGuildOwner || isAdministrator || hasManagerRole;
+  return { allowed, owner };
 }
 export async function respond(interaction: any, payload: any) {
   const target = interaction as object;
@@ -219,7 +235,7 @@ async function prepareInteraction(interaction: any) {
   // can be deferred. Every other interaction gets an acknowledgement before DB
   // and Discord API work so Discord never displays “The application did not respond”.
   if (interaction.isAutocomplete?.() || (interaction.isButton?.() && String(interaction.customId ?? "").startsWith("vanta:redeem"))) return;
-  const publicCommand = ["panel", "prices", "updates", "dropkey", "warn", "whitelabel", "unwhitelist"].includes(String(interaction.commandName ?? ""));
+  const publicCommand = ["panel", "prices", "updates", "dropkey", "warn", "whitelist", "unwhitelist", "blacklist"].includes(String(interaction.commandName ?? ""));
   const ephemeral = interaction.isModalSubmit?.() || interaction.isButton?.() || !publicCommand;
   await interaction.deferReply({ ephemeral });
 }
@@ -398,7 +414,12 @@ export async function handleInteraction(interaction: any) {
         if (!interaction.responded) return interaction.respond([]).catch(() => undefined);
       }
     }
-    await prepareInteraction(interaction);
+    try {
+      await prepareInteraction(interaction);
+    } catch (error: any) {
+      if (error?.code === 10062 || error?.code === 40060 || /unknown interaction|already been acknowledged/i.test(String(error?.message ?? ""))) return;
+      throw error;
+    }
     if (interaction.isModalSubmit()) return handleModal(interaction);
     if (interaction.isButton()) return handleButton(interaction);
     if (!interaction.isChatInputCommand()) return;
@@ -430,17 +451,20 @@ export async function handleInteraction(interaction: any) {
     if (interaction.commandName === "warn") return warn(interaction, interaction.options.getUser("user", true), interaction.options.getString("reason", true));
     if (interaction.commandName === "dropkey") return dropKeys(interaction, interaction.options.getInteger("amount", true));
     if (interaction.commandName === "blacklist") return blacklistCommand(interaction);
-    if (interaction.commandName === "whitelabel") return whitelistCommand(interaction);
+    if (interaction.commandName === "whitelist") return whitelistCommand(interaction);
     if (interaction.commandName === "unwhitelist") return unwhitelistCommand(interaction);
     return respond(interaction, { content: "❌ Este comando ya no está disponible. Escribe `/` de nuevo para cargar la lista actual.", ephemeral: true });
-  } catch (error) {
-    console.error("[Discord Bot] Interaction handler failed:", error);
+  } catch (error: any) {
+    const alreadyAcknowledged = error?.code === 40060 || /already been acknowledged/i.test(String(error?.message ?? ""));
+    if (!alreadyAcknowledged) console.error("[Discord Bot] Interaction handler failed:", error);
     const currentInteraction = interaction as any;
-    if (!currentInteraction.replied) {
-      respondedInteractions.delete(currentInteraction);
-      try {
-        await respond(currentInteraction, { content: "No se pudo completar la acción. Revisa la configuración del panel.", ephemeral: true });
-      } catch (responseError) {
+    // Discord has already accepted the acknowledgement in this case; trying
+    // to reply again only creates a second 40060 and hides the real outcome.
+    if (alreadyAcknowledged || currentInteraction.replied || currentInteraction.deferred || respondedInteractions.has(currentInteraction)) return;
+    try {
+      await respond(currentInteraction, { content: "No se pudo completar la acción. Revisa la configuración del panel.", ephemeral: true });
+    } catch (responseError: any) {
+      if (responseError?.code !== 40060 && !/already been acknowledged/i.test(String(responseError?.message ?? ""))) {
         console.error("[Discord Bot] Could not send interaction error response:", responseError);
       }
     }
@@ -541,15 +565,17 @@ async function getKeyForWhitelistedUser(interaction: any) {
 async function panelAccess(interaction: any) {
   const owner = await ownerAccount(interaction);
   const panelContext = getPanelContext(interaction);
-  if (!owner) return { owner, script: undefined, license: undefined };
+  if (!owner) return { owner, script: undefined, license: undefined, blocked: false };
   // Keep the hot path small: Get Script only needs this member's active
   // licenses and the single script bound to the selected panel.
+  const panelScript = panelContext?.hostedScriptId ? await getHostedScriptByOwnerId(owner.id, panelContext.hostedScriptId) : undefined;
   const rawLicenses = await getActiveLicensesByDiscordUserId(interaction.user.id, owner.id);
   const licenses = rawLicenses.filter((license: any) => !license.expiresAt || license.expiresAt.getTime() > Date.now());
   const license = panelContext?.hostedScriptId
     ? licenses.find((item: any) => Number(item.hostedScriptId) === panelContext.hostedScriptId)
     : licenses[0];
-  const script = license?.hostedScriptId ? await getHostedScriptByOwnerId(owner.id, license.hostedScriptId) : undefined;
+  const script = panelScript ?? (license?.hostedScriptId ? await getHostedScriptByOwnerId(owner.id, license.hostedScriptId) : undefined);
+  if (script && await isDiscordUserBlacklistedForScript(owner.id, script.id, interaction.user.id)) return { owner, script, license: undefined, blocked: true };
   if (!license) {
     const match = await getWhitelistScriptForMember(interaction, owner);
     if (match) {
@@ -557,11 +583,12 @@ async function panelAccess(interaction: any) {
       return { owner, script: match.script, license: created };
     }
   }
-  return { owner, script, license };
+  return { owner, script, license, blocked: false };
 }
 
 async function getScriptForUser(interaction: any) {
   const panel = await panelAccess(interaction);
+  if (panel.blocked) return respond(interaction, { content: `⛔ Estás bloqueado para **${panel.script?.name ?? "este script"}**. No puedes obtener el script ni ejecutar su loader.`, ephemeral: true });
   if (!panel.license) return respond(interaction, { content: "❌ No tienes una key activa ni una autorización whitelist válida para este script. Pide al owner que te autorice y vuelve a pulsar Get Script.", ephemeral: true });
   if (!panel.script) return respond(interaction, { content: "❌ Tu acceso está activo, pero todavía no hay un script asignado.", ephemeral: true });
   const copyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -572,6 +599,7 @@ async function getScriptForUser(interaction: any) {
 
 async function copyScriptForUser(interaction: any) {
   const panel = await panelAccess(interaction);
+  if (panel.blocked) return respond(interaction, { content: `⛔ Estás bloqueado para **${panel.script?.name ?? "este script"}**.`, ephemeral: true });
   if (!panel.license) return respond(interaction, { content: "❌ Tu usuario o rol no está en la whitelist de este script.", ephemeral: true });
   if (!panel.script) return respond(interaction, { content: "❌ Tu acceso está activo, pero no hay un script asignado.", ephemeral: true });
   return respond(interaction, { content: getScriptDisplayMessage(panel.script, panel.license.keyCode, panel.license.id), ephemeral: true });
@@ -693,7 +721,11 @@ async function whitelist(interaction: any, discordId: string, kind: "user" | "ro
   const counts = await createAccessRuleIfAbsent({ ownerId: owner.id, hostedScriptId: script.id, kind, discordId: canonicalId, label: kind === "role" ? roleName : "Buyer user" });
   const rules = await getAccessRulesByOwner(owner.id);
   const channel = interaction.channelId ? `<#${interaction.channelId}>` : "canal actual";
-  const embed = new EmbedBuilder().setColor(0x57f287).setTitle("✅ Whitelisted").setDescription(`Acceso concedido a **${kind === "role" ? `<@&${canonicalId}>` : `<@${canonicalId}>`}** en **${script.name}**.\n\n**Added:** ${counts.added} · **Already whitelisted:** ${counts.alreadyWhitelisted} · **Failed:** ${counts.failed}\n**Role ID:** \`${kind === "role" ? canonicalId : "no aplica"}\` · **Script ID:** \`${script.id}\`\n\nAccess the script via → ${channel}`).setFooter({ text: `Reglas activas: ${rules.length}` });
+  const panels = await getDiscordPanelsByOwner(owner.id);
+  const panel = panels.find((item: any) => item.targetScript === script.name);
+  const accessChannel = panel?.channelId ? `<#${panel.channelId}>` : channel;
+  const mention = kind === "role" ? `<@&${canonicalId}>` : `<@${canonicalId}>`;
+  const embed = new EmbedBuilder().setColor(0x57f287).setTitle(`${mention} You have been whitelisted!`).setDescription(`**${mention}** You have been whitelisted!\n\nAccess the script via this message --> ${accessChannel}\n\nScript: **${script.name}**\nAdded: ${counts.added} · Already whitelisted: ${counts.alreadyWhitelisted} · Failed: ${counts.failed}`).setFooter({ text: `Reglas activas: ${rules.length}` });
   return respond(interaction, { embeds: [embed] });
 }
 async function unwhitelist(interaction: any, discordId: string, scriptName: string) {
@@ -781,11 +813,16 @@ async function dropKeys(interaction: any, amount: number) {
 async function blacklistCommand(interaction: any) {
   const owner = await ownerAccount(interaction);
   const user = interaction.options.getUser("user", true);
-  const script = interaction.options.getString("script", true);
+  const scriptSelection = interaction.options.getString("script", true);
   const reason = interaction.options.getString("reason") ?? "Sin razón indicada";
-  if (!owner || (!(await isConfiguredOwner(interaction)) && !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator))) return respond(interaction, { content: "⛔ Solo el propietario o un administrador puede usar blacklist.", ephemeral: true });
-  await createBlacklist({ ownerId: owner.id, discordUserId: user.id, reason, active: 1 });
-  return respond(interaction, { content: `✅ Blacklist aplicada para <@${user.id}> en **${script}**.\nRazón: ${reason}` });
+  const manager = await canManageKeys(interaction);
+  if (!owner || !manager.allowed || !manager.owner) return respond(interaction, { content: "⛔ Solo el propietario, un administrador o el rol delegado puede usar blacklist.", ephemeral: true });
+  const script = await resolveScriptSelection(manager.owner.id, scriptSelection);
+  if (!script) return respond(interaction, { content: "❌ Selecciona un script hosteado válido de tu workspace.", ephemeral: true });
+  await createBlacklist({ ownerId: manager.owner.id, hostedScriptId: script.id, discordUserId: user.id, reason, active: 1 });
+  const panel = (await getDiscordPanelsByOwner(manager.owner.id)).find((item: any) => item.targetScript === script.name);
+  const accessChannel = panel?.channelId ? `<#${panel.channelId}>` : "el canal donde se publicó el panel";
+  return respond(interaction, { content: `⛔ **Blacklist aplicada**\nUsuario: <@${user.id}>\nScript: **${script.name}**\nRazón: ${reason}\n\nEl acceso queda bloqueado para este script.`, ephemeral: false });
 }
 
 function selectedTarget(interaction: any) {

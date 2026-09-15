@@ -141,6 +141,20 @@
       "when": 1787877240644,
       "tag": "0019_robust_white_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1789411327917,
+      "tag": "0020_medical_hex",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "5",
+      "when": 1789411353083,
+      "tag": "0021_steep_shotgun",
+      "breakpoints": true
     }
   ]
 }

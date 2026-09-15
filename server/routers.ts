@@ -67,7 +67,7 @@ const licenseInput = z.object({
   keyKind: z.enum(["normal", "plan"]).default("normal"),
 });
 const accessRuleInput = z.object({ kind: z.enum(["user", "role"]), discordId: z.string().trim().regex(/^\d{15,22}$/), hostedScriptId: z.number().int().positive(), label: z.string().trim().max(128).optional() });
-const blacklistInput = z.object({ discordUserId: z.string().trim().regex(/^\d{15,22}$/), reason: z.string().trim().max(500).optional() });
+const blacklistInput = z.object({ hostedScriptId: z.number().int().positive(), discordUserId: z.string().trim().regex(/^\d{15,22}$/), reason: z.string().trim().max(500).optional() });
 
 async function assertWorkspaceQuota(userId: number, plan: PlanTier | undefined, metric: "obfuscations" | "scripts" | "keys") {
   const selected = PLAN_DEFINITIONS.find((item) => item.id === (plan ?? "free")) ?? PLAN_DEFINITIONS[0];
@@ -292,7 +292,11 @@ export const appRouter = router({
   access: router({
     blacklist: router({
       list: protectedProcedure.query(({ ctx }) => getBlacklistsByOwner(ctx.user.id)),
-      add: protectedProcedure.input(blacklistInput).mutation(({ ctx, input }) => createBlacklist({ ownerId: ctx.user.id, discordUserId: input.discordUserId, reason: input.reason ?? null, active: 1 })),
+      add: protectedProcedure.input(blacklistInput).mutation(async ({ ctx, input }) => {
+        const script = await getHostedScriptByOwnerId(ctx.user.id, input.hostedScriptId);
+        if (!script) throw new TRPCError({ code: "NOT_FOUND", message: "Ese script no pertenece a tu cuenta." });
+        return createBlacklist({ ownerId: ctx.user.id, hostedScriptId: script.id, discordUserId: input.discordUserId, reason: input.reason ?? null, active: 1 });
+      }),
       remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(({ ctx, input }) => deleteBlacklist(ctx.user.id, input.id)),
     }),
     whitelist: router({

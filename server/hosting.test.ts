@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { findMock, licenseMock, licenseByIdMock, scriptByIdMock } = vi.hoisted(() => ({ findMock: vi.fn(), licenseMock: vi.fn(), licenseByIdMock: vi.fn(), scriptByIdMock: vi.fn() }));
-vi.mock("./db", () => ({ getHostedScriptBySlug: findMock, claimLicenseHwid: licenseMock, getLicenseById: licenseByIdMock, getHostedScriptById: scriptByIdMock }));
+const { findMock, licenseMock, activeLicenseMock, blacklistMock, licenseByIdMock, scriptByIdMock } = vi.hoisted(() => ({ findMock: vi.fn(), licenseMock: vi.fn(), activeLicenseMock: vi.fn().mockResolvedValue(undefined), blacklistMock: vi.fn().mockResolvedValue(false), licenseByIdMock: vi.fn(), scriptByIdMock: vi.fn() }));
+vi.mock("./db", () => ({ getHostedScriptBySlug: findMock, claimLicenseHwid: licenseMock, getActiveLicenseForHostedScript: activeLicenseMock, isDiscordUserBlacklistedForScript: blacklistMock, getLicenseById: licenseByIdMock, getHostedScriptById: scriptByIdMock }));
 
 import { registerHostingRoutes } from "./hosting";
 import { makeLoaderToken } from "./loaderTokens";
@@ -26,6 +26,11 @@ function responseMock() {
 }
 
 const script = { id: 1, slug: "scriptSlug123456789", name: "demo.lua", code: "return true", ffaMode: 1, scriptKey: null };
+
+beforeEach(() => {
+  activeLicenseMock.mockReset().mockResolvedValue(undefined);
+  blacklistMock.mockReset().mockResolvedValue(false);
+});
 
 describe("public hosted scripts", () => {
   it("requires the global trial token for FFA scripts", async () => {
@@ -63,6 +68,18 @@ describe("public hosted scripts", () => {
     await getHandler()({ params: { slug: script.slug }, query: { key: "86vC3ZULuEQpOImpm5VBB6oLROAQmPLe", hwid: "device-query" }, headers: { accept: "*/*" }, protocol: "https", get: () => "vanta.test" }, response);
     expect(response.statusCode).toBe(200);
     expect(response.body).toBe("return true");
+  });
+
+  it("blocks a Discord-linked license that is blacklisted for this script", async () => {
+    findMock.mockResolvedValue({ ...script, ffaMode: 0, scriptKey: null });
+    activeLicenseMock.mockResolvedValue({ ownerId: 9, discordUserId: "1501316920975036611" });
+    blacklistMock.mockResolvedValue(true);
+    licenseMock.mockResolvedValue({ id: 4, status: "active" });
+    const response = responseMock();
+    await getHandler()({ params: { slug: script.slug }, query: { key: "86vC3ZULuEQpOImpmVBB6oLROAQmPLe", hwid: "device-query" }, headers: { accept: "text/html" }, protocol: "https", get: () => "vanta.test" }, response);
+    expect(activeLicenseMock).toHaveBeenCalled();
+    expect(response.statusCode).toBe(403);
+    expect(response.body).toContain("Access blocked for this script");
   });
 
   it("serves a protected artifact when the key is active", async () => {

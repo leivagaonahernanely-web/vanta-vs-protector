@@ -686,3 +686,29 @@
 - [x] Mantener la vista owner aislada y sin exponer sources a cuentas normales
 - [x] Añadir huella de integridad server-side para sources publicadas sin almacenar secretos del cliente
 - [x] Probar aislamiento, descarga, preview y permisos owner
+- [x] Auditar la validación actual de Discord, key, HWID y /generatekeyrol
+- [x] Reforzar entrega de script con Discord + key + HWID server-side
+- [x] Aplicar cooldown real y mensajes claros para HWID inválido o bloqueado
+- [x] Corregir autorización de /generatekeyrol por owner o rol autorizado
+- [x] Añadir pruebas de seguridad, aislamiento y regresión del bot
+
+- [x] Reforzar la entrega runtime para exigir Discord vinculado, key activa y HWID compatible en cada acceso normal
+- [x] Mantener trial/FFA separado y explícito, sin debilitar la verificación de keys normales
+- [x] Corregir /generatekeyrol para que el owner vinculado y el rol delegado autorizado puedan administrar keys del workspace correcto
+- [x] Evitar respuestas duplicadas de Discord y controlar correctamente interacciones ya reconocidas
+- [x] Evaluar el loader aportado solo como referencia de carga/limpieza y documentar qué partes no deben copiarse por seguridad
+- [x] Añadir pruebas Vitest para Discord + key + HWID, permisos delegados y errores de interacción
+- [x] Verificar bot, hosting y flujo móvil antes de guardar checkpoint
+
+Nota técnica de referencia: el loader aportado descarga código remoto, lo guarda en una carpeta local, elimina archivos coincidentes y ejecuta el resultado. No se incorporará la escritura/borrado local ni la ejecución opaca sin una necesidad explícita; el servidor mantendrá la entrega controlada, auditable y vinculada a autorización.
+
+- [x] Renombrar /whitelabel a /whitelist y conservar compatibilidad solo si no duplica comandos
+- [x] Publicar la respuesta de whitelist con el canal real del panel y formato solicitado
+- [x] Publicar blacklist para todos con usuario, script y motivo, y mostrar el script elegido
+- [x] Hacer que blacklist bloquee Get Script y la entrega runtime únicamente para el usuario y script afectados
+- [x] Añadir selector web del script para bloquear HWID/usuario y sincronizarlo con Discord
+- [x] Fijar owner configurado por Discord ID 1501316920975036611 con validación segura
+- [x] Mantener el mismo loader estable al actualizar el contenido de un script
+- [x] Sincronizar sesiones, identidad Discord, ofuscaciones, scripts y cuotas del plan
+- [x] Añadir distintivos Pro/Premium y color de plan en las tarjetas de scripts
+- [x] Validar emojis, todos los comandos, mensajes públicos y estados de carga

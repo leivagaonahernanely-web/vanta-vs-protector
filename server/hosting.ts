@@ -1,5 +1,5 @@
 import type { Express, Request, Response } from "express";
-import { claimLicenseHwid, getHostedScriptBySlug, getLicenseById, getHostedScriptById } from "./db";
+import { claimLicenseHwid, getActiveLicenseForHostedScript, getHostedScriptBySlug, getLicenseById, getHostedScriptById, isDiscordUserBlacklistedForScript } from "./db";
 import { verifyLoaderToken } from "./loaderTokens";
 
 function browserNotice(title: string, message: string) {
@@ -48,9 +48,13 @@ export function registerHostingRoutes(app: Express) {
       const requestedHwid = typeof req.headers["x-hwid"] === "string" ? req.headers["x-hwid"].trim() : typeof query.hwid === "string" ? query.hwid.trim() : "";
       const normalKeyPattern = /^(?:[a-z0-9]{32,64}|(?:FREE|PRO|PREMIUM)-[a-z0-9]{16})$/i;
       const hasValidKeyShape = Boolean(requestedKey && normalKeyPattern.test(requestedKey));
-      const protectedAccess = !script.ffaMode && Boolean(requestedKey && requestedHwid && requestedHwid.length <= 128 && hasValidKeyShape && await claimLicenseHwid(script.id, requestedKey, requestedHwid));
+      const activeLicense = requestedKey ? await getActiveLicenseForHostedScript(script.id, requestedKey) : undefined;
+      const blocked = Boolean(activeLicense?.discordUserId && await isDiscordUserBlacklistedForScript(activeLicense.ownerId, script.id, activeLicense.discordUserId));
+      const protectedAccess = !script.ffaMode && !blocked && Boolean(requestedKey && requestedHwid && requestedHwid.length <= 128 && hasValidKeyShape && await claimLicenseHwid(script.id, requestedKey, requestedHwid));
       if (!trialAccess && !protectedAccess) {
-        const message = script.ffaMode
+        const message = blocked
+          ? "Access blocked for this script"
+          : script.ffaMode
           ? (requestedKey ? "La key trial no es válida." : "No key was provided")
           : (!requestedKey ? "No key was provided" : (!requestedHwid ? "HWID not compatible" : "HWID not compatible"));
         if (acceptsHtml) res.status(403).type("html").send(browserNotice("Key required", message));

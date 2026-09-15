@@ -114,9 +114,9 @@ describe("access management", () => {
   });
 
   it("creates blacklist and whitelist rules for the authenticated owner", async () => {
-    dbMocks.createBlacklist.mockResolvedValue({ id: 3, ownerId: 7, discordUserId: "123456789012345678", reason: "abuse", active: 1 });
+    dbMocks.createBlacklist.mockResolvedValue({ id: 3, ownerId: 7, hostedScriptId: 4, discordUserId: "123456789012345678", reason: "abuse", active: 1 });
     dbMocks.createAccessRule.mockResolvedValue({ id: 4, ownerId: 7, kind: "role", discordId: "123456789012345679", label: "VIP", active: 1 });
-    await appRouter.createCaller(context).access.blacklist.add({ discordUserId: "123456789012345678", reason: "abuse" });
+    await appRouter.createCaller(context).access.blacklist.add({ hostedScriptId: 4, discordUserId: "123456789012345678", reason: "abuse" });
     await appRouter.createCaller(context).access.whitelist.add({ hostedScriptId: 4, kind: "role", discordId: "123456789012345679", label: "VIP" });
     expect(dbMocks.createBlacklist).toHaveBeenCalledWith(expect.objectContaining({ ownerId: 7, discordUserId: "123456789012345678" }));
     expect(dbMocks.createAccessRule).toHaveBeenCalledWith(expect.objectContaining({ ownerId: 7, hostedScriptId: 4, kind: "role" }));

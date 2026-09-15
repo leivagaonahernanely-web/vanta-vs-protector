@@ -258,14 +258,36 @@ export async function getActiveLicenseForHostedScript(hostedScriptId: number, ke
   return license;
 }
 
+export async function isDiscordUserBlacklistedForScript(ownerId: number, hostedScriptId: number, discordUserId: string) {
+  const db = await getDb();
+  if (!db) return false;
+  const rows = await db.select({ id: blacklists.id }).from(blacklists).where(and(
+    eq(blacklists.ownerId, ownerId),
+    eq(blacklists.hostedScriptId, hostedScriptId),
+    eq(blacklists.discordUserId, discordUserId),
+    eq(blacklists.active, 1),
+  )).limit(1);
+  return Boolean(rows[0]);
+}
+
 export async function claimLicenseHwid(hostedScriptId: number, keyCode: string, hwid: string) {
   const db = await getDb();
   if (!db) return undefined;
   const rows = await db.select().from(licenses).where(and(eq(licenses.keyCode, keyCode), eq(licenses.status, "active"), or(eq(licenses.hostedScriptId, hostedScriptId), isNull(licenses.hostedScriptId)))).limit(1);
   const license = rows[0];
   if (!license || (license.expiresAt && license.expiresAt.getTime() <= Date.now())) return undefined;
+  if (!license.discordUserId) return undefined;
+  if (await isDiscordUserBlacklistedForScript(license.ownerId, hostedScriptId, license.discordUserId)) return undefined;
   if (license.hwid && license.hwid !== hwid) return undefined;
-  if (!license.hwid) await db.update(licenses).set({ hwid }).where(and(eq(licenses.id, license.id), isNull(licenses.hwid), eq(licenses.status, "active")));
+  if (!license.hwid) {
+    const result = await db.update(licenses).set({ hwid }).where(and(eq(licenses.id, license.id), isNull(licenses.hwid), eq(licenses.status, "active"), eq(licenses.discordUserId, license.discordUserId)));
+    if (Number(result[0]?.affectedRows ?? 0) === 0) {
+      const current = await db.select().from(licenses).where(eq(licenses.id, license.id)).limit(1);
+      const claimed = current[0];
+      if (!claimed || claimed.status !== "active" || claimed.hwid !== hwid) return undefined;
+      return claimed;
+    }
+  }
   return { ...license, hwid };
 }
 
