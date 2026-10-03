@@ -355,7 +355,7 @@ export async function deleteLicense(ownerId: number, id: number) {
 export async function getAccessRulesByOwner(ownerId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(accessRules).where(and(eq(accessRules.ownerId, ownerId), ne(accessRules.label, "__key_manager__"))).orderBy(desc(accessRules.createdAt)).limit(100);
+  return db.select().from(accessRules).where(and(eq(accessRules.ownerId, ownerId), or(isNull(accessRules.label), ne(accessRules.label, "__key_manager__")))).orderBy(desc(accessRules.createdAt)).limit(100);
 }
 
 export async function createAccessRule(input: typeof accessRules.$inferInsert) {

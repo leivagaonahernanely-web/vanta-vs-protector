@@ -783,10 +783,14 @@ async function resetHwidCommand(interaction: any) {
   const target = interaction.options.getUser("user", true);
   const result = await canManageKeys(interaction);
   if (!result.allowed) return respond(interaction, { content: "⛔ Solo el propietario, un administrador o el rol delegado puede reiniciar HWID.", ephemeral: true });
-  const reset = await resetLicenseHwidByDiscordUserId(target.id);
+  if (!result.owner) return respond(interaction, { content: "❌ No se encontró el workspace propietario.", ephemeral: true });
+  const scriptSelection = interaction.options.getString("script", true);
+  const script = await resolveScriptSelection(result.owner.id, scriptSelection);
+  if (!script) return respond(interaction, { content: "❌ Selecciona un script hosteado válido de tu workspace.", ephemeral: true });
+  const reset = await resetLicenseHwidByDiscordUserId(target.id, false, { ownerId: result.owner.id, hostedScriptId: script.id });
   if (reset.reason === "not_found") return respond(interaction, { content: "❌ No se encontraron keys activas para ese usuario.", ephemeral: true });
   if (reset.reason === "cooldown") return respond(interaction, { content: `⏳ Ese usuario ya reinició su HWID. Podrá volver a hacerlo <t:${Math.floor(reset.retryAt.getTime() / 1000)}:R>.`, ephemeral: true });
-  return respond(interaction, { content: `✅ HWID reiniciado para <@${target.id}> en el script indicado. El próximo reset estará disponible en 24 horas.`, ephemeral: true });
+  return respond(interaction, { content: `✅ HWID reiniciado para <@${target.id}> en **${script.name}**. El próximo reset estará disponible en 24 horas.`, ephemeral: true });
 }
 
 async function addTime(interaction: any, key: string, rawDuration: string) {
