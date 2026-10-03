@@ -68,7 +68,7 @@ export const discordCommands = [
   new SlashCommandBuilder().setName("deletekey").setDescription("Elimina una key").addStringOption(o => o.setName("key").setDescription("Key a eliminar").setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario opcional").setRequired(false)).addRoleOption(o => o.setName("role").setDescription("Rol opcional").setRequired(false)).toJSON(),
   new SlashCommandBuilder().setName("whitelist").setDescription("Añade un usuario o rol a la whitelist").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario del servidor").setRequired(false)).addRoleOption(o => o.setName("role").setDescription("Rol del servidor").setRequired(false)).toJSON(),
   new SlashCommandBuilder().setName("unwhitelist").setDescription("Retira un usuario o rol de la whitelist").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario del servidor").setRequired(false)).addRoleOption(o => o.setName("role").setDescription("Rol del servidor").setRequired(false)).toJSON(),
-  new SlashCommandBuilder().setName("blacklist").setDescription("Bloquea un usuario para un script").addStringOption(o => o.setName("script").setDescription("Script objetivo").setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario obligatorio").setRequired(true)).addStringOption(o => o.setName("reason").setDescription("Razón").setRequired(false)).toJSON(),
+  new SlashCommandBuilder().setName("blacklist").setDescription("Bloquea un usuario para un script").addStringOption(o => o.setName("script").setDescription("Script objetivo").setAutocomplete(true).setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario obligatorio").setRequired(true)).addStringOption(o => o.setName("reason").setDescription("Razón").setRequired(false)).toJSON(),
   new SlashCommandBuilder().setName("resethwid").setDescription("Reinicia el HWID de un usuario").addStringOption(o => o.setName("script").setDescription("Script objetivo").setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario obligatorio").setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("addtime").setDescription("Añade tiempo a una key").addStringOption(o => o.setName("key").setDescription("Key obligatoria").setRequired(true)).addStringOption(o => o.setName("duration").setDescription("Tiempo a añadir").setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("warn").setDescription("Advierte a un usuario").addUserOption(o => o.setName("user").setDescription("Usuario obligatorio").setRequired(true)).addStringOption(o => o.setName("reason").setDescription("Razón obligatoria").setRequired(true)).toJSON(),
@@ -174,6 +174,13 @@ async function ownerAccount(interaction?: any) {
   if (resolved) ownerAccountCache.set(cacheKey, { user: resolved, expiresAt: Date.now() + OWNER_ACCOUNT_CACHE_MS });
   return resolved;
 }
+async function configuredWorkspaceOwner(interaction?: any) {
+  const configured = ENV.ownerOpenId ? await getUserByOpenId(ENV.ownerOpenId) : undefined;
+  if (configured) return configured;
+  const configuredIdentity = await getUserByDiscordUserId(CONFIGURED_OWNER_DISCORD_ID);
+  if (configuredIdentity?.id) return getUserById(configuredIdentity.id);
+  return ownerAccount(interaction);
+}
 async function warmScriptChoiceCache() {
   try {
     const owner = await ownerAccount();
@@ -186,7 +193,7 @@ async function warmScriptChoiceCache() {
   }
 }
 async function isConfiguredOwner(interaction: any) {
-  const owner = await ownerAccount(interaction);
+  const owner = await configuredWorkspaceOwner(interaction);
   if (!owner) return false;
   const actorId = normalizeDiscordIdentity(interaction.user?.id);
   const linkedId = normalizeDiscordIdentity(owner.discordUserId);
@@ -685,7 +692,7 @@ async function redeem(interaction: any, rawKey: string, panelContext?: { ownerId
   return respond(interaction, license ? { content: `✅ Key canjeada correctamente: **${license.keyCode}**.`, ephemeral: true } : { content: "❌ Key inválida, expirada o ya vinculada a otra cuenta.", ephemeral: true });
 }
 async function configureKeyRole(interaction: any, role: { id: string }) {
-  const owner = await ownerAccount(interaction);
+  const owner = await configuredWorkspaceOwner(interaction);
   if (!owner || !(await isConfiguredOwner(interaction))) return respond(interaction, { content: "⛔ Solo el owner vinculado desde la web puede configurar Generate Key Role.", ephemeral: true });
   await setKeyManagerRole(owner.id, role.id);
   return respond(interaction, { content: `✅ El rol <@&${role.id}> ahora puede usar "/generatekey" y "/deletekey".`, ephemeral: true });
@@ -700,7 +707,7 @@ export async function resolveScriptSelection(ownerId: number, selection: string)
 }
 
 async function whitelist(interaction: any, discordId: string, kind: "user" | "role", scriptName: string) {
-  const owner = await ownerAccount(interaction);
+  const owner = await configuredWorkspaceOwner(interaction);
   if (!owner || !(await isConfiguredOwner(interaction))) return respond(interaction, { content: "⛔ Solo el owner vinculado puede modificar la whitelist.", ephemeral: true });
   const script = await resolveScriptSelection(owner.id, scriptName);
   if (!script) return respond(interaction, { content: "❌ Selecciona un script hosteado válido de tu workspace.", ephemeral: true });
@@ -729,7 +736,7 @@ async function whitelist(interaction: any, discordId: string, kind: "user" | "ro
   return respond(interaction, { embeds: [embed] });
 }
 async function unwhitelist(interaction: any, discordId: string, scriptName: string) {
-  const owner = await ownerAccount(interaction);
+  const owner = await configuredWorkspaceOwner(interaction);
   if (!owner || !(await isConfiguredOwner(interaction))) return respond(interaction, { content: "⛔ Solo el owner vinculado puede modificar la whitelist.", ephemeral: true });
   const script = await resolveScriptSelection(owner.id, scriptName);
   if (!script) return respond(interaction, { content: "❌ Selecciona un script hosteado válido de tu workspace.", ephemeral: true });
@@ -863,7 +870,7 @@ async function generate(interaction: any, scriptName: string, rawDuration?: stri
   const result = await canManageKeys(interaction);
   if (!canPerformKeyAction(interaction.user.id)) return respond(interaction, { content: "⏳ Espera unos segundos antes de gestionar otra key.", ephemeral: true });
   if (!result.allowed || !result.owner) return respond(interaction, { content: "⛔ No tienes permiso para generar keys.", ephemeral: true });
-  const script = await getHostedScriptByName(result.owner.id, scriptName);
+  const script = await resolveScriptSelection(result.owner.id, scriptName);
   if (!script) return respond(interaction, { content: `❌ No se encontró el script **${scriptName}** en tu workspace.`, ephemeral: true });
   const durationMs = rawDuration ? parseDuration(rawDuration) : undefined;
   if (rawDuration && !durationMs) return respond(interaction, { content: "❌ Usa `30d`, `12h`, `4weeks`, `3months` o `1year`, o déjala vacía para forever.", ephemeral: true });

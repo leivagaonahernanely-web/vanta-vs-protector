@@ -182,6 +182,7 @@ describe("Discord access panel", () => {
     expect(options("unwhitelist").find((item: any) => item.name === "user").required).toBe(false);
     expect(options("unwhitelist").find((item: any) => item.name === "role").required).toBe(false);
     expect(options("blacklist").find((item: any) => item.name === "script").required).toBe(true);
+    expect(options("blacklist").find((item: any) => item.name === "script").autocomplete).toBe(true);
     expect(options("blacklist").find((item: any) => item.name === "user").required).toBe(true);
     expect(options("resethwid").find((item: any) => item.name === "script").required).toBe(true);
     expect(options("resethwid").find((item: any) => item.name === "user").required).toBe(true);
