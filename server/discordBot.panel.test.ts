@@ -35,7 +35,8 @@ describe("Discord access panel", () => {
     const display = getScriptDisplayMessage({ name: "Vanta.vs", slug: "display-script", ffaMode: false }, "mbe2krjut4gdyiggoqc3t47zq3eaxnkl", 42);
     expect(display).toContain("📜 **Vanta.vs**");
     expect(display).toContain("```lua");
-    expect(display).toContain("loadstring(game:HttpGet(");
+    expect(display).toContain("game:HttpGet(");
+    expect(display).toContain("loadstring(response)");
     expect(display).toContain("\n```");
   });
 
@@ -51,6 +52,8 @@ describe("Discord access panel", () => {
     expect(message).not.toContain("Vanta.vs");
     expect(message).not.toContain("```");
     expect(message).not.toContain("```lua");
+    expect(message).toContain('player:Kick("Key is required")');
+    expect(message).toContain('player:Kick("Invalid key")');
   });
 
   it("builds the requested two-row action layout", () => {
