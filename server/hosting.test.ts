@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { findMock, licenseMock, activeLicenseMock, blacklistMock, licenseByIdMock, scriptByIdMock } = vi.hoisted(() => ({ findMock: vi.fn(), licenseMock: vi.fn(), activeLicenseMock: vi.fn().mockResolvedValue(undefined), blacklistMock: vi.fn().mockResolvedValue(false), licenseByIdMock: vi.fn(), scriptByIdMock: vi.fn() }));
 vi.mock("./db", () => ({ getHostedScriptBySlug: findMock, claimLicenseHwid: licenseMock, getActiveLicenseForHostedScript: activeLicenseMock, isDiscordUserBlacklistedForScript: blacklistMock, getLicenseById: licenseByIdMock, getHostedScriptById: scriptByIdMock }));
 
-import { registerHostingRoutes } from "./hosting";
+import { buildVantaIntegrityGuard, registerHostingRoutes } from "./hosting";
 import { makeLoaderToken } from "./loaderTokens";
 
 type Handler = (req: any, res: any) => Promise<void> | void;
@@ -33,6 +33,15 @@ beforeEach(() => {
 });
 
 describe("public hosted scripts", () => {
+  it("builds a local Vanta integrity guard without external bootstrap URLs", () => {
+    const loader = buildVantaIntegrityGuard("return true");
+    expect(loader).toContain("vanta_integrity_ok");
+    expect(loader).toContain("Integrity check failed");
+    expect(loader).toContain("return true");
+    expect(loader).not.toContain("luauprotect.win");
+    expect(loader).not.toContain("bootstrapUrl");
+  });
+
   it("requires the global trial token for FFA scripts", async () => {
     findMock.mockResolvedValue(script);
     const response = responseMock();
@@ -100,6 +109,7 @@ describe("public hosted scripts", () => {
     await getHandler("/scripts/loaders")({ params: { token: makeLoaderToken(license.id, license.keyCode) }, query: {}, headers: { accept: "*/*" }, protocol: "https", get: () => "vanta.test" }, response);
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("RbxAnalyticsService");
+    expect(response.body).toContain("vanta_integrity_ok");
     expect(response.body).toContain("/scripts/hosted/scriptSlug123456789?key=");
     expect(response.body).toContain("&hwid=\" .. h");
   });

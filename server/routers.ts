@@ -11,6 +11,7 @@ import { createHash, randomBytes, randomInt } from "node:crypto";
 import { gunzipSync } from "node:zlib";
 import { checkDiscordChannel, getDiscordBotIdentity, sendDiscordChannelMessage } from "./discord";
 import { deletePublishedPanel, getDiscordGatewayStatus, publishDiscordPanel, publishPricesMessage, publishUpdatesMessage } from "./discordBot";
+import { buildVantaIntegrityGuard } from "./hosting";
 import { getProtectionAdapterStatus, getProviderStatus, protectWithAdapter } from "./protection";
 import { durationToDays, type DurationUnit } from "../shared/duration";
 import { PLAN_DEFINITIONS, type PlanTier } from "../shared/plans";
@@ -52,7 +53,7 @@ function buildRuntimeLoader(url: string, scriptKey?: string | null, ffaMode = fa
   const accessUrl = runtimeKey ? `${url}?key=${encodeURIComponent(runtimeKey)}` : url;
   const load = ffaMode || !runtimeKey
     ? `loadstring(game:HttpGet(\"${accessUrl}\"))()`
-    : `local hwid = game:GetService(\"RbxAnalyticsService\"):GetClientId()\nloadstring(game:HttpGet(\"${accessUrl}&hwid=\" .. hwid))()`;
+    : buildVantaIntegrityGuard(`local hwid = game:GetService(\"RbxAnalyticsService\"):GetClientId()\nloadstring(game:HttpGet(\"${accessUrl}&hwid=\" .. hwid))()`);
   return runtimeKey ? `script_key = \"${runtimeKey}\"\n${load}` : load;
 }
 
