@@ -106,12 +106,25 @@ describe("public hosted scripts", () => {
     licenseByIdMock.mockResolvedValue(license);
     scriptByIdMock.mockResolvedValue(protectedScript);
     const response = responseMock();
-    await getHandler("/scripts/loaders")({ params: { token: makeLoaderToken(license.id, license.keyCode) }, query: {}, headers: { accept: "*/*" }, protocol: "https", get: () => "vanta.test" }, response);
+    await getHandler("/scripts/loaders")({ params: { token: makeLoaderToken(license.id, license.keyCode) }, query: { key: license.keyCode }, headers: { accept: "*/*" }, protocol: "https", get: () => "vanta.test" }, response);
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("RbxAnalyticsService");
     expect(response.body).toContain("vanta_integrity_ok");
     expect(response.body).toContain("/scripts/hosted/scriptSlug123456789?key=");
     expect(response.body).toContain("&hwid=\" .. h");
+  });
+
+  it("rejects an opaque loader when script_key is missing or incorrect", async () => {
+    const protectedScript = { ...script, id: 9, ffaMode: 0, scriptKey: null };
+    const license = { id: 4, status: "active", hostedScriptId: 9, keyCode: "86vC3ZULuEQpOImpm5VBB6oLROAQmPLe", expiresAt: null };
+    licenseByIdMock.mockResolvedValue(license);
+    scriptByIdMock.mockResolvedValue(protectedScript);
+    const missing = responseMock();
+    await getHandler("/scripts/loaders")({ params: { token: makeLoaderToken(license.id, license.keyCode) }, query: {}, headers: { accept: "*/*" }, protocol: "https", get: () => "vanta.test" }, missing);
+    expect(missing.statusCode).toBe(404);
+    const wrong = responseMock();
+    await getHandler("/scripts/loaders")({ params: { token: makeLoaderToken(license.id, license.keyCode) }, query: { key: "wrong-key" }, headers: { accept: "*/*" }, protocol: "https", get: () => "vanta.test" }, wrong);
+    expect(wrong.statusCode).toBe(404);
   });
 
   it("serves only the FFA artifact to non-browser runtime clients with trial", async () => {

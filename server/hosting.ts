@@ -33,7 +33,8 @@ export function registerHostingRoutes(app: Express) {
     if (!match) { res.status(404).type("text/plain").send("Loader not found"); return; }
     try {
       const license = await getLicenseById(Number(match[1]));
-      if (!license || license.status !== "active" || !license.hostedScriptId || (license.expiresAt && license.expiresAt.getTime() <= Date.now()) || !verifyLoaderToken(token.replace(/^\d+-|\.lua$/g, ""), license.id, license.keyCode)) {
+      const suppliedKey = typeof req.query?.key === "string" ? req.query.key.trim() : "";
+      if (!license || license.status !== "active" || !license.hostedScriptId || suppliedKey !== license.keyCode || (license.expiresAt && license.expiresAt.getTime() <= Date.now()) || !verifyLoaderToken(token.replace(/^\d+-|\.lua$/g, ""), license.id, license.keyCode)) {
         res.status(404).type("text/plain").send("Loader not found"); return;
       }
       const script = await getHostedScriptById(license.hostedScriptId);
