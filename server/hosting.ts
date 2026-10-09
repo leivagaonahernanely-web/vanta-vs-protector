@@ -31,9 +31,15 @@ function browserNotice(title: string, message: string) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} · Vanta.vs Protector</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#061a2d;color:#f3f6fa;font:15px system-ui,sans-serif}main{width:min(100%,540px);padding:42px 24px;border:1px solid #174568;border-radius:20px;background:#08213a;text-align:center;box-shadow:0 24px 70px #0007}.mark{width:42px;height:42px;display:grid;place-items:center;margin:0 auto 18px;border-radius:50%;background:#f5f7fa;color:#071a2d;font-weight:800}.eyebrow{color:#65baff;font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}h1{margin:12px 0 0;font-size:30px}p{color:#98b1c5;line-height:1.5}</style></head><body><main><div class="mark">&lt;/&gt;</div><div class="eyebrow">Vanta.vs Protector</div><h1>${title}</h1><p>${message}</p></main></body></html>`;
 }
 
+function loaderBrowserPage(code: string) {
+  const safe = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vanta.vs Loader</title><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#191b35;color:#f8f8ff;font:14px system-ui,sans-serif}main{width:min(100%,620px);text-align:center}.brand{font-weight:800;font-size:20px;margin-bottom:22px}.brand span{color:#e93540}pre{margin:0;padding:18px 16px;text-align:left;overflow:auto;border:1px solid #2e3154;border-radius:8px;background:#111327;color:#cfd2e8;font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;box-shadow:0 18px 50px #0005}button{margin-top:14px;padding:9px 15px;border:1px solid #464b78;border-radius:7px;background:#2a2d51;color:#fff;font-weight:700;cursor:pointer}button:hover{background:#363b68}.note{margin-top:14px;color:#8d91b0;font-size:11px}</style></head><body><main><div class="brand"><span>◈</span> Vanta.vs</div><pre id="loader">${safe}</pre><button onclick="navigator.clipboard.writeText(document.getElementById('loader').innerText)">Copy loader</button><div class="note">Contents are delivered by Vanta.vs Protector.</div></main></body></html>`;
+}
+
 export function registerHostingRoutes(app: Express) {
   app.get("/scripts/loaders/:token", async (req: Request, res: Response) => {
     const token = typeof req.params.token === "string" ? req.params.token : "";
+    const acceptsHtml = typeof req.headers.accept === "string" && req.headers.accept.includes("text/html");
     const match = /^(\d+)-([A-Za-z0-9_-]{24})\.lua$/.exec(token);
     if (!match) { res.status(404).type("text/plain").send("Loader not found"); return; }
     try {
@@ -45,15 +51,21 @@ export function registerHostingRoutes(app: Express) {
       if (license.status !== "active" || (license.expiresAt && license.expiresAt.getTime() <= Date.now())) {
         res.status(200).type("text/plain; charset=utf-8").send(runtimeKick("Invalid key")); return;
       }
-      if (!suppliedKey) {
+      if (!suppliedKey && !acceptsHtml) {
         res.status(200).type("text/plain; charset=utf-8").send(runtimeKick("Key is required")); return;
       }
-      if (suppliedKey !== license.keyCode) {
+      if (suppliedKey !== license.keyCode && !(acceptsHtml && !suppliedKey)) {
         res.status(200).type("text/plain; charset=utf-8").send(runtimeKick("Invalid key")); return;
       }
       const script = await getHostedScriptById(license.hostedScriptId);
       if (!script) { res.status(404).type("text/plain").send("Loader not found"); return; }
       const endpoint = `${req.protocol}://${req.get("host")}/scripts/hosted/${script.slug}?key=${encodeURIComponent(license.keyCode)}`;
+      const visibleLoader = `script_key = "${license.keyCode}"\nloadstring(game:HttpGet("${`${req.protocol}://${req.get("host")}/scripts/loaders/${token}`}?key=" .. (script_key or "")))()`;
+      if (acceptsHtml && !suppliedKey) {
+        res.setHeader("Cache-Control", "private, no-store");
+        res.type("html; charset=utf-8").send(loaderBrowserPage(visibleLoader));
+        return;
+      }
       const stageTwo = buildVantaIntegrityGuard(`local h = game:GetService("RbxAnalyticsService"):GetClientId()\nloadstring(game:HttpGet("${endpoint}&hwid=" .. h))()`);
       res.setHeader("Cache-Control", "private, no-store");
       res.type("text/plain; charset=utf-8").send(stageTwo);

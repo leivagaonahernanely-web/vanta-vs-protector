@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createReconnectGate, discordCommands, formatWhitelistDiagnostic, GET_SCRIPT_COPY_BUTTON_LABEL, getScriptDisplayMessage, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, isConfiguredOwnerId, isGuildOwner, matchesWhitelistRule, mobileViewScriptMessage, panelMessage, parseDuration, respond, resolveScriptSelection, scriptRuntimeLoader, targetChoices } from "./discordBot";
+import { createReconnectGate, discordCommands, formatWhitelistDiagnostic, handleGatewayFailure, handleInteraction, hasKeyManagementAccess, isConfiguredOwnerId, isGuildOwner, matchesWhitelistRule, panelMessage, parseDuration, respond, resolveScriptSelection, scriptRuntimeLoader, targetChoices } from "./discordBot";
 import * as db from "./db";
 
 describe("Discord access panel", () => {
@@ -19,10 +19,6 @@ describe("Discord access panel", () => {
     expect(protectedLoader).toContain("RbxAnalyticsService");
   });
 
-  it("labels the Get Script copy action for mobile users", () => {
-    expect(GET_SCRIPT_COPY_BUTTON_LABEL).toBe("Mobile View Script");
-  });
-
   it("uses the active license key when building a protected Get Script loader", () => {
     const loader = scriptRuntimeLoader({ slug: "bound-script", ffaMode: false, scriptKey: "internal-script-key" }, "86vC3ZULuEQpOImpm5VBB6oLROAQmPLe");
     expect(loader).toContain('script_key = "86vC3ZULuEQpOImpm5VBB6oLROAQmPLe"');
@@ -31,27 +27,12 @@ describe("Discord access panel", () => {
     expect(loader).toContain("&hwid=\" .. hwid");
   });
 
-  it("keeps Get Script visually formatted while Mobile View stays compact", () => {
-    const display = getScriptDisplayMessage({ name: "Vanta.vs", slug: "display-script", ffaMode: false }, "mbe2krjut4gdyiggoqc3t47zq3eaxnkl", 42);
-    expect(display).toContain("📜 **Vanta.vs**");
-    expect(display).toContain("```lua");
-    expect(display).toContain("game:HttpGet(");
-    expect(display).toContain("script_key");
-    expect(display).toContain("\n```");
-  });
-
-  it("builds Mobile View Script as only the two loader lines", () => {
+  it("builds Get Script as only the two loader lines", () => {
     const loader = scriptRuntimeLoader({ slug: "mobile-script", ffaMode: false, scriptKey: "internal-key" }, "mbe2krjut4gdyiggoqc3t47zq3eaxnkl", 42);
-    const message = mobileViewScriptMessage({ name: "Vanta.vs", slug: "mobile-script", ffaMode: false }, "mbe2krjut4gdyiggoqc3t47zq3eaxnkl", 42);
     expect(loader.split("\n")).toHaveLength(2);
     expect(loader).toContain('/scripts/loaders/');
     expect(loader).not.toContain("RbxAnalyticsService");
     expect(loader).not.toContain("/scripts/hosted/");
-    expect(message).toBe(loader);
-    expect(message.split("\n")).toHaveLength(2);
-    expect(message).not.toContain("Vanta.vs");
-    expect(message).not.toContain("```");
-    expect(message).not.toContain("```lua");
   });
 
   it("builds the requested two-row action layout", () => {

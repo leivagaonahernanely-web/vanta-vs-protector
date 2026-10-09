@@ -114,6 +114,21 @@ describe("public hosted scripts", () => {
     expect(response.body).toContain("&hwid=\" .. h");
   });
 
+  it("renders a browser loader page instead of exposing the auth stage", async () => {
+    const protectedScript = { ...script, id: 9, ffaMode: 0, scriptKey: null };
+    const license = { id: 4, status: "active", hostedScriptId: 9, keyCode: "86vC3ZULuEQpOImpm5VBB6oLROAQmPLe", expiresAt: null };
+    licenseByIdMock.mockResolvedValue(license);
+    scriptByIdMock.mockResolvedValue(protectedScript);
+    const response = responseMock();
+    await getHandler("/scripts/loaders")({ params: { token: makeLoaderToken(license.id, license.keyCode) }, query: {}, headers: { accept: "text/html" }, protocol: "https", get: () => "vanta.test" }, response);
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain("Vanta.vs Loader");
+    expect(response.body).toContain("script_key = &quot;");
+    expect(response.body).toContain("Copy loader");
+    expect(response.body).not.toContain("vanta_integrity_ok");
+    expect(response.body).not.toContain("RbxAnalyticsService");
+  });
+
   it("rejects an opaque loader when script_key is missing or incorrect", async () => {
     const protectedScript = { ...script, id: 9, ffaMode: 0, scriptKey: null };
     const license = { id: 4, status: "active", hostedScriptId: 9, keyCode: "86vC3ZULuEQpOImpm5VBB6oLROAQmPLe", expiresAt: null };

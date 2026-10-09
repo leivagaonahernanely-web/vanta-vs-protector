@@ -55,7 +55,6 @@ import {
 import { randomInt } from "node:crypto";
 
 const PANEL_URL = "https://vanta-prot-hfw5hmym.manus.space";
-export const GET_SCRIPT_COPY_BUTTON_LABEL = "Mobile View Script";
 export const discordCommands = [
   new SlashCommandBuilder().setName("ping").setDescription("Verifica la latencia del bot").toJSON(),
   new SlashCommandBuilder().setName("panel").setDescription("Publica un panel existente de Vanta.vs Protector").addStringOption(o => o.setName("panel").setDescription("Panel existente").setAutocomplete(true).setRequired(true)).toJSON(),
@@ -151,7 +150,7 @@ export function isConfiguredOwnerId(input: { actorId: unknown; linkedDiscordUser
 }
 function getPanelContext(interaction: any) {
   const parts = String(interaction?.customId ?? "").split(":");
-  if (parts[0] !== "vanta" || !["redeem", "redeem-modal", "script", "role", "hwid", "stats", "copy-loader"].includes(parts[1])) return undefined;
+  if (parts[0] !== "vanta" || !["redeem", "redeem-modal", "script", "role", "hwid", "stats"].includes(parts[1])) return undefined;
   const ownerId = Number(parts[2]);
   if (!Number.isInteger(ownerId) || ownerId <= 0) return undefined;
   const hostedScriptId = Number(parts[3]);
@@ -246,12 +245,8 @@ async function prepareInteraction(interaction: any) {
   const ephemeral = interaction.isModalSubmit?.() || interaction.isButton?.() || !publicCommand;
   await interaction.deferReply({ ephemeral });
 }
-export function mobileViewScriptMessage(script: any, accessKey: string, licenseId: number) {
-  return scriptRuntimeLoader(script, accessKey, licenseId);
-}
-
 export function getScriptDisplayMessage(script: any, accessKey: string, licenseId: number) {
-  return "📜 **" + script.name + "**\n\n```lua\n" + scriptRuntimeLoader(script, accessKey, licenseId) + "\n```";
+  return scriptRuntimeLoader(script, accessKey, licenseId);
 }
 
 export function scriptRuntimeLoader(script: any, accessKey?: string, licenseId?: number) {
@@ -598,18 +593,7 @@ async function getScriptForUser(interaction: any) {
   if (panel.blocked) return respond(interaction, { content: `⛔ Estás bloqueado para **${panel.script?.name ?? "este script"}**. No puedes obtener el script ni ejecutar su loader.`, ephemeral: true });
   if (!panel.license) return respond(interaction, { content: "❌ No tienes una key activa ni una autorización whitelist válida para este script. Pide al owner que te autorice y vuelve a pulsar Get Script.", ephemeral: true });
   if (!panel.script) return respond(interaction, { content: "❌ Tu acceso está activo, pero todavía no hay un script asignado.", ephemeral: true });
-  const copyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(panelActionId("copy-loader", panel.owner?.id, panel.script.id)).setLabel(GET_SCRIPT_COPY_BUTTON_LABEL).setStyle(ButtonStyle.Secondary),
-  );
-  return respond(interaction, { content: scriptRuntimeLoader(panel.script, panel.license.keyCode, panel.license.id), components: [copyRow], ephemeral: true });
-}
-
-async function copyScriptForUser(interaction: any) {
-  const panel = await panelAccess(interaction);
-  if (panel.blocked) return respond(interaction, { content: `⛔ Estás bloqueado para **${panel.script?.name ?? "este script"}**.`, ephemeral: true });
-  if (!panel.license) return respond(interaction, { content: "❌ Tu usuario o rol no está en la whitelist de este script.", ephemeral: true });
-  if (!panel.script) return respond(interaction, { content: "❌ Tu acceso está activo, pero no hay un script asignado.", ephemeral: true });
-  return respond(interaction, { content: getScriptDisplayMessage(panel.script, panel.license.keyCode, panel.license.id), ephemeral: true });
+  return respond(interaction, { content: scriptRuntimeLoader(panel.script, panel.license.keyCode, panel.license.id), ephemeral: true });
 }
 
 async function configureBuyerRole(interaction: any, role: { id: string }) {
@@ -637,7 +621,7 @@ async function getRoleForUser(interaction: any) {
 
 async function handleButton(interaction: ButtonInteraction) {
   const panelAction = String(interaction.customId).split(":").slice(0, 2).join(":");
-  const requiresPanelContext = ["vanta:redeem", "vanta:script", "vanta:role", "vanta:hwid", "vanta:stats", "vanta:copy-loader"].includes(panelAction);
+  const requiresPanelContext = ["vanta:redeem", "vanta:script", "vanta:role", "vanta:hwid", "vanta:stats"].includes(panelAction);
   if (requiresPanelContext && !getPanelContext(interaction)) {
     return respond(interaction, { content: "⚠️ Este panel es antiguo o no está vinculado a un script. Pide al owner que lo vuelva a publicar desde el dashboard.", ephemeral: true });
   }
@@ -650,13 +634,6 @@ async function handleButton(interaction: ButtonInteraction) {
   }
   if (interaction.customId === "vanta:get-key") return getKeyForWhitelistedUser(interaction);
   if (panelAction === "vanta:script") return getScriptForUser(interaction);
-  if (panelAction === "vanta:copy-loader") {
-    const updatedRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId(interaction.customId).setLabel(GET_SCRIPT_COPY_BUTTON_LABEL).setStyle(ButtonStyle.Secondary),
-    );
-    if (interaction.message?.edit) await interaction.message.edit({ components: [updatedRow] }).catch(() => undefined);
-    return copyScriptForUser(interaction);
-  }
   if (interaction.customId.startsWith("vanta:copy-key:")) {
     const key = interaction.customId.slice("vanta:copy-key:".length).trim();
     if (!/^[A-Za-z0-9-]{1,64}$/.test(key)) return respond(interaction, { content: "❌ Esta key ya no es válida.", ephemeral: true });
