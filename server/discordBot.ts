@@ -259,7 +259,7 @@ export function scriptRuntimeLoader(script: any, accessKey?: string, licenseId?:
   const runtimeKey = script.ffaMode ? "trial" : (accessKey || script.scriptKey);
   if (!script.ffaMode && accessKey && licenseId) {
     const compactUrl = `${PANEL_URL}/scripts/loaders/${makeLoaderToken(licenseId, accessKey)}`;
-    return `script_key = "${accessKey}"\n(function() local player = game:GetService("Players").LocalPlayer; if type(script_key) ~= "string" or script_key == "" then if player then player:Kick("Key is required") end; return end; local response = game:HttpGet("${compactUrl}?key=" .. script_key); if not response or response == "Loader not found" then if player then player:Kick("Invalid key") end; return end; local chunk = loadstring(response); if type(chunk) ~= "function" then if player then player:Kick("Invalid key") end; return end; chunk() end)()`;
+    return `script_key = "${accessKey}"\nloadstring(game:HttpGet("${compactUrl}?key=" .. (script_key or "")))()`;
   }
   const accessUrl = runtimeKey ? `${url}?key=${encodeURIComponent(runtimeKey)}` : url;
   const load = script.ffaMode || !runtimeKey

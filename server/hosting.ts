@@ -19,7 +19,12 @@ if not vanta_integrity_ok() then
   vanta_fail("Integrity check failed")
   return
 end
-${nextLoader}`;
+	${nextLoader}`;
+}
+
+function runtimeKick(message: string) {
+  return `local player = game:GetService("Players").LocalPlayer
+if player then player:Kick(${JSON.stringify(message)}) end`;
 }
 
 function browserNotice(title: string, message: string) {
@@ -34,8 +39,17 @@ export function registerHostingRoutes(app: Express) {
     try {
       const license = await getLicenseById(Number(match[1]));
       const suppliedKey = typeof req.query?.key === "string" ? req.query.key.trim() : "";
-      if (!license || license.status !== "active" || !license.hostedScriptId || suppliedKey !== license.keyCode || (license.expiresAt && license.expiresAt.getTime() <= Date.now()) || !verifyLoaderToken(token.replace(/^\d+-|\.lua$/g, ""), license.id, license.keyCode)) {
+      if (!license || !license.hostedScriptId || !verifyLoaderToken(token.replace(/^\d+-|\.lua$/g, ""), license.id, license.keyCode)) {
         res.status(404).type("text/plain").send("Loader not found"); return;
+      }
+      if (license.status !== "active" || (license.expiresAt && license.expiresAt.getTime() <= Date.now())) {
+        res.status(200).type("text/plain; charset=utf-8").send(runtimeKick("Invalid key")); return;
+      }
+      if (!suppliedKey) {
+        res.status(200).type("text/plain; charset=utf-8").send(runtimeKick("Key is required")); return;
+      }
+      if (suppliedKey !== license.keyCode) {
+        res.status(200).type("text/plain; charset=utf-8").send(runtimeKick("Invalid key")); return;
       }
       const script = await getHostedScriptById(license.hostedScriptId);
       if (!script) { res.status(404).type("text/plain").send("Loader not found"); return; }

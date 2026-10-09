@@ -121,10 +121,12 @@ describe("public hosted scripts", () => {
     scriptByIdMock.mockResolvedValue(protectedScript);
     const missing = responseMock();
     await getHandler("/scripts/loaders")({ params: { token: makeLoaderToken(license.id, license.keyCode) }, query: {}, headers: { accept: "*/*" }, protocol: "https", get: () => "vanta.test" }, missing);
-    expect(missing.statusCode).toBe(404);
+    expect(missing.statusCode).toBe(200);
+    expect(missing.body).toContain('player:Kick("Key is required")');
     const wrong = responseMock();
     await getHandler("/scripts/loaders")({ params: { token: makeLoaderToken(license.id, license.keyCode) }, query: { key: "wrong-key" }, headers: { accept: "*/*" }, protocol: "https", get: () => "vanta.test" }, wrong);
-    expect(wrong.statusCode).toBe(404);
+    expect(wrong.statusCode).toBe(200);
+    expect(wrong.body).toContain('player:Kick("Invalid key")');
   });
 
   it("serves only the FFA artifact to non-browser runtime clients with trial", async () => {
