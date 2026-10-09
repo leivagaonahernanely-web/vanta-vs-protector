@@ -250,9 +250,9 @@ export default function Home(props: any = {}) {
   const whitelist = (whitelistQuery.data ?? []) as AccessRule[];
   const existingPanels = panelsQuery.data ?? [];
 
-  if (loading) return <div className="auth-screen"><div className="auth-card"><div className="auth-icon"><Code2 size={19} /></div><div className="skeleton-line" /><div className="skeleton-line short" /></div></div>;
+  if (loading) return <div className="auth-screen"><div className="auth-card"><div className="auth-icon"><img src="/manus-storage/vantaprotect-vp_3feb80e8.webp" alt="Vantaprotect" /></div><div className="skeleton-line" /><div className="skeleton-line short" /></div></div>;
 
-  if (!isAuthenticated) return <div className="auth-screen"><div className="auth-card"><div className="auth-icon"><Code2 size={20} /></div><h1>Inicia sesión con Discord</h1><p>Vincula tu cuenta de Discord para entrar a Vanta.vs Protector y administrar tu workspace.</p><Button className="primary-button full-button" onClick={startDiscordLogin}><span className="discord-login-mark">D</span> Continuar con Discord <ExternalLink size={15} /></Button><div className="auth-foot"><span>Vanta.vs Protector</span><span>Acceso seguro por Discord</span></div></div><span className="made-by">Built for controlled delivery</span></div>;
+  if (!isAuthenticated) return <div className="auth-screen"><div className="auth-card"><div className="auth-icon"><img src="/manus-storage/vantaprotect-vp_3feb80e8.webp" alt="Vantaprotect" /></div><h1>Inicia sesión con Discord</h1><p>Vincula tu cuenta de Discord para entrar a Vanta.vs Protector y administrar tu workspace.</p><Button className="primary-button full-button" onClick={startDiscordLogin}><span className="discord-login-mark">D</span> Continuar con Discord <ExternalLink size={15} /></Button><div className="auth-foot"><span>Vantaprotect</span><span>Acceso seguro por Discord</span></div></div><span className="made-by">Built for controlled delivery</span></div>;
 
   const scripts = (hostedQuery.data ?? []) as HostedItem[];
   const scriptById = new Map(scripts.map((script) => [script.id, script.name]));
@@ -264,7 +264,7 @@ export default function Home(props: any = {}) {
   const overviewCopy = getOverviewCopy();
   return <div className="app-shell">
     <aside className={`sidebar ${mobileOpen ? "open" : ""}`}>
-      <div className="sidebar-brand"><span className="brand-symbol"><ShieldCheck size={18} /></span><span><strong>Vanta.vs</strong><small>Protector</small></span></div>
+      <div className="sidebar-brand"><span className="brand-symbol"><img src="/manus-storage/vantaprotect-vp_3feb80e8.webp" alt="Vantaprotect" /></span><span><strong>Vantaprotect</strong><small>Vanta.vs Protector</small></span></div>
       <div className="workspace-switch"><span className="workspace-dot" /> <span>Personal workspace</span><span className="chevron">⌄</span></div>
       <nav className="side-nav">
         {(["Workspace", "Protection", "Panels", "Owner"] as const).map((group) => <div key={group}>

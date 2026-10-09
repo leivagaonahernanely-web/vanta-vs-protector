@@ -122,7 +122,7 @@ describe("public hosted scripts", () => {
     const response = responseMock();
     await getHandler("/scripts/loaders")({ params: { token: makeLoaderToken(license.id, license.keyCode) }, query: {}, headers: { accept: "text/html" }, protocol: "https", get: () => "vanta.test" }, response);
     expect(response.statusCode).toBe(200);
-    expect(response.body).toContain("Vanta.vs Loader");
+    expect(response.body).toContain("Vantaprotect Loader");
     expect(response.body).toContain("script_key = &quot;");
     expect(response.body).toContain("Copy loader");
     expect(response.body).not.toContain("vanta_integrity_ok");
