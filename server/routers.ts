@@ -189,6 +189,9 @@ export const appRouter = router({
     remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const existing = await getHostedScriptById(input.id);
       if (!existing || existing.userId !== ctx.user.id) throw new TRPCError({ code: "NOT_FOUND", message: "Script no encontrado." });
+      let panels: Array<{ targetScript: string; channelId: string; messageId: string | null }> = [];
+      try { if (typeof getDiscordPanelsByOwner === "function") panels = (await getDiscordPanelsByOwner(ctx.user.id)).filter((panel) => panel.targetScript === existing.name); } catch { panels = []; }
+      for (const panel of panels) if (panel.messageId) { try { await deletePublishedPanel(panel.channelId, panel.messageId); } catch (error) { console.warn("[Discord] No se pudo borrar el mensaje del panel eliminado", error); } }
       await deleteHostedScript(ctx.user.id, input.id);
       return { success: true as const };
     }),

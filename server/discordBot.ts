@@ -24,6 +24,7 @@ import { makeLoaderToken } from "./loaderTokens";
 import {
   createAccessRuleIfAbsent,
   createBlacklist,
+  deleteBlacklist,
   createKeyAuditLog,
   createWarning,
   addTimeToLicense,
@@ -31,12 +32,14 @@ import {
   getAccessRulesByOwner,
   createLicense,
   deleteLicenseByKeyCode,
+  deleteLicensesByDiscordUserId,
   getKeyManagerRoleId,
   getHostedScriptByName,
   getHostedScriptById,
   getHostedScriptByOwnerId,
   getHostedScriptsByUser,
   getDiscordPanelsByOwner,
+  getBlacklistsByOwner,
   getLicensesByOwner,
   getActiveLicensesByDiscordUserId,
   getApiKeyByDiscordUserId,
@@ -61,13 +64,14 @@ export const discordCommands = [
   new SlashCommandBuilder().setName("stats").setDescription("Muestra el estado del acceso").toJSON(),
   new SlashCommandBuilder().setName("apikey").setDescription("Muestra la API key de tu cuenta vinculada").toJSON(),
   new SlashCommandBuilder().setName("getscript").setDescription("Obtiene el enlace de acceso al script").toJSON(),
-  new SlashCommandBuilder().setName("getrole").setDescription("Configura el rol que recibirá un usuario con key activa").addRoleOption(o => o.setName("role").setDescription("Rol comprador").setRequired(true)).toJSON(),
+  new SlashCommandBuilder().setName("getrole").setDescription("Configura el rol que recibirá un usuario con key activa").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addRoleOption(o => o.setName("role").setDescription("Rol comprador").setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("redeem").setDescription("Canjea una key de acceso").addStringOption(o => o.setName("key").setDescription("Key alfanumérica de mínimo 32 caracteres").setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("generatekey").setDescription("Genera una key aleatoria para un script hosteado").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addStringOption(o => o.setName("duration").setDescription("Duración; vacío = forever").setRequired(false)).toJSON(),
-  new SlashCommandBuilder().setName("deletekey").setDescription("Elimina una key").addStringOption(o => o.setName("key").setDescription("Key a eliminar").setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario opcional").setRequired(false)).addRoleOption(o => o.setName("role").setDescription("Rol opcional").setRequired(false)).toJSON(),
+  new SlashCommandBuilder().setName("deletekey").setDescription("Elimina una key reclamada o una key concreta").addStringOption(o => o.setName("key").setDescription("Key a eliminar (opcional si eliges usuario)").setRequired(false)).addUserOption(o => o.setName("user").setDescription("Usuario que reclamó la key").setRequired(false)).addRoleOption(o => o.setName("role").setDescription("Rol opcional").setRequired(false)).toJSON(),
   new SlashCommandBuilder().setName("whitelist").setDescription("Añade un usuario o rol a la whitelist").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario del servidor").setRequired(false)).addRoleOption(o => o.setName("role").setDescription("Rol del servidor").setRequired(false)).toJSON(),
   new SlashCommandBuilder().setName("unwhitelist").setDescription("Retira un usuario o rol de la whitelist").addStringOption(o => o.setName("script").setDescription("Script hosteado").setAutocomplete(true).setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario del servidor").setRequired(false)).addRoleOption(o => o.setName("role").setDescription("Rol del servidor").setRequired(false)).toJSON(),
   new SlashCommandBuilder().setName("blacklist").setDescription("Bloquea un usuario para un script").addStringOption(o => o.setName("script").setDescription("Script objetivo").setAutocomplete(true).setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario obligatorio").setRequired(true)).addStringOption(o => o.setName("reason").setDescription("Razón").setRequired(false)).toJSON(),
+  new SlashCommandBuilder().setName("unblacklist").setDescription("Quita el bloqueo de un usuario para un script").addStringOption(o => o.setName("script").setDescription("Script objetivo").setAutocomplete(true).setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario obligatorio").setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("resethwid").setDescription("Reinicia el HWID de un usuario").addStringOption(o => o.setName("script").setDescription("Script objetivo").setRequired(true)).addUserOption(o => o.setName("user").setDescription("Usuario obligatorio").setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("addtime").setDescription("Añade tiempo a una key").addStringOption(o => o.setName("key").setDescription("Key obligatoria").setRequired(true)).addStringOption(o => o.setName("duration").setDescription("Tiempo a añadir").setRequired(true)).toJSON(),
   new SlashCommandBuilder().setName("warn").setDescription("Advierte a un usuario").addUserOption(o => o.setName("user").setDescription("Usuario obligatorio").setRequired(true)).addStringOption(o => o.setName("reason").setDescription("Razón obligatoria").setRequired(true)).toJSON(),
@@ -270,6 +274,7 @@ export function panelMessage(context?: { ownerId?: number; hostedScriptId?: numb
   const embed = new EmbedBuilder()
     .setColor(0x5865f2)
     .setAuthor({ name: "Vanta.vs Protector · APP" })
+    .setAuthor({ name: "Vanta.vs Protector" })
     .setTitle(projectName)
     .setDescription(`This control panel is for the project: **${projectName}**\nIf you're a buyer, click on the buttons below to redeem your key, get the script or get your role`)
     .setFooter({ text: `Sent by ${senderName} · ${new Date().toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })}`, ...(senderAvatarUrl ? { iconURL: senderAvatarUrl } : {}) })
@@ -326,13 +331,13 @@ export async function publishDiscordPanel(channelId: string, config?: { name?: s
   if (!client || !gatewayOnline) throw new Error("El Gateway Discord no está conectado.");
   const channel = await client.channels.fetch(channelId);
   if (!channel?.isTextBased() || !("send" in channel)) throw new Error("El canal Discord no permite mensajes.");
-  const projectName = config?.name?.trim() || "Vanta.vs Protector";
+  const projectName = config?.script?.trim() || config?.name?.trim() || "Vanta.vs Protector";
   const base = panelMessage({ ownerId: config?.ownerId, hostedScriptId: config?.hostedScriptId, projectName, senderName: config?.senderName, senderAvatarUrl: config?.senderAvatarUrl });
   const senderName = config?.senderName?.trim() || client?.user?.username || "Vantaprotect";
   const senderAvatarUrl = config?.senderAvatarUrl || undefined;
   const sentBy = `Sent by ${senderName}`;
   const footer = config?.script ? `Script: ${config.script} · ${sentBy}` : `${sentBy} · Vanta.vs Protector`;
-  const embed = new EmbedBuilder().setColor(0x5865f2).setAuthor({ name: "Vanta.vs Protector · APP" }).setTitle(projectName).setDescription(`This control panel is for the project: **${projectName}**\nIf you're a buyer, click on the buttons below to redeem your key, get the script or get your role`).setFooter({ text: footer, ...(senderAvatarUrl ? { iconURL: senderAvatarUrl } : {}) }).setTimestamp();
+  const embed = new EmbedBuilder().setColor(0x5865f2).setAuthor({ name: "Vanta.vs Protector" }).setTitle(projectName).setDescription(`This control panel is for the project: **${projectName}**\nIf you're a buyer, click on the buttons below to redeem your key, get the script or get your role`).setFooter({ text: footer, ...(senderAvatarUrl ? { iconURL: senderAvatarUrl } : {}) }).setTimestamp();
   const sent = await channel.send({ embeds: [embed], components: base.components });
   return { channelId, title: config?.name?.trim() || "Vanta.vs Protector · Access Panel", messageId: sent.id };
 }
@@ -445,23 +450,24 @@ export async function handleInteraction(interaction: any) {
       if (!owner || !panel) return respond(interaction, { content: "❌ Selecciona un panel existente de tu workspace.", ephemeral: true });
       const script = await getHostedScriptByName(owner.id, panel.targetScript);
       if (!script) return respond(interaction, { content: "❌ El script asociado a ese panel ya no pertenece a tu workspace.", ephemeral: true });
-      return respond(interaction, { content: `✅ Panel **${panel.name}** colocado con **${script.name}**.`, ephemeral: false, ...panelMessage({ ownerId: owner.id, hostedScriptId: script.id, senderName: interaction.user?.globalName || interaction.user?.username, senderAvatarUrl: interaction.user?.displayAvatarURL?.({ extension: "png", size: 128 }) }) });
+      return respond(interaction, { ephemeral: false, ...panelMessage({ ownerId: owner.id, hostedScriptId: script.id, projectName: script.name, senderName: interaction.user?.globalName || interaction.user?.username, senderAvatarUrl: interaction.user?.displayAvatarURL?.({ extension: "png", size: 128 }) }) });
     }
     if (interaction.commandName === "prices") return prices(interaction);
     if (interaction.commandName === "updates") return updates(interaction);
     if (interaction.commandName === "stats") return respond(interaction, { content: "Vanta.vs Protector está conectado. Usa el dashboard web para consultar scripts, licencias y actividad.", ephemeral: true });
     if (interaction.commandName === "apikey") return apiKeyForUser(interaction);
     if (interaction.commandName === "getscript") return getScriptForUser(interaction);
-    if (interaction.commandName === "getrole") return configureBuyerRole(interaction, interaction.options.getRole("role", true));
+    if (interaction.commandName === "getrole") return configureBuyerRole(interaction, interaction.options.getRole("role", true), interaction.options.getString("script", true));
     if (interaction.commandName === "redeem") return redeem(interaction, interaction.options.getString("key", true));
     if (interaction.commandName === "resethwid") return resetHwidCommand(interaction);
     if (interaction.commandName === "generatekeyrol") return configureKeyRole(interaction, interaction.options.getRole("role", true));
     if (interaction.commandName === "generatekey") return generate(interaction, interaction.options.getString("script", true), interaction.options.getString("duration"));
-    if (interaction.commandName === "deletekey") return remove(interaction, interaction.options.getString("key", true));
+    if (interaction.commandName === "deletekey") return remove(interaction, interaction.options.getString("key"), interaction.options.getUser("user"));
     if (interaction.commandName === "addtime") return addTime(interaction, interaction.options.getString("key", true), interaction.options.getString("duration", true));
     if (interaction.commandName === "warn") return warn(interaction, interaction.options.getUser("user", true), interaction.options.getString("reason", true));
     if (interaction.commandName === "dropkey") return dropKeys(interaction, interaction.options.getInteger("amount", true));
     if (interaction.commandName === "blacklist") return blacklistCommand(interaction);
+    if (interaction.commandName === "unblacklist") return unblacklistCommand(interaction);
     if (interaction.commandName === "whitelist") return whitelistCommand(interaction);
     if (interaction.commandName === "unwhitelist") return unwhitelistCommand(interaction);
     return respond(interaction, { content: "❌ Este comando ya no está disponible. Escribe `/` de nuevo para cargar la lista actual.", ephemeral: true });
@@ -605,11 +611,13 @@ async function getScriptForUser(interaction: any) {
   return respond(interaction, { content: scriptRuntimeLoader(panel.script, panel.license.keyCode, panel.license.id), ephemeral: true });
 }
 
-async function configureBuyerRole(interaction: any, role: { id: string }) {
-  const owner = await ownerAccount(interaction);
+async function configureBuyerRole(interaction: any, role: { id: string }, scriptSelection: string) {
+  const owner = await configuredWorkspaceOwner(interaction);
   if (!owner || !(await isConfiguredOwner(interaction))) return respond(interaction, { content: "⛔ Solo el owner vinculado puede configurar el rol comprador.", ephemeral: true });
+  const script = await resolveScriptSelection(owner.id, scriptSelection);
+  if (!script) return respond(interaction, { content: "❌ Selecciona un script hosteado válido de tu workspace.", ephemeral: true });
   await setBuyerRoleId(owner.id, role.id);
-  return respond(interaction, { content: `✅ Rol comprador configurado: <@&${role.id}>. Los usuarios con una key activa podrán obtenerlo desde Get Role.`, ephemeral: true });
+  return respond(interaction, { content: `✅ Rol comprador configurado para **${script.name}**: <@&${role.id}>. Los usuarios con una key activa en ese script podrán obtenerlo desde Get Role.`, ephemeral: true });
 }
 
 async function getRoleForUser(interaction: any) {
@@ -822,6 +830,18 @@ async function blacklistCommand(interaction: any) {
   const accessChannel = panel?.channelId ? `<#${panel.channelId}>` : "el canal donde se publicó el panel";
   return respond(interaction, { content: `⛔ **Blacklist aplicada**\nUsuario: <@${user.id}>\nScript: **${script.name}**\nRazón: ${reason}\n\nEl acceso queda bloqueado para este script.`, ephemeral: false });
 }
+async function unblacklistCommand(interaction: any) {
+  const manager = await canManageKeys(interaction);
+  const user = interaction.options.getUser("user", true);
+  const scriptSelection = interaction.options.getString("script", true);
+  if (!manager.allowed || !manager.owner) return respond(interaction, { content: "⛔ Solo el propietario, un administrador o el rol delegado puede usar unblacklist.", ephemeral: true });
+  const script = await resolveScriptSelection(manager.owner.id, scriptSelection);
+  if (!script) return respond(interaction, { content: "❌ Selecciona un script hosteado válido de tu workspace.", ephemeral: true });
+  const rows = await getBlacklistsByOwner(manager.owner.id);
+  const matches = rows.filter((row: any) => Number(row.hostedScriptId) === Number(script.id) && String(row.discordUserId) === String(user.id) && Number(row.active) !== 0);
+  for (const row of matches) await deleteBlacklist(manager.owner.id, row.id);
+  return respond(interaction, { content: matches.length ? `✅ **Blacklist retirada**\nUsuario: <@${user.id}>\nScript: **${script.name}**\n\nEl usuario puede volver a solicitar acceso.` : `ℹ️ <@${user.id}> no tenía un bloqueo activo para **${script.name}**.`, ephemeral: false });
+}
 
 function selectedTarget(interaction: any) {
   const raw = interaction.options.getString("target");
@@ -873,13 +893,19 @@ async function generate(interaction: any, scriptName: string, rawDuration?: stri
   );
   return respond(interaction, { content: `✅ Key generada para **${script.name}**:\n\`${row.keyCode}\``, components: [copyRow], ephemeral: true });
 }
-async function remove(interaction: any, value: string) {
+async function remove(interaction: any, value?: string | null, user?: { id: string } | null) {
   const result = await canManageKeys(interaction);
   if (!result.allowed || !result.owner) return respond(interaction, { content: "⛔ No tienes permiso para eliminar keys.", ephemeral: true });
   if (!canPerformKeyAction(interaction.user.id)) return respond(interaction, { content: "⏳ Espera unos segundos antes de gestionar otra key.", ephemeral: true });
-  const removed = await deleteLicenseByKeyCode(result.owner.id, value.trim());
-  if (removed) await createKeyAuditLog({ ownerId: result.owner.id, actorDiscordId: interaction.user.id, action: "delete", keyCode: value.trim() });
-  return respond(interaction, { content: removed ? `🗑️ Key **${value.trim()}** eliminada.` : "No se encontró esa key en tu workspace.", ephemeral: true });
+  if (!value?.trim() && !user?.id) return respond(interaction, { content: "❌ Indica una key o selecciona el usuario de Discord que la reclamó.", ephemeral: true });
+  if (user?.id && !value?.trim()) {
+    const removedCount = await deleteLicensesByDiscordUserId(result.owner.id, user.id);
+    return respond(interaction, { content: removedCount ? `🗑️ Se eliminaron **${removedCount}** key(s) reclamadas por <@${user.id}>.` : "No se encontraron keys reclamadas por ese usuario en tu workspace.", ephemeral: true });
+  }
+  const keyValue = value!.trim();
+  const removed = await deleteLicenseByKeyCode(result.owner.id, keyValue);
+  if (removed) await createKeyAuditLog({ ownerId: result.owner.id, actorDiscordId: interaction.user.id, action: "delete", keyCode: keyValue });
+  return respond(interaction, { content: removed ? `🗑️ Key **${keyValue}** eliminada.` : "No se encontró esa key en tu workspace.", ephemeral: true });
 }
 function canPerformKeyAction(actorId: string) {
   const now = Date.now();

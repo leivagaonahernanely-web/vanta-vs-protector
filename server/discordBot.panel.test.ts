@@ -129,7 +129,7 @@ describe("Discord access panel", () => {
 
   it("registers slash commands for every panel action", () => {
     const names = discordCommands.map((command: any) => command.name);
-    expect(names).toEqual(["ping", "panel", "stats", "apikey", "getscript", "getrole", "redeem", "generatekey", "deletekey", "whitelist", "unwhitelist", "blacklist", "resethwid", "addtime", "warn", "dropkey", "prices", "updates", "generatekeyrol"]);
+    expect(names).toEqual(["ping", "panel", "stats", "apikey", "getscript", "getrole", "redeem", "generatekey", "deletekey", "whitelist", "unwhitelist", "blacklist", "unblacklist", "resethwid", "addtime", "warn", "dropkey", "prices", "updates", "generatekeyrol"]);
     expect(new Set(names).size).toBe(names.length);
     expect(names).toContain("getscript");
     expect(names).not.toContain("getkey");
@@ -147,11 +147,12 @@ describe("Discord access panel", () => {
     expect(options("panel").find((item: any) => item.name === "panel").autocomplete).toBe(true);
     expect(options("generatekey").find((item: any) => item.name === "script").required).toBe(true);
     expect(options("generatekey").find((item: any) => item.name === "duration").required).toBe(false);
-    expect(options("getrole")).toHaveLength(1);
-    expect(options("getrole")[0].name).toBe("role");
-    expect(options("getrole")[0].type).toBe(8);
-    expect(options("getrole")[0].required).toBe(true);
-    expect(options("deletekey").find((item: any) => item.name === "key").required).toBe(true);
+    expect(options("getrole")).toHaveLength(2);
+    expect(options("getrole").find((item: any) => item.name === "script").autocomplete).toBe(true);
+    expect(options("getrole").find((item: any) => item.name === "script").required).toBe(true);
+    expect(options("getrole").find((item: any) => item.name === "role").type).toBe(8);
+    expect(options("getrole").find((item: any) => item.name === "role").required).toBe(true);
+    expect(options("deletekey").find((item: any) => item.name === "key").required).toBe(false);
     expect(options("deletekey").find((item: any) => item.name === "user").required).toBe(false);
     expect(options("whitelist")).toHaveLength(3);
     expect(options("whitelist").find((item: any) => item.name === "script").autocomplete).toBe(true);

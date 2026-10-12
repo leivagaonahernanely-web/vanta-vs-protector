@@ -64,7 +64,7 @@ export function registerHostingRoutes(app: Express) {
       if (acceptsHtml) {
         res.setHeader("Cache-Control", "private, no-store");
         res.setHeader("Content-Disposition", "inline");
-        res.type("html; charset=utf-8").send(loaderBrowserPage(visibleLoader));
+        res.setHeader("Content-Type", "text/html; charset=utf-8"); res.send(loaderBrowserPage(visibleLoader));
         return;
       }
       const stageTwo = buildVantaIntegrityGuard(`local h = game:GetService("RbxAnalyticsService"):GetClientId()\nloadstring(game:HttpGet("${endpoint}&hwid=" .. h))()`);

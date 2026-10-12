@@ -477,6 +477,13 @@ export async function deleteLicenseByKeyCode(ownerId: number, keyCode: string) {
   return Number(result[0]?.affectedRows ?? 0) > 0;
 }
 
+export async function deleteLicensesByDiscordUserId(ownerId: number, discordUserId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const result = await db.delete(licenses).where(and(eq(licenses.ownerId, ownerId), eq(licenses.discordUserId, discordUserId)));
+  return Number(result[0]?.affectedRows ?? 0);
+}
+
 export async function resetLicenseHwidByDiscordUserId(discordUserId: string, bypassCooldown = false, scope?: { ownerId?: number; hostedScriptId?: number }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
