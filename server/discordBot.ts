@@ -264,11 +264,13 @@ export function scriptRuntimeLoader(script: any, accessKey?: string, licenseId?:
 }
 
 export function panelMessage(context?: { ownerId?: number; hostedScriptId?: number }) {
+  const sentBy = client?.user?.username ? `Sent by ${client.user.username}` : "Sent by Vantaprotect";
   const embed = new EmbedBuilder()
     .setColor(0x5865f2)
+    .setAuthor({ name: "Vanta.vs Protector · APP" })
     .setTitle("Vanta.vs Protector · Access Panel")
     .setDescription("Este panel de control es para el proyecto: **Vanta.vs Protector**\n\nSi eres comprador, utiliza los botones de abajo para canjear tu key, obtener el script autorizado o conseguir tu rol.")
-    .setFooter({ text: "Vanta.vs Protector · Panel de acceso" })
+    .setFooter({ text: `${sentBy} · ${new Date().toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })}` })
     .setTimestamp();
   const rowOne = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(panelActionId("redeem", context?.ownerId, context?.hostedScriptId)).setLabel("🔑 Redeem Key").setStyle(ButtonStyle.Success),
@@ -323,7 +325,9 @@ export async function publishDiscordPanel(channelId: string, config?: { name?: s
   const channel = await client.channels.fetch(channelId);
   if (!channel?.isTextBased() || !("send" in channel)) throw new Error("El canal Discord no permite mensajes.");
   const base = panelMessage({ ownerId: config?.ownerId, hostedScriptId: config?.hostedScriptId });
-  const embed = new EmbedBuilder().setColor(0x5865f2).setTitle(config?.name?.trim() || "Vanta.vs Protector · Access Panel").setDescription(config?.description?.trim() || "Este panel permite canjear tu key, obtener el script autorizado y conseguir tu rol.").setFooter({ text: config?.script ? `Script: ${config.script}` : "Vanta.vs Protector · Panel de acceso" }).setTimestamp();
+  const sentBy = client?.user?.username ? `Sent by ${client.user.username}` : "Sent by Vantaprotect";
+  const footer = config?.script ? `Script: ${config.script} · ${sentBy}` : `${sentBy} · Vanta.vs Protector`;
+  const embed = new EmbedBuilder().setColor(0x5865f2).setAuthor({ name: "Vanta.vs Protector · APP" }).setTitle(config?.name?.trim() || "Vanta.vs Protector · Access Panel").setDescription(config?.description?.trim() || "Este panel permite canjear tu key, obtener el script autorizado y conseguir tu rol.").setFooter({ text: footer }).setTimestamp();
   const sent = await channel.send({ embeds: [embed], components: base.components });
   return { channelId, title: config?.name?.trim() || "Vanta.vs Protector · Access Panel", messageId: sent.id };
 }
@@ -707,10 +711,11 @@ async function whitelist(interaction: any, discordId: string, kind: "user" | "ro
   const channel = interaction.channelId ? `<#${interaction.channelId}>` : "canal actual";
   const panels = await getDiscordPanelsByOwner(owner.id);
   const panel = panels.find((item: any) => item.targetScript === script.name);
-  const accessChannel = panel?.channelId ? `<#${panel.channelId}>` : channel;
+  const accessUrl = panel?.channelId && panel?.messageId && interaction.guildId
+    ? `https://discord.com/channels/${interaction.guildId}/${panel.channelId}/${panel.messageId}`
+    : panel?.channelId ? `https://discord.com/channels/${interaction.guildId ?? "@me"}/${panel.channelId}` : channel;
   const mention = kind === "role" ? `<@&${canonicalId}>` : `<@${canonicalId}>`;
-  const embed = new EmbedBuilder().setColor(0x57f287).setTitle(`${mention} You have been whitelisted!`).setDescription(`**${mention}** You have been whitelisted!\n\nAccess the script via this message --> ${accessChannel}\n\nScript: **${script.name}**\nAdded: ${counts.added} · Already whitelisted: ${counts.alreadyWhitelisted} · Failed: ${counts.failed}`).setFooter({ text: `Reglas activas: ${rules.length}` });
-  return respond(interaction, { embeds: [embed] });
+  return respond(interaction, { content: `${mention} has been whitelisted!\nMembers can access the script via this message --> ${accessUrl}` });
 }
 async function unwhitelist(interaction: any, discordId: string, scriptName: string) {
   const owner = await configuredWorkspaceOwner(interaction);
