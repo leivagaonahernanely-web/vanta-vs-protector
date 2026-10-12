@@ -263,14 +263,15 @@ export function scriptRuntimeLoader(script: any, accessKey?: string, licenseId?:
   return !script.ffaMode && runtimeKey ? `script_key = "${runtimeKey}"\n${load}` : load;
 }
 
-export function panelMessage(context?: { ownerId?: number; hostedScriptId?: number; senderName?: string; senderAvatarUrl?: string | null }) {
+export function panelMessage(context?: { ownerId?: number; hostedScriptId?: number; projectName?: string; senderName?: string; senderAvatarUrl?: string | null }) {
   const senderName = context?.senderName?.trim() || client?.user?.username || "Vantaprotect";
   const senderAvatarUrl = context?.senderAvatarUrl || undefined;
+  const projectName = context?.projectName?.trim() || "Vanta.vs Protector";
   const embed = new EmbedBuilder()
     .setColor(0x5865f2)
     .setAuthor({ name: "Vanta.vs Protector · APP" })
-    .setTitle("Vanta.vs Protector · Access Panel")
-    .setDescription("Este panel de control es para el proyecto: **Vanta.vs Protector**\n\nSi eres comprador, utiliza los botones de abajo para canjear tu key, obtener el script autorizado o conseguir tu rol.")
+    .setTitle(projectName)
+    .setDescription(`This control panel is for the project: **${projectName}**\nIf you're a buyer, click on the buttons below to redeem your key, get the script or get your role`)
     .setFooter({ text: `Sent by ${senderName} · ${new Date().toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })}`, ...(senderAvatarUrl ? { iconURL: senderAvatarUrl } : {}) })
     .setTimestamp();
   const rowOne = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -325,12 +326,13 @@ export async function publishDiscordPanel(channelId: string, config?: { name?: s
   if (!client || !gatewayOnline) throw new Error("El Gateway Discord no está conectado.");
   const channel = await client.channels.fetch(channelId);
   if (!channel?.isTextBased() || !("send" in channel)) throw new Error("El canal Discord no permite mensajes.");
-  const base = panelMessage({ ownerId: config?.ownerId, hostedScriptId: config?.hostedScriptId, senderName: config?.senderName, senderAvatarUrl: config?.senderAvatarUrl });
+  const projectName = config?.name?.trim() || "Vanta.vs Protector";
+  const base = panelMessage({ ownerId: config?.ownerId, hostedScriptId: config?.hostedScriptId, projectName, senderName: config?.senderName, senderAvatarUrl: config?.senderAvatarUrl });
   const senderName = config?.senderName?.trim() || client?.user?.username || "Vantaprotect";
   const senderAvatarUrl = config?.senderAvatarUrl || undefined;
   const sentBy = `Sent by ${senderName}`;
   const footer = config?.script ? `Script: ${config.script} · ${sentBy}` : `${sentBy} · Vanta.vs Protector`;
-  const embed = new EmbedBuilder().setColor(0x5865f2).setAuthor({ name: "Vanta.vs Protector · APP" }).setTitle(config?.name?.trim() || "Vanta.vs Protector · Access Panel").setDescription(config?.description?.trim() || "Este panel permite canjear tu key, obtener el script autorizado y conseguir tu rol.").setFooter({ text: footer, ...(senderAvatarUrl ? { iconURL: senderAvatarUrl } : {}) }).setTimestamp();
+  const embed = new EmbedBuilder().setColor(0x5865f2).setAuthor({ name: "Vanta.vs Protector · APP" }).setTitle(projectName).setDescription(`This control panel is for the project: **${projectName}**\nIf you're a buyer, click on the buttons below to redeem your key, get the script or get your role`).setFooter({ text: footer, ...(senderAvatarUrl ? { iconURL: senderAvatarUrl } : {}) }).setTimestamp();
   const sent = await channel.send({ embeds: [embed], components: base.components });
   return { channelId, title: config?.name?.trim() || "Vanta.vs Protector · Access Panel", messageId: sent.id };
 }
@@ -538,7 +540,7 @@ export function formatWhitelistDiagnostic(input: { guildId?: string | null; memb
 }
 
 async function getWhitelistScriptForMember(interaction: any, knownOwner?: any) {
-  const owner = knownOwner ?? await ownerAccount(interaction);
+  const owner = knownOwner ?? (getPanelContext(interaction) ? await ownerAccount(interaction) : await configuredWorkspaceOwner(interaction));
   if (!owner) return undefined;
   const panelScriptId = getPanelContext(interaction)?.hostedScriptId;
   const [{ roleIds }, allRules] = await Promise.all([

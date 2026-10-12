@@ -61,7 +61,7 @@ export function registerHostingRoutes(app: Express) {
       if (!script) { res.status(404).type("text/plain").send("Loader not found"); return; }
       const endpoint = `${req.protocol}://${req.get("host")}/scripts/hosted/${script.slug}?key=${encodeURIComponent(license.keyCode)}`;
       const visibleLoader = `script_key = "${license.keyCode}"\nloadstring(game:HttpGet("${`${req.protocol}://${req.get("host")}/scripts/loaders/${token}`}?key=" .. (script_key or "")))()`;
-      if (acceptsHtml && !suppliedKey) {
+      if (acceptsHtml) {
         res.setHeader("Cache-Control", "private, no-store");
         res.setHeader("Content-Disposition", "inline");
         res.type("html; charset=utf-8").send(loaderBrowserPage(visibleLoader));

@@ -120,7 +120,7 @@ describe("public hosted scripts", () => {
     licenseByIdMock.mockResolvedValue(license);
     scriptByIdMock.mockResolvedValue(protectedScript);
     const response = responseMock();
-    await getHandler("/scripts/loaders")({ params: { token: makeLoaderToken(license.id, license.keyCode) }, query: {}, headers: { accept: "text/html" }, protocol: "https", get: () => "vanta.test" }, response);
+    await getHandler("/scripts/loaders")({ params: { token: makeLoaderToken(license.id, license.keyCode) }, query: { key: license.keyCode }, headers: { accept: "text/html" }, protocol: "https", get: () => "vanta.test" }, response);
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("Vantaprotect Loader");
     expect(response.body).toContain("script_key = &quot;");

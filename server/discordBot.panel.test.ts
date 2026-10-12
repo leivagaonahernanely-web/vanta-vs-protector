@@ -40,10 +40,11 @@ describe("Discord access panel", () => {
     const ids = message.components.flatMap((row: any) => row.components.map((button: any) => button.data.custom_id));
     expect(ids).toEqual(["vanta:redeem", "vanta:script", "vanta:role", "vanta:hwid", "vanta:stats"]);
     expect(discordCommands.some((command: any) => command.name === "apikey")).toBe(true);
-    expect(message.embeds[0].data.title).toBe("Vanta.vs Protector · Access Panel");
+    expect(message.embeds[0].data.title).toBe("Vanta.vs Protector");
     expect(message.embeds[0].data.color).toBe(0x5865f2);
     expect(message.embeds[0].data.description).toContain("Vanta.vs Protector");
-    expect(message.embeds[0].data.description).toContain("canjear tu key");
+    expect(message.embeds[0].data.description).toContain("This control panel is for the project: **Vanta.vs Protector**");
+    expect(message.embeds[0].data.description).toContain("redeem your key, get the script or get your role");
     expect((message as any).ephemeral).not.toBe(true);
   });
 
