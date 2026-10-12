@@ -263,14 +263,15 @@ export function scriptRuntimeLoader(script: any, accessKey?: string, licenseId?:
   return !script.ffaMode && runtimeKey ? `script_key = "${runtimeKey}"\n${load}` : load;
 }
 
-export function panelMessage(context?: { ownerId?: number; hostedScriptId?: number }) {
-  const sentBy = client?.user?.username ? `Sent by ${client.user.username}` : "Sent by Vantaprotect";
+export function panelMessage(context?: { ownerId?: number; hostedScriptId?: number; senderName?: string; senderAvatarUrl?: string | null }) {
+  const senderName = context?.senderName?.trim() || client?.user?.username || "Vantaprotect";
+  const senderAvatarUrl = context?.senderAvatarUrl || undefined;
   const embed = new EmbedBuilder()
     .setColor(0x5865f2)
     .setAuthor({ name: "Vanta.vs Protector · APP" })
     .setTitle("Vanta.vs Protector · Access Panel")
     .setDescription("Este panel de control es para el proyecto: **Vanta.vs Protector**\n\nSi eres comprador, utiliza los botones de abajo para canjear tu key, obtener el script autorizado o conseguir tu rol.")
-    .setFooter({ text: `${sentBy} · ${new Date().toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })}` })
+    .setFooter({ text: `Sent by ${senderName} · ${new Date().toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })}`, ...(senderAvatarUrl ? { iconURL: senderAvatarUrl } : {}) })
     .setTimestamp();
   const rowOne = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(panelActionId("redeem", context?.ownerId, context?.hostedScriptId)).setLabel("🔑 Redeem Key").setStyle(ButtonStyle.Success),
@@ -320,14 +321,16 @@ export async function publishPricesMessage(channelId: string, config: { title: s
   return { channelId, title, messageId: sent.id };
 }
 
-export async function publishDiscordPanel(channelId: string, config?: { name?: string; description?: string; script?: string; hwidHours?: number; ownerId?: number; hostedScriptId?: number }) {
+export async function publishDiscordPanel(channelId: string, config?: { name?: string; description?: string; script?: string; hwidHours?: number; ownerId?: number; hostedScriptId?: number; senderName?: string; senderAvatarUrl?: string | null }) {
   if (!client || !gatewayOnline) throw new Error("El Gateway Discord no está conectado.");
   const channel = await client.channels.fetch(channelId);
   if (!channel?.isTextBased() || !("send" in channel)) throw new Error("El canal Discord no permite mensajes.");
-  const base = panelMessage({ ownerId: config?.ownerId, hostedScriptId: config?.hostedScriptId });
-  const sentBy = client?.user?.username ? `Sent by ${client.user.username}` : "Sent by Vantaprotect";
+  const base = panelMessage({ ownerId: config?.ownerId, hostedScriptId: config?.hostedScriptId, senderName: config?.senderName, senderAvatarUrl: config?.senderAvatarUrl });
+  const senderName = config?.senderName?.trim() || client?.user?.username || "Vantaprotect";
+  const senderAvatarUrl = config?.senderAvatarUrl || undefined;
+  const sentBy = `Sent by ${senderName}`;
   const footer = config?.script ? `Script: ${config.script} · ${sentBy}` : `${sentBy} · Vanta.vs Protector`;
-  const embed = new EmbedBuilder().setColor(0x5865f2).setAuthor({ name: "Vanta.vs Protector · APP" }).setTitle(config?.name?.trim() || "Vanta.vs Protector · Access Panel").setDescription(config?.description?.trim() || "Este panel permite canjear tu key, obtener el script autorizado y conseguir tu rol.").setFooter({ text: footer }).setTimestamp();
+  const embed = new EmbedBuilder().setColor(0x5865f2).setAuthor({ name: "Vanta.vs Protector · APP" }).setTitle(config?.name?.trim() || "Vanta.vs Protector · Access Panel").setDescription(config?.description?.trim() || "Este panel permite canjear tu key, obtener el script autorizado y conseguir tu rol.").setFooter({ text: footer, ...(senderAvatarUrl ? { iconURL: senderAvatarUrl } : {}) }).setTimestamp();
   const sent = await channel.send({ embeds: [embed], components: base.components });
   return { channelId, title: config?.name?.trim() || "Vanta.vs Protector · Access Panel", messageId: sent.id };
 }
@@ -440,7 +443,7 @@ export async function handleInteraction(interaction: any) {
       if (!owner || !panel) return respond(interaction, { content: "❌ Selecciona un panel existente de tu workspace.", ephemeral: true });
       const script = await getHostedScriptByName(owner.id, panel.targetScript);
       if (!script) return respond(interaction, { content: "❌ El script asociado a ese panel ya no pertenece a tu workspace.", ephemeral: true });
-      return respond(interaction, { content: `✅ Panel **${panel.name}** colocado con **${script.name}**.`, ephemeral: false, ...panelMessage({ ownerId: owner.id, hostedScriptId: script.id }) });
+      return respond(interaction, { content: `✅ Panel **${panel.name}** colocado con **${script.name}**.`, ephemeral: false, ...panelMessage({ ownerId: owner.id, hostedScriptId: script.id, senderName: interaction.user?.globalName || interaction.user?.username, senderAvatarUrl: interaction.user?.displayAvatarURL?.({ extension: "png", size: 128 }) }) });
     }
     if (interaction.commandName === "prices") return prices(interaction);
     if (interaction.commandName === "updates") return updates(interaction);

@@ -25,7 +25,7 @@ beforeEach(() => { vi.clearAllMocks(); dbMocks.getDiscordPanelsByOwner.mockImple
 describe("discord panel management", () => {
   it("republishes an owner panel with its saved configuration", async () => {
     const result = await appRouter.createCaller(context).discord.republishPanel({ id: panel.id });
-    expect(botMocks.publishDiscordPanel).toHaveBeenCalledWith(panel.channelId, { name: panel.name, description: panel.description, script: panel.targetScript, hwidHours: panel.hwidHours, ownerId: user.id, hostedScriptId: 4 });
+    expect(botMocks.publishDiscordPanel).toHaveBeenCalledWith(panel.channelId, { name: panel.name, description: panel.description, script: panel.targetScript, hwidHours: panel.hwidHours, ownerId: user.id, hostedScriptId: 4, senderName: user.discordUsername, senderAvatarUrl: user.discordAvatarUrl });
     expect(result.messageId).toBe("new-message");
   });
 
