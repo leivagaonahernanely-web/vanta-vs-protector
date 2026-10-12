@@ -97,6 +97,32 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+export async function getUsersForOwner() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: users.id,
+    name: users.name,
+    email: users.email,
+    role: users.role,
+    plan: users.plan,
+    webAccess: users.webAccess,
+    discordUserId: users.discordUserId,
+    discordUsername: users.discordUsername,
+    discordNickname: users.discordNickname,
+    discordAvatarUrl: users.discordAvatarUrl,
+    createdAt: users.createdAt,
+    lastSignedIn: users.lastSignedIn,
+  }).from(users).orderBy(desc(users.lastSignedIn)).limit(500);
+}
+
+export async function updateManagedUser(id: number, input: { webAccess?: number; role?: "user" | "admin"; plan?: "free" | "pro" | "premium" }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(users).set(input).where(eq(users.id, id));
+  return getUserById(id);
+}
+
 export async function createProtection(protection: InsertProtection) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
@@ -234,10 +260,13 @@ export async function updateHostedScript(ownerId: number, id: number, input: Par
 export async function deleteHostedScript(ownerId: number, id: number) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const script = await db.select({ id: hostedScripts.id }).from(hostedScripts).where(and(eq(hostedScripts.id, id), eq(hostedScripts.userId, ownerId))).limit(1);
+  const script = await db.select({ id: hostedScripts.id, name: hostedScripts.name }).from(hostedScripts).where(and(eq(hostedScripts.id, id), eq(hostedScripts.userId, ownerId))).limit(1);
   if (!script[0]) return false;
   await db.delete(licenses).where(and(eq(licenses.ownerId, ownerId), eq(licenses.hostedScriptId, id)));
   await db.delete(accessRules).where(and(eq(accessRules.ownerId, ownerId), eq(accessRules.hostedScriptId, id)));
+  await db.delete(blacklists).where(and(eq(blacklists.ownerId, ownerId), eq(blacklists.hostedScriptId, id)));
+  await db.delete(warnings).where(and(eq(warnings.ownerId, ownerId), eq(warnings.hostedScriptId, id)));
+  await db.delete(discordPanels).where(and(eq(discordPanels.ownerId, ownerId), eq(discordPanels.targetScript, script[0].name)));
   await db.delete(hostedScripts).where(and(eq(hostedScripts.id, id), eq(hostedScripts.userId, ownerId)));
   return true;
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `webAccess` int DEFAULT 1 NOT NULL;

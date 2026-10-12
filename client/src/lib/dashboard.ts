@@ -1,6 +1,6 @@
 export type DashboardNavItem = {
   group: "Workspace" | "Protection" | "Panels" | "Owner";
-  label: "Overview" | "Scripts" | "Obfuscator" | "API key" | "License keys" | "Plan keys" | "HWID bans" | "Logs" | "Plans" | "Create New Panel" | "Manage Panels" | "Prices" | "Updates" | "Published TXT";
+  label: "Overview" | "Scripts" | "API key" | "License keys" | "Plan keys" | "HWID bans" | "Logs" | "Plans" | "Create New Panel" | "Manage Panels" | "Prices" | "Updates" | "Published TXT" | "Users";
   icon: "overview" | "scripts" | "obfuscator" | "keys" | "hwid" | "logs" | "plans" | "panel" | "prices" | "updates" | "settings";
   badge?: "scripts";
 };
@@ -8,7 +8,6 @@ export type DashboardNavItem = {
 export const dashboardNavItems: DashboardNavItem[] = [
   { group: "Workspace", label: "Overview", icon: "overview" },
   { group: "Workspace", label: "Scripts", icon: "scripts", badge: "scripts" },
-  { group: "Workspace", label: "Obfuscator", icon: "obfuscator" },
   { group: "Workspace", label: "API key", icon: "settings" },
   { group: "Protection", label: "License keys", icon: "keys" },
   { group: "Protection", label: "Plan keys", icon: "keys" },
@@ -20,6 +19,7 @@ export const dashboardNavItems: DashboardNavItem[] = [
   { group: "Panels", label: "Prices", icon: "prices" },
   { group: "Panels", label: "Updates", icon: "updates" },
   { group: "Owner", label: "Published TXT", icon: "logs" },
+  { group: "Owner", label: "Users", icon: "settings" },
 ];
 
 export function getDashboardNavLabels() {

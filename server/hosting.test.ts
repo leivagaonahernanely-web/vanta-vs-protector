@@ -144,6 +144,15 @@ describe("public hosted scripts", () => {
     expect(wrong.body).toContain('player:Kick("Invalid key")');
   });
 
+  it("kicks when the HWID is not compatible with the active license", async () => {
+    findMock.mockResolvedValue({ ...script, ffaMode: 0, scriptKey: null });
+    licenseMock.mockResolvedValue(undefined);
+    const response = responseMock();
+    await getHandler()({ params: { slug: script.slug }, query: { key: "86vC3ZULuEQpOImpm5VBB6oLROAQmPLe", hwid: "different-device" }, headers: { accept: "*/*" }, protocol: "https", get: () => "vanta.test" }, response);
+    expect(response.statusCode).toBe(403);
+    expect(response.body).toContain('LocalPlayer:Kick("HWID not compatible")');
+  });
+
   it("serves only the FFA artifact to non-browser runtime clients with trial", async () => {
     findMock.mockResolvedValue(script);
     const response = responseMock();

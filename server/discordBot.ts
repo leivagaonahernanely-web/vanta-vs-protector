@@ -216,7 +216,7 @@ async function canManageKeys(interaction: any) {
   // owner at all.
   const panelOwner = getPanelContext(interaction)?.ownerId;
   const configuredOwner = ENV.ownerOpenId ? await getUserByOpenId(ENV.ownerOpenId) : undefined;
-  const owner = panelOwner ? await getUserById(panelOwner) : (configuredOwner ?? await ownerAccount(interaction));
+  const owner = panelOwner ? await getUserById(panelOwner) : (configuredOwner ?? await configuredWorkspaceOwner(interaction));
   if (!owner) return { allowed: false, owner: undefined };
   const managerRole = await getKeyManagerRoleId(owner.id);
   const actorId = String(interaction.user?.id ?? "");

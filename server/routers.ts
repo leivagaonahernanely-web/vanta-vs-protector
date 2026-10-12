@@ -5,7 +5,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { notifyOwner } from "./_core/notification";
 import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createAccessRule, createBlacklist, createDiscordPanel, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getDiscordPanelsByOwner, getHostedScriptSourceByUser, getHostedScriptsByUser, getHostedScriptByName, getHostedScriptById, getHostedScriptByOwnerId, updateHostedScript, deleteHostedScript, getWorkspaceUsage, getKeyAuditLogsByOwner, deleteKeyAuditLogsByOwner, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, redeemPlanKey, updateDiscordChannelId, updateDiscordContentChannels, ensureUserApiKey, getPublishedScriptsForOwnerReview } from "./db";
+import { createAccessRule, createBlacklist, createDiscordPanel, createHostedScript, createLicense, createProtection, deleteAccessRule, deleteBlacklist, deleteLicense, getAccessRulesByOwner, getBlacklistsByOwner, getDiscordPanelsByOwner, getHostedScriptSourceByUser, getHostedScriptsByUser, getHostedScriptByName, getHostedScriptById, getHostedScriptByOwnerId, getUserById, updateHostedScript, deleteHostedScript, getWorkspaceUsage, getKeyAuditLogsByOwner, deleteKeyAuditLogsByOwner, getLicensesByOwner, getProtectionsByUser, resetLicenseHwid, revokeLicense, redeemPlanKey, updateDiscordChannelId, updateDiscordContentChannels, ensureUserApiKey, getPublishedScriptsForOwnerReview, getUsersForOwner, updateManagedUser } from "./db";
 import { nanoid } from "nanoid";
 import { createHash, randomBytes, randomInt } from "node:crypto";
 import { gunzipSync } from "node:zlib";
@@ -229,6 +229,18 @@ export const appRouter = router({
   }),
 
   owner: router({
+    users: ownerProcedure.query(async () => {
+      const rows = await getUsersForOwner();
+      return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString(), lastSignedIn: row.lastSignedIn.toISOString() }));
+    }),
+    updateUser: ownerProcedure.input(z.object({ id: z.number().int().positive(), webAccess: z.boolean().optional(), role: z.enum(["user", "admin"]).optional(), plan: z.enum(["free", "pro", "premium"]).optional() })).mutation(async ({ ctx, input }) => {
+      const target = await getUserById(input.id);
+      if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "Usuario no encontrado." });
+      if (target.openId === ENV.ownerOpenId) throw new TRPCError({ code: "FORBIDDEN", message: "La cuenta owner no se puede modificar desde Users." });
+      const updated = await updateManagedUser(input.id, { webAccess: input.webAccess === undefined ? undefined : input.webAccess ? 1 : 0, role: input.role, plan: input.plan });
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Usuario no encontrado." });
+      return { id: updated.id, webAccess: updated.webAccess, role: updated.role, plan: updated.plan };
+    }),
     publishedScripts: ownerProcedure.query(async () => {
       const rows = await getPublishedScriptsForOwnerReview();
       return rows.map(({ script, ownerName, ownerOpenId, discordUserId, discordUsername }) => {

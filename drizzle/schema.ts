@@ -18,6 +18,7 @@ export const users = mysqlTable("users", {
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   plan: mysqlEnum("plan", ["free", "pro", "premium"]).default("free").notNull(),
+  webAccess: int("webAccess").default(1).notNull(),
   discordChannelId: varchar("discordChannelId", { length: 32 }),
   pricesChannelId: varchar("pricesChannelId", { length: 32 }),
   updatesChannelId: varchar("updatesChannelId", { length: 32 }),

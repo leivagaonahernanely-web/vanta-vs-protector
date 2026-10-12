@@ -8,7 +8,6 @@ describe("dashboard navigation contract", () => {
     expect(labels).toEqual([
       "Overview",
       "Scripts",
-      "Obfuscator",
       "API key",
       "License keys",
       "Plan keys",
@@ -20,6 +19,7 @@ describe("dashboard navigation contract", () => {
       "Prices",
       "Updates",
       "Published TXT",
+      "Users",
     ]);
   });
 

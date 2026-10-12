@@ -311,6 +311,10 @@ class SDKServer {
       throw ForbiddenError("User not found");
     }
 
+    if (user.webAccess === 0 && user.openId !== ENV.ownerOpenId) {
+      throw ForbiddenError("El acceso web de esta cuenta está desactivado por el owner.");
+    }
+
     await db.upsertUser({
       openId: user.openId,
       lastSignedIn: signedInAt,

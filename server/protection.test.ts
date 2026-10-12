@@ -82,6 +82,19 @@ describe("protection validation", () => {
     });
     expect(artifact.code).toContain("Vanta.vs");
   });
+
+  it("keeps emoji code points intact when string obfuscation reverses the source", () => {
+    const source = "print('🚀 ✅ 你好')";
+    const artifact = buildProtectionArtifact(source, {
+      mode: "balanced",
+      obfuscateStrings: true,
+      addLoaderGuard: false,
+    });
+    const encoded = artifact.code.match(/local __vanta_payload = \"([^\"]+)\"/)?.[1];
+    expect(encoded).toBeTruthy();
+    const decodedReversed = Buffer.from(encoded!, "base64").toString("utf8");
+    expect(Array.from(decodedReversed).reverse().join("")).toBe(source);
+  });
 });
 
 describe("protection options", () => {

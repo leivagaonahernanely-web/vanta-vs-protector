@@ -43,7 +43,9 @@ export function getProviderStatus() {
 }
 
 function encodeLua(source: string, obfuscateStrings: boolean, shift = 0) {
-  const prepared = obfuscateStrings ? source.split("").reverse().join("") : source;
+  // Array.from reverses Unicode code points instead of UTF-16 code units,
+  // preventing astral emojis from being split into invalid surrogate pairs.
+  const prepared = obfuscateStrings ? Array.from(source).reverse().join("") : source;
   const shifted = shift ? Buffer.from(prepared, "utf8").map((byte) => (byte + shift) % 256) : Buffer.from(prepared, "utf8");
   return shifted.toString("base64");
 }
