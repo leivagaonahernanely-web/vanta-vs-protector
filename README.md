@@ -18,9 +18,29 @@ pnpm build
 
 Las pruebas de equivalencia con Lua real se activan con `NX_LUA_BIN=lua5.1 pnpm test` (requiere un intérprete Lua 5.1 instalado).
 
+## Macros de control
+
+- `--NXT_LPH_OPTIMIZACION` ... `--NXT_LPH_OPTIMIZACION_END`: el bloque se emite como Lua nativo, sin virtualizar. Es la opción recomendada para código que se ejecuta muchas veces.
+- `--NXT_LPH_PROTECCION` ... `--NXT_LPH_PROTECCION_END`: si el archivo tiene alguno, solo esos bloques se virtualizan y el resto queda como Lua normal.
+- Los comentarios de los bloques nativos se eliminan en la salida.
+- Las variables locales no pueden cruzar los límites de un bloque nativo.
+
+## Lenguaje soportado
+
+- Expresiones, aritmética, concatenación, comparaciones, `and`/`or`/`not` con cortocircuito.
+- Variables locales y globales, tablas (constructores, `.`, `[]`, `#`), métodos con `:`.
+- Control de flujo: `if`/`elseif`/`else`, `while`, `repeat`/`until`, `for` numérico, `for` genérico (`in`), `break`.
+- Funciones, recursión, closures con captura de variables, `...` (varargs), retornos múltiples y expansión de listas en llamadas, tablas y asignaciones.
+- Cadenas de los opcodes, nombres globales y constantes de texto van cifrados en la salida.
+
+## Límites conocidos
+
+- `#` sobre tablas con huecos (nil en medio del arreglo) puede devolver un valor distinto al de Lua nativo. Las tablas sin huecos funcionan igual.
+- La VM es más lenta que Lua nativo. Para código que se ejecuta muchas veces, usa `--NXT_LPH_OPTIMIZACION`.
+- La verificación de equivalencia se hizo contra Lua 5.3 (`texlua`). Antes de usarlo en producción, ejecuta `NX_LUA_BIN=lua5.1 pnpm test` con un intérprete Lua 5.1.
+
 ## Pendiente
 
 - Cuentas con email y contraseña, NX_KEY para Premium, API key única por cuenta con regeneración y dominio, panel de admin para generar keys.
-- Macros `NXT_LPH_PROTECCION` y `NXT_LPH_OPTIMIZACION`.
-- Varargs, `for` genérico y retornos múltiples en el compilador.
+- Optimizar la llamada de funciones en la VM (hoy crea `{...}` y usa `select` en cada cierre).
 - Migración de base de datos para el nuevo esquema de `users` (generar con `pnpm db:push` en un entorno con base de datos).
