@@ -87,7 +87,7 @@ function runFunction(bc: Bytecode, fn: LuaFunction, args: unknown[], ctx: Ctx): 
   try {
     const cells: Cell[] = [];
     for (let i = 0; i < proto.slots; i++) cells.push({ v: null });
-    for (let i = 0; i < proto.params; i++) cells[i] = { v: args[i] ?? null };
+    for (let i = 0; i < proto.params; i++) cells[i + 1] = { v: args[i] ?? null };
     // Argumentos extra: son los valores de '...'.
     const varargs = args.slice(proto.params);
 

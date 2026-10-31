@@ -42,5 +42,5 @@ Las pruebas de equivalencia con Lua real se activan con `NX_LUA_BIN=lua5.1 pnpm 
 ## Pendiente
 
 - Cuentas con email y contraseña, NX_KEY para Premium, API key única por cuenta con regeneración y dominio, panel de admin para generar keys.
-- Optimizar la llamada de funciones en la VM (hoy crea `{...}` y usa `select` en cada cierre).
+- Reducir el costo por llamada en la VM: cada cierre crea una tabla `{...}` y usa `select`. Los argumentos extra ya no se copian, pero el costo principal es el despacho de instrucciones, que es estructural en un intérprete escrito en Lua.
 - Migración de base de datos para el nuevo esquema de `users` (generar con `pnpm db:push` en un entorno con base de datos).

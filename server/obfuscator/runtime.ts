@@ -210,18 +210,18 @@ export const RUNTIME_LUA = `local function nx_run(P)
     local code = proto.code
     -- Celdas de locales: valor directo, salvo las capturadas por closures (cajas {v=...}).
     local cells = {}
-    for i = 0, proto.params - 1 do cells[i] = args[i + 1] end
+    for i = 1, proto.params do cells[i] = args[i] end
     local bp = proto.bp
     for j = 1, #bp do
       local s = bp[j]
       cells[s] = { v = cells[s] }
     end
 
-    -- Argumentos extra: valores de '...'. Sin extras se reutiliza una tabla vacía.
-    local va = NO_VARARGS
+    -- Argumentos extra ('...'): se leen directamente de args desde vo + j, sin copiarlos.
+    -- Sin extras se usa una tabla vacía y vn = 0.
+    local va, vn, vo = NO_VARARGS, 0, 0
     if nargs > proto.params then
-      va = { n = nargs - proto.params }
-      for i = 1, va.n do va[i] = args[proto.params + i] end
+      va, vn, vo = args, nargs - proto.params, proto.params
     end
 
     local stack, sp = {}, 0
@@ -457,15 +457,15 @@ export const RUNTIME_LUA = `local function nx_run(P)
               depth = myd - 1
               return unpack(stack, sp - k + 1, sp)
             elseif op == 41 then -- VARARG
-              for j = 1, va.n do
+              for j = 1, vn do
                 sp = sp + 1
-                stack[sp] = va[j]
+                stack[sp] = va[vo + j]
               end
               sp = sp + 1
-              stack[sp] = va.n
+              stack[sp] = vn
             elseif op == 42 then -- VARARG1
               sp = sp + 1
-              stack[sp] = va[1]
+              stack[sp] = va[vo + 1]
             else -- SETLIST (43): [..., t, inicio, v1..vk, k]; consume el duplicado de t
               local k = stack[sp]
               sp = sp - 1

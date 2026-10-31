@@ -103,7 +103,9 @@ class Compiler {
     const index = this.protos.length;
     this.protos.push(null as unknown as Proto); // reserva el índice antes de compilar anidadas
     this.fns.push({
-      code: [], scopes: [new Map()], slots: 0, loops: [], upvals: [], upvalNames: new Map(),
+      // Los slots empiezan en 1: el runtime guarda las celdas en una tabla de array (1..n),
+      // y el índice 0 caería en la parte hash, más lenta.
+      code: [], scopes: [new Map()], slots: 1, loops: [], upvals: [], upvalNames: new Map(),
       captured: new Set(), vararg: isVararg,
     });
     for (const p of params) this.declareLocal(p);
@@ -120,7 +122,8 @@ class Compiler {
       else if (instr.op === "LOCAL_SET") instr.op = "BOX_SET";
       else if (instr.op === "DECL") instr.op = "BOX_DECL";
     }
-    const boxedParams = [...Array(params.length).keys()].filter((s) => state.captured.has(s));
+    // Los parámetros ocupan los slots 1..n (ver slots: 1 arriba).
+    const boxedParams = [...Array(params.length).keys()].map((i) => i + 1).filter((s) => state.captured.has(s));
     this.protos[index] = { code: state.code, params: params.length, slots: state.slots, upvals: state.upvals, boxedParams };
     return index;
   }
