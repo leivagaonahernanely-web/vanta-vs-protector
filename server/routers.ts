@@ -5,7 +5,6 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { ENV } from "./_core/env";
 import { sdk } from "./_core/sdk";
-import { systemRouter } from "./_core/systemRouter";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import * as db from "./db";
 import { BuildError, buildLua } from "./obfuscator/build";
@@ -53,8 +52,6 @@ const obfuscateInput = z.object({
 });
 
 export const appRouter = router({
-  system: systemRouter,
-
   auth: router({
     me: publicProcedure.query(opts => (opts.ctx.user ? publicUser(opts.ctx.user) : null)),
 
@@ -110,7 +107,7 @@ export const appRouter = router({
         }
         loginLimiter.recordSuccess(acctKey);
 
-        const token = await sdk.createSessionToken(user.openId, { expiresInMs: ONE_YEAR_MS, name: user.email ?? "" });
+        const token = await sdk.createSessionToken(user.openId, ONE_YEAR_MS);
         ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
         return { success: true } as const;
       }),

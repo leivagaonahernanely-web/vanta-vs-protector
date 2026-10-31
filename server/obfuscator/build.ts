@@ -9,7 +9,7 @@
 // - Un bloque nativo y uno protegido no pueden compartir variables "local" a nivel principal
 //   (cada uno vive en un contexto distinto). Las globales sí se comparten.
 import { compile } from "./compiler";
-import { emitLua, payloadLiteral } from "./emit";
+import { payloadLiteral } from "./emit";
 import { LuaSyntaxError } from "./lexer";
 import { RUNTIME_LUA } from "./runtime";
 import { parse } from "./parser";
@@ -196,6 +196,3 @@ export function buildLua(source: string, seed: number, options: { printResult?: 
     segments: segments.length,
   };
 }
-
-// Compatibilidad con la ruta anterior: un solo segmento protegido.
-export { emitLua };

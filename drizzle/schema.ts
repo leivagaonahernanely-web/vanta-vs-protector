@@ -37,4 +37,3 @@ export const nxKeys = mysqlTable("nxKeys", {
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
-export type NxKey = typeof nxKeys.$inferSelect;
