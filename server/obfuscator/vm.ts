@@ -76,22 +76,38 @@ type Ctx = { steps: number; maxSteps: number; env: Env; depth: number };
 
 export function execute(bc: Bytecode, env: Env, maxSteps = DEFAULT_MAX_STEPS): unknown {
   const ctx: Ctx = { steps: 0, maxSteps, env, depth: 0 };
-  return runFunction(bc, new LuaFunction(bc.protos[0], []), [], ctx);
+  const results = runFunction(bc, new LuaFunction(bc.protos[0], []), [], ctx);
+  return results.length > 0 ? results[0] : null;
 }
 
-function runFunction(bc: Bytecode, fn: LuaFunction, args: unknown[], ctx: Ctx): unknown {
+// Devuelve la lista de resultados de la función (puede ser vacía o tener varios valores).
+function runFunction(bc: Bytecode, fn: LuaFunction, args: unknown[], ctx: Ctx): unknown[] {
   const proto = fn.proto;
   if (++ctx.depth > MAX_DEPTH) throw new RuntimeError("desbordamiento de la pila de llamadas");
   try {
     const cells: Cell[] = [];
     for (let i = 0; i < proto.slots; i++) cells.push({ v: null });
     for (let i = 0; i < proto.params; i++) cells[i] = { v: args[i] ?? null };
+    // Argumentos extra: son los valores de '...'.
+    const varargs = args.slice(proto.params);
 
     const stack: unknown[] = [];
     const push = (v: unknown) => { stack.push(v); };
     const pop = (): unknown => {
       if (stack.length === 0) throw new RuntimeError("pila vacía");
       return stack.pop();
+    };
+    // Saca n valores de la pila, en su orden original.
+    const popN = (n: number): unknown[] => {
+      const out: unknown[] = [];
+      for (let i = 0; i < n; i++) out.unshift(pop());
+      return out;
+    };
+    const countOf = (): number => pop() as number;
+    // Empuja una lista de valores seguida de su cantidad.
+    const pushAll = (vals: unknown[]) => {
+      for (const v of vals) push(v);
+      push(vals.length);
     };
 
     let pc = 0;
@@ -132,10 +148,46 @@ function runFunction(bc: Bytecode, fn: LuaFunction, args: unknown[], ctx: Ctx): 
           const callArgs: unknown[] = [];
           for (let i = 0; i < a; i++) callArgs.unshift(pop());
           const callee = pop();
-          push(call(bc, callee, callArgs, ctx));
+          push(first(call(bc, callee, callArgs, ctx)));
           break;
         }
-        case "RET": return pop();
+        case "CALLM": {
+          const callArgs: unknown[] = [];
+          for (let i = 0; i < a; i++) callArgs.unshift(pop());
+          const callee = pop();
+          pushAll(call(bc, callee, callArgs, ctx));
+          break;
+        }
+        case "CALLV": {
+          const callArgs = popN(countOf());
+          const callee = pop();
+          push(first(call(bc, callee, callArgs, ctx)));
+          break;
+        }
+        case "CALLVM": {
+          const callArgs = popN(countOf());
+          const callee = pop();
+          pushAll(call(bc, callee, callArgs, ctx));
+          break;
+        }
+        case "ADJ": {
+          const vals = popN(countOf());
+          for (let j = 0; j < a; j++) push(j < vals.length ? vals[j] : null);
+          break;
+        }
+        case "ADDCOUNT": push(countOf() + a); break;
+        case "RETV": return popN(countOf());
+        case "VARARG": pushAll(varargs); break;
+        case "VARARG1": push(varargs.length > 0 ? varargs[0] : null); break;
+        case "SETLIST": {
+          // Pila: [..., tabla, inicio, v1..vk, k]. Consume la tabla duplicada y deja la original.
+          const vals = popN(countOf());
+          const start = pop() as number;
+          const t = pop();
+          vals.forEach((v, j) => setIndex(t, start + j, v));
+          break;
+        }
+        case "RET": return [pop()];
         case "CLOSURE": {
           const child = bc.protos[a];
           const ups = child.upvals.map((d) => (d.fromLocal ? cells[d.index] : fn.upvals[d.index]));
@@ -164,16 +216,19 @@ function runFunction(bc: Bytecode, fn: LuaFunction, args: unknown[], ctx: Ctx): 
   }
 }
 
-function call(bc: Bytecode, callee: unknown, args: unknown[], ctx: Ctx): unknown {
-  if (callee instanceof LuaFunction) {
-    const result = runFunction(bc, callee, args, ctx);
-    return result === undefined ? null : result;
-  }
+// Llamada genérica: devuelve la lista de resultados (vacía si la función no devuelve nada).
+function call(bc: Bytecode, callee: unknown, args: unknown[], ctx: Ctx): unknown[] {
+  if (callee instanceof LuaFunction) return runFunction(bc, callee, args, ctx);
   if (typeof callee === "function") {
     const result = callee(...args);
-    return result === undefined ? null : result;
+    return result === undefined ? [] : [result];
   }
   throw new RuntimeError(`se intentó llamar a un valor de tipo ${typeName(callee)}`);
+}
+
+// Primer resultado de una llamada en contexto de un solo valor (nil si no hay ninguno).
+function first(results: unknown[]): unknown {
+  return results.length > 0 ? results[0] : null;
 }
 
 function index(ctx: Ctx, obj: unknown, key: unknown): unknown {

@@ -87,11 +87,8 @@ describe("compilador + VM", () => {
     expect(() => execute(encode(compile(parse("while true do end")), 1), {}, 10_000)).toThrow(/límite de ejecución/);
   });
 
-  it("rechaza lo que aún no soporta el subconjunto", () => {
-    expect(() => compile(parse("return ..."))).toThrow(/varargs/);
-    expect(() => compile(parse("local function f(...) end"))).toThrow(/varargs/);
-    expect(() => compile(parse("return 1, 2"))).toThrow(/un valor de retorno/);
-    expect(() => compile(parse("for k, v in pairs({}) do end"))).toThrow(/for genérico/);
+  it("rechaza '...' fuera de una función vararg y break fuera de un bucle", () => {
+    expect(() => compile(parse("local function f() return ... end"))).toThrow(/vararg/);
     expect(() => compile(parse("break"))).toThrow(/fuera de un bucle/);
   });
 });

@@ -11,6 +11,11 @@ export const OP_NAMES = [
   "CONST", "LOCAL_GET", "LOCAL_SET", "DECL", "GLOBAL_GET", "GLOBAL_SET", "UP_GET", "UP_SET",
   "BIN", "UN", "JMP", "JMPF", "JMPT", "DUP", "POP", "SWAP", "CALL", "RET", "CLOSURE",
   "NEWTABLE", "INDEX", "SETINDEX", "BOX_GET", "BOX_SET", "BOX_DECL",
+  // Listas de valores variables: la lista va seguida de su cantidad (el contador queda en la cima).
+  // CALLM: llamada con argumentos fijos y resultados variables. CALLV/CALLVM: argumentos variables.
+  // ADJ n: deja exactamente n valores. ADDCOUNT n: suma n a la cantidad. RETV: devuelve la lista.
+  // VARARG/VARARG1: todos (o el primero) de los argumentos extra. SETLIST: llena una tabla.
+  "CALLM", "CALLV", "CALLVM", "ADJ", "ADDCOUNT", "RETV", "VARARG", "VARARG1", "SETLIST",
 ] as const;
 export type OpName = (typeof OP_NAMES)[number];
 
@@ -52,6 +57,7 @@ type FnState = {
   upvals: UpvalDesc[];
   upvalNames: Map<string, number>;
   captured: Set<number>; // slots de esta función que usa alguna closure hija
+  vararg: boolean; // la función acepta '...'
 };
 
 type Ref = { kind: "local" | "up" | "global"; a: number };
@@ -73,7 +79,8 @@ class Compiler {
   private fns: FnState[] = [];
 
   compileMain(block: Block): Program {
-    this.functionProto([], block, false);
+    // El fragmento principal de Lua es una función vararg.
+    this.functionProto([], block, true);
     return { protos: this.protos, consts: this.consts, names: this.names, ops: this.ops };
   }
 
@@ -93,11 +100,11 @@ class Compiler {
 
   // Compila una función y devuelve el índice de su prototipo.
   private functionProto(params: string[], body: Block, isVararg: boolean, line?: number): number {
-    if (isVararg) throw new CompileError("varargs (...) todavía no soportados", line);
     const index = this.protos.length;
     this.protos.push(null as unknown as Proto); // reserva el índice antes de compilar anidadas
     this.fns.push({
-      code: [], scopes: [new Map()], slots: 0, loops: [], upvals: [], upvalNames: new Map(), captured: new Set(),
+      code: [], scopes: [new Map()], slots: 0, loops: [], upvals: [], upvalNames: new Map(),
+      captured: new Set(), vararg: isVararg,
     });
     for (const p of params) this.declareLocal(p);
     this.block(body, false);
@@ -210,7 +217,7 @@ class Compiler {
   private statement(s: Stmt) {
     switch (s.kind) {
       case "Local": {
-        this.pushValues(s.values, s.names.length);
+        this.pushList(s.values, s.names.length);
         const slots = s.names.map((n) => this.declareLocal(n));
         for (let i = slots.length - 1; i >= 0; i--) this.emit("DECL", slots[i]);
         return;
@@ -255,7 +262,7 @@ class Compiler {
           this.emit("DECL", key);
           return { obj, key };
         });
-        this.pushValues(s.values, s.targets.length);
+        this.pushList(s.values, s.targets.length);
         for (let i = s.targets.length - 1; i >= 0; i--) {
           const t = s.targets[i];
           const p = prepared[i];
@@ -351,14 +358,58 @@ class Compiler {
         this.fn.scopes.pop();
         return;
       }
-      case "GenericFor":
-        throw new CompileError("for genérico todavía no soportado (requiere retornos múltiples)", s.line);
-      case "Return":
-        if (s.values.length > 1) throw new CompileError("solo se soporta un valor de retorno por ahora", s.line);
-        if (s.values.length === 0) this.emit("CONST", this.constIndex(null));
-        else this.expr(s.values[0]);
-        this.emit("RET");
+      case "GenericFor": {
+        // f, estado y control se evalúan una vez. Cada vuelta llama f(estado, control), reparte los
+        // resultados entre las variables y termina cuando la primera es nil.
+        this.fn.scopes.push(new Map());
+        this.pushList(s.iterators, 3);
+        const control = this.newTemp();
+        this.emit("DECL", control);
+        const state = this.newTemp();
+        this.emit("DECL", state);
+        const iter = this.newTemp();
+        this.emit("DECL", iter);
+        const start = this.here();
+        this.emit("LOCAL_GET", iter);
+        this.emit("LOCAL_GET", state);
+        this.emit("LOCAL_GET", control);
+        this.emit("CALLM", 2);
+        this.emit("ADJ", s.names.length);
+        // Las variables del bucle son nuevas en cada vuelta (importa para closures).
+        this.fn.scopes.push(new Map());
+        const slots = s.names.map((n) => this.declareLocal(n));
+        for (let i = slots.length - 1; i >= 0; i--) this.emit("DECL", slots[i]);
+        this.emit("LOCAL_GET", slots[0]);
+        this.emit("CONST", this.constIndex(null));
+        this.emit("BIN", this.opIndex("=="));
+        const exit = this.emit("JMPT", -1);
+        this.emit("LOCAL_GET", slots[0]);
+        this.emit("LOCAL_SET", control);
+        this.fn.loops.push([]);
+        this.block(s.body, false);
+        this.emit("JMP", start);
+        this.finishLoop(exit);
+        this.fn.scopes.pop();
+        this.fn.scopes.pop();
         return;
+      }
+      case "Return": {
+        const values = s.values;
+        if (values.length === 0) {
+          this.emit("CONST", this.constIndex(null));
+          this.emit("RET");
+        } else if (values.length === 1 && !this.isMulti(values[0])) {
+          this.expr(values[0]);
+          this.emit("RET");
+        } else if (values.length === 1) {
+          this.emitMulti(values[0]);
+          this.emit("RETV");
+        } else {
+          this.pushVar(values);
+          this.emit("RETV");
+        }
+        return;
+      }
       case "Break": {
         const loop = this.fn.loops[this.fn.loops.length - 1];
         if (!loop) throw new CompileError("'break' fuera de un bucle", s.line);
@@ -380,13 +431,81 @@ class Compiler {
     throw new CompileError("se esperaba una constante numérica");
   }
 
-  // Empuja exactamente `count` valores, rellenando con nil o descartando sobrantes.
-  private pushValues(values: Expr[], count: number) {
+  // Expresiones que pueden dar varios valores: llamadas y '...'.
+  private isMulti(e: Expr): boolean {
+    return e.kind === "Call" || e.kind === "MethodCall" || e.kind === "Vararg";
+  }
+
+  // Deja todos los valores de una expresión multivalor seguidos de su cantidad.
+  private emitMulti(e: Expr) {
+    if (e.kind === "Vararg") {
+      if (!this.fn.vararg) throw new CompileError("no se puede usar '...' fuera de una función vararg");
+      this.emit("VARARG");
+      return;
+    }
+    this.emitCall(e, true);
+  }
+
+  // Empuja exactamente `want` valores para una lista de expresiones (asignación, local).
+  // Solo la última expresión puede expandirse; las demás aportan un valor cada una.
+  private pushList(values: Expr[], want: number) {
+    const n = values.length;
     values.forEach((v, i) => {
+      if (i === n - 1 && this.isMulti(v)) {
+        this.emitMulti(v);
+        this.emit("ADJ", Math.max(want - i, 0));
+        return;
+      }
       this.expr(v);
-      if (i >= count) this.emit("POP");
+      if (i >= want) this.emit("POP");
     });
-    for (let i = values.length; i < count; i++) this.emit("CONST", this.constIndex(null));
+    if (n === 0 || !this.isMulti(values[n - 1])) {
+      for (let i = n; i < want; i++) this.emit("CONST", this.constIndex(null));
+    }
+  }
+
+  // Empuja todos los valores de una lista seguidos de su cantidad, con la cantidad en la cima.
+  // Se usa cuando la lista tiene un tamaño que solo se conoce al ejecutar (argumentos, return).
+  private pushVar(values: Expr[]) {
+    const n = values.length;
+    values.forEach((v, i) => {
+      if (i === n - 1 && this.isMulti(v)) {
+        this.emitMulti(v);
+        if (n > 1) this.emit("ADDCOUNT", n - 1);
+      } else {
+        this.expr(v);
+      }
+    });
+    if (n === 0 || !this.isMulti(values[n - 1])) this.emit("CONST", this.constIndex(n));
+  }
+
+  // Compila una llamada. Con multi=true deja todos los resultados y su cantidad en la pila.
+  private emitCall(e: Expr, multi: boolean) {
+    let args: Expr[];
+    let hasSelf = false;
+    if (e.kind === "Call") {
+      this.expr(e.callee);
+      args = e.args;
+    } else if (e.kind === "MethodCall") {
+      // obj:m(args) == obj.m(obj, args)
+      this.expr(e.object);
+      this.emit("DUP");
+      this.emit("CONST", this.constIndex(e.method));
+      this.emit("INDEX");
+      this.emit("SWAP");
+      args = e.args;
+      hasSelf = true;
+    } else {
+      throw new CompileError("se esperaba una llamada");
+    }
+    if (args.length > 0 && this.isMulti(args[args.length - 1])) {
+      this.pushVar(args);
+      if (hasSelf) this.emit("ADDCOUNT", 1); // 'self' queda debajo de la lista variable
+      this.emit(multi ? "CALLVM" : "CALLV");
+    } else {
+      for (const a of args) this.expr(a);
+      this.emit(multi ? "CALLM" : "CALL", args.length + (hasSelf ? 1 : 0));
+    }
   }
 
   private expr(e: Expr) {
@@ -399,7 +518,9 @@ class Compiler {
         this.emit("CONST", this.constIndex(e.value));
         return;
       case "Vararg":
-        throw new CompileError("varargs (...) todavía no soportados");
+        if (!this.fn.vararg) throw new CompileError("no se puede usar '...' fuera de una función vararg");
+        this.emit("VARARG1");
+        return;
       case "Name": {
         const ref = this.lookup(e.name);
         if (ref.kind === "local") this.emit("LOCAL_GET", ref.a);
@@ -435,19 +556,9 @@ class Compiler {
         this.emit("BIN", this.opIndex(e.op));
         return;
       case "Call":
-        this.expr(e.callee);
-        for (const a of e.args) this.expr(a);
-        this.emit("CALL", e.args.length);
-        return;
       case "MethodCall":
-        // obj:m(args) == obj.m(obj, args)
-        this.expr(e.object);
-        this.emit("DUP");
-        this.emit("CONST", this.constIndex(e.method));
-        this.emit("INDEX");
-        this.emit("SWAP");
-        for (const a of e.args) this.expr(a);
-        this.emit("CALL", e.args.length + 1);
+        // En contexto de un solo valor: la llamada se queda con el primer resultado.
+        this.emitCall(e, false);
         return;
       case "Function": {
         const proto = this.functionProto(e.params, e.body, e.isVararg, e.line);
@@ -457,7 +568,16 @@ class Compiler {
       case "Table": {
         this.emit("NEWTABLE");
         let position = 1;
-        for (const item of e.items) {
+        const lastIndex = e.items.length - 1;
+        for (const [idx, item] of e.items.entries()) {
+          // Último elemento posicional multivalor: se expande dentro de la tabla.
+          if (idx === lastIndex && item.kind === "Positional" && this.isMulti(item.value)) {
+            this.emit("DUP");
+            this.emit("CONST", this.constIndex(position));
+            this.emitMulti(item.value);
+            this.emit("SETLIST");
+            return;
+          }
           this.emit("DUP");
           if (item.kind === "Positional") {
             this.emit("CONST", this.constIndex(position++));

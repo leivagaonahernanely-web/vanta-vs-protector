@@ -25,7 +25,9 @@ function tsEnv(): Env {
   const lib = new LuaTable();
   lib.hash.set("len", (s: unknown) => (s as string).length);
   lib.hash.set("upper", (s: unknown) => (s as string).toUpperCase());
-  return { string: lib };
+  // select como en Lua 5.1: select("#", ...) cuenta; select(n, ...) devuelve el n-ésimo.
+  const select = (n: unknown, ...rest: unknown[]) => (n === "#" ? rest.length : (rest[(n as number) - 1] ?? null));
+  return { string: lib, select };
 }
 
 // Texto que imprimiría `print` en Lua 5.1 para el resultado de la VM de TypeScript.
@@ -60,7 +62,19 @@ const PROGRAMS: string[] = [
   // Capturas: parámetro capturado y mutado, captura de dos niveles y closures creadas en un bucle.
   "local function mk(x) return function() x = x + 1 return x end end local f = mk(10) f() return f()",
   "local a = 1 local function f() local function g() return a end return g() end a = 5 return f()",
-  "local t = {} for i = 1, 3 do local j = i * 10 t[i] = function() j = j + 1 return j end end return t[1]() + t[1]() * 100 + t[3]()",
+  "local t = {} for i = 1, 3 do local j = i * 10 t[i] = function() j = j + 1 return j end end return t[1]() + t[1]() * 100 + t[3]()",  // For genérico, varargs, retornos múltiples y listas variables.
+  "local function it(t, i) i = i + 1 if t[i] ~= nil then return i, t[i] end return nil end local function each(t) return it, t, 0 end local s = 0 for i, v in each({10, 20, 30}) do s = s + i * v end return s",
+  "local function sum(...) local s = 0 for i = 1, select('#', ...) do s = s + select(i, ...) end return s end return sum(1, 2, 3)",
+  "local function two() return 1, 2 end local a, b = two() return a * 10 + b",
+  "local function two() return 1, 2 end local t = {two(), two()} return #t",
+  "local function two() return 3, 4 end local function fwd() return two() end local a, b = fwd() return a + b",
+  "local o = {} function o:count(...) return select('#', ...) end local function two() return 1, 2 end return o:count(7, two())",
+  "local function pk(...) return {...} end local t = pk(5, 6, 7) return t[1] + t[3]",
+  "local function f(a, b) return a, b end local x, y, z = f(1) return (x or 0) + (y or 0) * 10 + (z or 0) * 100",
+  "local function gen() local i = 0 return function() i = i + 1 if i <= 3 then return i end end end local s = 0 for v in gen() do s = s + v end return s",
+  "local function f(...) local a, b = ... return a + b end return f(4, 5, 6)",
+  "local function g(...) return ... end local x, y = g(8, 9) return x * y",
+  "local function it(t, i) i = i + 1 if t[i] then return i end end local n = 0 for i in it, {1, 2, 3, 4}, 0 do if i == 3 then break end n = n + i end return n",
 ];
 
 describe("emisión Lua: cadenas cifradas", () => {

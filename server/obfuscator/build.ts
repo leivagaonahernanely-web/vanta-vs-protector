@@ -9,6 +9,7 @@
 // - Un bloque nativo y uno protegido no pueden compartir variables "local" a nivel principal
 //   (cada uno vive en un contexto distinto). Las globales sí se comparten.
 import { compile } from "./compiler";
+import { stripComments } from "./comments";
 import { payloadLiteral } from "./emit";
 import { LuaSyntaxError } from "./lexer";
 import { RUNTIME_LUA } from "./runtime";
@@ -176,7 +177,7 @@ export function buildLua(source: string, seed: number, options: { printResult?: 
   segments.forEach((seg, i) => {
     const last = i === segments.length - 1;
     if (seg.kind === "native") {
-      chunks.push(`do\n${seg.source}\nend`);
+      chunks.push(`do\n${stripComments(seg.source)}\nend`);
       return;
     }
     let program;

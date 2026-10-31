@@ -130,6 +130,8 @@ export const RUNTIME_LUA = `local function nx_run(P)
     MUL = 11, CALL = 12, LSET = 13, JMPF = 14, BGET = 15, BSET = 16, BDECL = 17, DECL = 18,
     POP = 19, RET = 20, BIN = 21, GGET = 22, GSET = 23, DUP = 24, SWAP = 25, UPGET = 26,
     UPSET = 27, UN = 28, JMPT = 29, CLOSURE = 30, NEWTABLE = 31, JMP = 32, INDEX = 33, SETINDEX = 34,
+    CALLM = 35, CALLV = 36, CALLVM = 37, ADJ = 38, ADDCOUNT = 39, RETV = 40, VARARG = 41, VARARG1 = 42,
+    SETLIST = 43,
   }
   local fast = {
     ["+"] = K.ADD, ["-"] = K.SUB, ["*"] = K.MUL, ["<"] = K.LT, ["<="] = K.LE,
@@ -171,6 +173,15 @@ export const RUNTIME_LUA = `local function nx_run(P)
       elseif name == "UN" then kind, arg = K.UN, ufn[a + 1]
       elseif name == "CLOSURE" then kind, arg = K.CLOSURE, protos[a + 1]
       elseif name == "NEWTABLE" then kind = K.NEWTABLE
+      elseif name == "CALLM" then kind, arg = K.CALLM, a
+      elseif name == "CALLV" then kind = K.CALLV
+      elseif name == "CALLVM" then kind = K.CALLVM
+      elseif name == "ADJ" then kind, arg = K.ADJ, a
+      elseif name == "ADDCOUNT" then kind, arg = K.ADDCOUNT, a
+      elseif name == "RETV" then kind = K.RETV
+      elseif name == "VARARG" then kind = K.VARARG
+      elseif name == "VARARG1" then kind = K.VARARG1
+      elseif name == "SETLIST" then kind = K.SETLIST
       else fail("operación desconocida") end
       code[pc], code[pc + 1] = kind, arg
     end
@@ -181,6 +192,13 @@ export const RUNTIME_LUA = `local function nx_run(P)
       return run_proto(proto, ups, { ... }, select("#", ...))
     end
   end
+
+  -- Empaqueta resultados de una llamada con su cantidad (los nil también cuentan).
+  local function pack(...)
+    return { n = select("#", ...), ... }
+  end
+
+  local NO_VARARGS = { n = 0 }
 
   run_proto = function(proto, ups, args, nargs)
     -- La profundidad de este marco se deriva de quien llama (CALL la fija antes de llamar),
@@ -197,6 +215,13 @@ export const RUNTIME_LUA = `local function nx_run(P)
     for j = 1, #bp do
       local s = bp[j]
       cells[s] = { v = cells[s] }
+    end
+
+    -- Argumentos extra: valores de '...'. Sin extras se reutiliza una tabla vacía.
+    local va = NO_VARARGS
+    if nargs > proto.params then
+      va = { n = nargs - proto.params }
+      for i = 1, va.n do va[i] = args[proto.params + i] end
     end
 
     local stack, sp = {}, 0
@@ -370,9 +395,85 @@ export const RUNTIME_LUA = `local function nx_run(P)
             elseif op == 33 then -- INDEX
               stack[sp - 1] = index(stack[sp - 1], stack[sp])
               sp = sp - 1
-            else -- SETINDEX (34)
+            elseif op == 34 then -- SETINDEX
               setindex(stack[sp - 2], stack[sp - 1], stack[sp])
               sp = sp - 3
+            elseif op == 35 then -- CALLM: args fijos, resultados variables (callee en sp - a)
+              local callee = stack[sp - a]
+              if type(callee) ~= "function" then
+                fail("se intentó llamar a un valor de tipo " .. typename(callee))
+              end
+              depth = myd
+              local res = pack(callee(unpack(stack, sp - a + 1, sp)))
+              sp = sp - a - 1
+              for j = 1, res.n do
+                sp = sp + 1
+                stack[sp] = res[j]
+              end
+              sp = sp + 1
+              stack[sp] = res.n
+            elseif op == 36 then -- CALLV: args variables, un resultado
+              local k = stack[sp]
+              sp = sp - 1
+              local callee = stack[sp - k]
+              if type(callee) ~= "function" then
+                fail("se intentó llamar a un valor de tipo " .. typename(callee))
+              end
+              depth = myd
+              local r = callee(unpack(stack, sp - k + 1, sp))
+              sp = sp - k
+              stack[sp] = r
+            elseif op == 37 then -- CALLVM: args variables, resultados variables
+              local k = stack[sp]
+              sp = sp - 1
+              local callee = stack[sp - k]
+              if type(callee) ~= "function" then
+                fail("se intentó llamar a un valor de tipo " .. typename(callee))
+              end
+              depth = myd
+              local res = pack(callee(unpack(stack, sp - k + 1, sp)))
+              sp = sp - k - 1
+              for j = 1, res.n do
+                sp = sp + 1
+                stack[sp] = res[j]
+              end
+              sp = sp + 1
+              stack[sp] = res.n
+            elseif op == 38 then -- ADJ: deja exactamente a valores de la lista
+              local k = stack[sp]
+              sp = sp - 1
+              local base = sp - k
+              for j = 1, a do
+                local v = nil
+                if j <= k then v = stack[base + j] end
+                stack[base + j] = v
+              end
+              sp = base + a
+            elseif op == 39 then -- ADDCOUNT
+              stack[sp] = stack[sp] + a
+            elseif op == 40 then -- RETV: devuelve la lista
+              local k = stack[sp]
+              sp = sp - 1
+              depth = myd - 1
+              return unpack(stack, sp - k + 1, sp)
+            elseif op == 41 then -- VARARG
+              for j = 1, va.n do
+                sp = sp + 1
+                stack[sp] = va[j]
+              end
+              sp = sp + 1
+              stack[sp] = va.n
+            elseif op == 42 then -- VARARG1
+              sp = sp + 1
+              stack[sp] = va[1]
+            else -- SETLIST (43): [..., t, inicio, v1..vk, k]; consume el duplicado de t
+              local k = stack[sp]
+              sp = sp - 1
+              local base = sp - k
+              local start = stack[base]
+              local t = stack[base - 1]
+              for j = 1, k do setindex(t, start + j - 1, stack[base + j]) end
+              sp = base - 2
             end
           end
         end
