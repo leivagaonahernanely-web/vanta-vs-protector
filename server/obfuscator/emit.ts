@@ -72,7 +72,8 @@ export function payloadLiteral(bc: Bytecode): string {
 
   const protos = bc.protos.map((p) =>
     `{code=${luaList(p.code.map(String))},params=${p.params},slots=${p.slots},` +
-    `up=${luaList(p.upvals.map((u) => `{${u.fromLocal ? 1 : 0},${u.index}}`))}}`,
+    `up=${luaList(p.upvals.map((u) => `{${u.fromLocal ? 1 : 0},${u.index}}`))},` +
+    `bp=${luaList(p.boxedParams.map(String))}}`,
   );
   return (
     `{` +

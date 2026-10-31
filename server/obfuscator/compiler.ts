@@ -6,10 +6,11 @@
 // No soporta todavía: varargs, for genérico y retornos múltiples.
 import type { Block, Expr, Stmt } from "./parser";
 
+// BOX_* son LOCAL_* para locales capturadas por closures: su celda es una caja {v=...}.
 export const OP_NAMES = [
   "CONST", "LOCAL_GET", "LOCAL_SET", "DECL", "GLOBAL_GET", "GLOBAL_SET", "UP_GET", "UP_SET",
   "BIN", "UN", "JMP", "JMPF", "JMPT", "DUP", "POP", "SWAP", "CALL", "RET", "CLOSURE",
-  "NEWTABLE", "INDEX", "SETINDEX",
+  "NEWTABLE", "INDEX", "SETINDEX", "BOX_GET", "BOX_SET", "BOX_DECL",
 ] as const;
 export type OpName = (typeof OP_NAMES)[number];
 
@@ -24,6 +25,7 @@ export type Proto = {
   params: number;
   slots: number;
   upvals: UpvalDesc[];
+  boxedParams: number[]; // slots de parámetros que se capturan y deben empaquetarse en caja
 };
 
 export type Program = {
@@ -49,6 +51,7 @@ type FnState = {
   loops: number[][];
   upvals: UpvalDesc[];
   upvalNames: Map<string, number>;
+  captured: Set<number>; // slots de esta función que usa alguna closure hija
 };
 
 type Ref = { kind: "local" | "up" | "global"; a: number };
@@ -93,13 +96,25 @@ class Compiler {
     if (isVararg) throw new CompileError("varargs (...) todavía no soportados", line);
     const index = this.protos.length;
     this.protos.push(null as unknown as Proto); // reserva el índice antes de compilar anidadas
-    this.fns.push({ code: [], scopes: [new Map()], slots: 0, loops: [], upvals: [], upvalNames: new Map() });
+    this.fns.push({
+      code: [], scopes: [new Map()], slots: 0, loops: [], upvals: [], upvalNames: new Map(), captured: new Set(),
+    });
     for (const p of params) this.declareLocal(p);
     this.block(body, false);
     this.emit("CONST", this.constIndex(null));
     this.emit("RET");
     const state = this.fns.pop()!;
-    this.protos[index] = { code: state.code, params: params.length, slots: state.slots, upvals: state.upvals };
+    // Ahora que se conocen todas las capturas (las hijas ya están compiladas), se pasan a caja
+    // las operaciones sobre locales capturadas. Cada variable tiene un slot único, así que esto
+    // no afecta a otras variables.
+    for (const instr of state.code) {
+      if (!state.captured.has(instr.a ?? -1)) continue;
+      if (instr.op === "LOCAL_GET") instr.op = "BOX_GET";
+      else if (instr.op === "LOCAL_SET") instr.op = "BOX_SET";
+      else if (instr.op === "DECL") instr.op = "BOX_DECL";
+    }
+    const boxedParams = [...Array(params.length).keys()].filter((s) => state.captured.has(s));
+    this.protos[index] = { code: state.code, params: params.length, slots: state.slots, upvals: state.upvals, boxedParams };
     return index;
   }
 
@@ -150,6 +165,7 @@ class Compiler {
     let desc: UpvalDesc;
     if (local !== undefined) {
       desc = { fromLocal: true, index: local };
+      parent.captured.add(local);
     } else {
       const outer = this.upvalIndex(level - 1, name);
       if (outer < 0) return -1;

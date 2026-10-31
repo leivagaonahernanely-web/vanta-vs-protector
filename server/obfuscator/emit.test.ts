@@ -57,6 +57,10 @@ const PROGRAMS: string[] = [
   'return ("abc"):upper()',
   "x = 5 y = x * 2 return y",
   'local s = "hola mundo \\"ñ\\"" g = s .. "!" return g',
+  // Capturas: parámetro capturado y mutado, captura de dos niveles y closures creadas en un bucle.
+  "local function mk(x) return function() x = x + 1 return x end end local f = mk(10) f() return f()",
+  "local a = 1 local function f() local function g() return a end return g() end a = 5 return f()",
+  "local t = {} for i = 1, 3 do local j = i * 10 t[i] = function() j = j + 1 return j end end return t[1]() + t[1]() * 100 + t[3]()",
 ];
 
 describe("emisión Lua: cadenas cifradas", () => {

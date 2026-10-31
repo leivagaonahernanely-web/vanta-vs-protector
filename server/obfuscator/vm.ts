@@ -10,6 +10,7 @@ export type BytecodeProto = {
   params: number;
   slots: number;
   upvals: UpvalDesc[];
+  boxedParams: number[];
 };
 
 export type Bytecode = {
@@ -66,7 +67,7 @@ export function encode(program: Program, seed: number): Bytecode {
     for (const instr of p.code) {
       code.push(idOf.get(instr.op)!, instr.a ?? 0);
     }
-    return { code, params: p.params, slots: p.slots, upvals: p.upvals };
+    return { code, params: p.params, slots: p.slots, upvals: p.upvals, boxedParams: p.boxedParams };
   });
   return { protos, opTable, consts: program.consts, names: program.names, ops: program.ops };
 }
@@ -106,6 +107,10 @@ function runFunction(bc: Bytecode, fn: LuaFunction, args: unknown[], ctx: Ctx): 
         case "LOCAL_GET": push(cells[a].v); break;
         case "LOCAL_SET": cells[a].v = pop(); break;
         case "DECL": cells[a] = { v: pop() }; break;
+        // Locales capturadas: en la VM de referencia toda celda ya es una caja, así que son iguales.
+        case "BOX_GET": push(cells[a].v); break;
+        case "BOX_SET": cells[a].v = pop(); break;
+        case "BOX_DECL": cells[a] = { v: pop() }; break;
         case "GLOBAL_GET": push(ctx.env[bc.names[a]] ?? null); break;
         case "GLOBAL_SET": ctx.env[bc.names[a]] = pop(); break;
         case "UP_GET": push(fn.upvals[a].v); break;

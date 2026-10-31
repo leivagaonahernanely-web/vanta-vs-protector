@@ -1,17 +1,22 @@
 // Runtime de la VM en Lua 5.1, incrustado en cada archivo de salida junto con el bytecode.
 // Sin límite de pasos: los scripts del cliente pueden ejecutarse indefinidamente.
-// Replica la semántica de la VM de referencia (vm.ts), pero optimizado para velocidad:
-// operadores resueltos una sola vez al cargar, pila con puntero y sin closures por frame.
+// Replica la semántica de la VM de referencia (vm.ts). Rendimiento:
+// - Al cargar, el bytecode se resuelve una vez: el tipo de instrucción pasa a ser un entero y
+//   los argumentos (constantes, globales, funciones de operador, destinos de salto) ya vienen
+//   listos, así que el bucle no hace búsquedas.
+// - El despacho es un árbol binario de comparaciones (≈6 comparaciones por instrucción).
+// - Las locales son valores directos; solo las capturadas por closures viven en una caja {v=...}.
+// - Aritmética y comparación tienen camino rápido para números.
 export const RUNTIME_LUA = `local function nx_run(P)
   local protos, consts, names = P.protos, P.consts, P.names
   local opnames, bopnames = P.opnames, P.ops
   -- Descifrado de cadenas (ver emit.ts): byte - clave - salt, módulo 256. Mismos salts que SALT.
-  local K, KN = P.k, #P.k
+  local KEYB, KN = P.k, #P.k
   local string_byte, string_char = string.byte, string.char
   local function decstr(s, salt)
     local out = {}
     for i = 1, #s do
-      out[i] = string_char((string_byte(s, i) - K[(i - 1) % KN + 1] - salt) % 256)
+      out[i] = string_char((string_byte(s, i) - KEYB[(i - 1) % KN + 1] - salt) % 256)
     end
     return table.concat(out)
   end
@@ -113,15 +118,65 @@ export const RUNTIME_LUA = `local function nx_run(P)
     end,
   }
 
-  -- Resuelve cada operador una sola vez, en lugar de compararlo en cada ejecución.
   local bfn, ufn = {}, {}
   for i = 1, #bopnames do
     bfn[i] = binary_impl[bopnames[i]]
     ufn[i] = unary_impl[bopnames[i]]
   end
 
-  local function make_closure(index_, ups)
-    local proto = protos[index_]
+  -- Tipos de instrucción resueltos al cargar. Enteros: comparar enteros es más barato que strings.
+  local K = {
+    LGET = 1, CONST = 2, ADD = 3, SUB = 4, LT = 5, LE = 6, GT = 7, GE = 8, EQ = 9, NE = 10,
+    MUL = 11, CALL = 12, LSET = 13, JMPF = 14, BGET = 15, BSET = 16, BDECL = 17, DECL = 18,
+    POP = 19, RET = 20, BIN = 21, GGET = 22, GSET = 23, DUP = 24, SWAP = 25, UPGET = 26,
+    UPSET = 27, UN = 28, JMPT = 29, CLOSURE = 30, NEWTABLE = 31, JMP = 32, INDEX = 33, SETINDEX = 34,
+  }
+  local fast = {
+    ["+"] = K.ADD, ["-"] = K.SUB, ["*"] = K.MUL, ["<"] = K.LT, ["<="] = K.LE,
+    [">"] = K.GT, [">="] = K.GE, ["=="] = K.EQ, ["~="] = K.NE,
+  }
+
+  -- Reescribe un código plano [tipo, argumento, ...] con argumentos ya resueltos.
+  -- Saltos: destino plano (a * 2 + 1). Constantes, globales y operadores: el valor o la función.
+  local function resolve(code)
+    local n = #code
+    for pc = 1, n, 2 do
+      local name = opnames[code[pc] + 1]
+      local a = code[pc + 1]
+      local kind, arg = nil, a
+      if name == "LOCAL_GET" then kind = K.LGET
+      elseif name == "CONST" then kind, arg = K.CONST, consts[a + 1]
+      elseif name == "BIN" then
+        local op = bopnames[a + 1]
+        kind, arg = fast[op] or K.BIN, bfn[a + 1]
+      elseif name == "CALL" then kind = K.CALL
+      elseif name == "LOCAL_SET" then kind = K.LSET
+      elseif name == "JMPF" then kind, arg = K.JMPF, a * 2 + 1
+      elseif name == "JMPT" then kind, arg = K.JMPT, a * 2 + 1
+      elseif name == "JMP" then kind, arg = K.JMP, a * 2 + 1
+      elseif name == "INDEX" then kind = K.INDEX
+      elseif name == "SETINDEX" then kind = K.SETINDEX
+      elseif name == "DECL" then kind = K.DECL
+      elseif name == "BOX_GET" then kind = K.BGET
+      elseif name == "BOX_SET" then kind = K.BSET
+      elseif name == "BOX_DECL" then kind = K.BDECL
+      elseif name == "POP" then kind = K.POP
+      elseif name == "RET" then kind = K.RET
+      elseif name == "GLOBAL_GET" then kind, arg = K.GGET, names[a + 1]
+      elseif name == "GLOBAL_SET" then kind, arg = K.GSET, names[a + 1]
+      elseif name == "DUP" then kind = K.DUP
+      elseif name == "SWAP" then kind = K.SWAP
+      elseif name == "UP_GET" then kind, arg = K.UPGET, a + 1
+      elseif name == "UP_SET" then kind, arg = K.UPSET, a + 1
+      elseif name == "UN" then kind, arg = K.UN, ufn[a + 1]
+      elseif name == "CLOSURE" then kind, arg = K.CLOSURE, protos[a + 1]
+      elseif name == "NEWTABLE" then kind = K.NEWTABLE
+      else fail("operación desconocida") end
+      code[pc], code[pc + 1] = kind, arg
+    end
+  end
+
+  local function make_closure(proto, ups)
     return function(...)
       return run_proto(proto, ups, { ... }, select("#", ...))
     end
@@ -135,101 +190,197 @@ export const RUNTIME_LUA = `local function nx_run(P)
     depth = myd
 
     local code = proto.code
-    -- Las celdas se crean al declarar cada local (DECL); solo los parámetros se crean aquí.
+    -- Celdas de locales: valor directo, salvo las capturadas por closures (cajas {v=...}).
     local cells = {}
-    for i = 0, proto.params - 1 do cells[i] = { v = args[i + 1] } end
+    for i = 0, proto.params - 1 do cells[i] = args[i + 1] end
+    local bp = proto.bp
+    for j = 1, #bp do
+      local s = bp[j]
+      cells[s] = { v = cells[s] }
+    end
 
     local stack, sp = {}, 0
-    local pc = 1 -- índice plano: código[pc] = operación, código[pc + 1] = argumento
+    local pc = 1
 
     while true do
-      local op = opnames[code[pc] + 1]
+      local op = code[pc]
       local a = code[pc + 1]
       pc = pc + 2
 
-      if op == "LOCAL_GET" then
-        sp = sp + 1
-        stack[sp] = cells[a].v
-      elseif op == "CONST" then
-        sp = sp + 1
-        stack[sp] = consts[a + 1]
-      elseif op == "BIN" then
-        stack[sp - 1] = bfn[a + 1](stack[sp - 1], stack[sp])
-        sp = sp - 1
-      elseif op == "CALL" then
-        local callee = stack[sp - a]
-        if type(callee) ~= "function" then
-          fail("se intentó llamar a un valor de tipo " .. typename(callee))
+      if op <= 17 then
+        if op <= 9 then
+          if op <= 5 then
+            if op <= 3 then
+              if op == 1 then -- LGET
+                sp = sp + 1
+                stack[sp] = cells[a]
+              elseif op == 2 then -- CONST
+                sp = sp + 1
+                stack[sp] = a
+              elseif op == 3 then -- ADD
+                local l, r = stack[sp - 1], stack[sp]
+                if type(l) == "number" and type(r) == "number" then stack[sp - 1] = l + r
+                else stack[sp - 1] = a(l, r) end
+                sp = sp - 1
+              end
+            else
+              if op == 4 then -- SUB
+                local l, r = stack[sp - 1], stack[sp]
+                if type(l) == "number" and type(r) == "number" then stack[sp - 1] = l - r
+                else stack[sp - 1] = a(l, r) end
+                sp = sp - 1
+              elseif op == 5 then -- LT
+                local l, r = stack[sp - 1], stack[sp]
+                if type(l) == "number" and type(r) == "number" then stack[sp - 1] = l < r
+                else stack[sp - 1] = a(l, r) end
+                sp = sp - 1
+              end
+            end
+          else
+            if op <= 7 then
+              if op == 6 then -- LE
+                local l, r = stack[sp - 1], stack[sp]
+                if type(l) == "number" and type(r) == "number" then stack[sp - 1] = l <= r
+                else stack[sp - 1] = a(l, r) end
+                sp = sp - 1
+              else -- GT (7)
+                local l, r = stack[sp - 1], stack[sp]
+                if type(l) == "number" and type(r) == "number" then stack[sp - 1] = l > r
+                else stack[sp - 1] = a(l, r) end
+                sp = sp - 1
+              end
+            elseif op == 8 then -- GE
+              local l, r = stack[sp - 1], stack[sp]
+              if type(l) == "number" and type(r) == "number" then stack[sp - 1] = l >= r
+              else stack[sp - 1] = a(l, r) end
+              sp = sp - 1
+            else -- EQ (9)
+              stack[sp - 1] = stack[sp - 1] == stack[sp]
+              sp = sp - 1
+            end
+          end
+        else
+          if op <= 13 then
+            if op == 10 then -- NE
+              stack[sp - 1] = stack[sp - 1] ~= stack[sp]
+              sp = sp - 1
+            elseif op == 11 then -- MUL
+              local l, r = stack[sp - 1], stack[sp]
+              if type(l) == "number" and type(r) == "number" then stack[sp - 1] = l * r
+              else stack[sp - 1] = a(l, r) end
+              sp = sp - 1
+            elseif op == 12 then -- CALL
+              local callee = stack[sp - a]
+              if type(callee) ~= "function" then
+                fail("se intentó llamar a un valor de tipo " .. typename(callee))
+              end
+              depth = myd
+              local r = callee(unpack(stack, sp - a + 1, sp))
+              sp = sp - a
+              stack[sp] = r
+            else -- LSET (13)
+              cells[a] = stack[sp]
+              sp = sp - 1
+            end
+          else
+            if op == 14 then -- JMPF
+              local v = stack[sp]
+              sp = sp - 1
+              if v == nil or v == false then pc = a end
+            elseif op == 15 then -- BGET
+              sp = sp + 1
+              stack[sp] = cells[a].v
+            elseif op == 16 then -- BSET
+              cells[a].v = stack[sp]
+              sp = sp - 1
+            else -- BDECL (17)
+              cells[a] = { v = stack[sp] }
+              sp = sp - 1
+            end
+          end
         end
-        depth = myd
-        local r = callee(unpack(stack, sp - a + 1, sp))
-        sp = sp - a
-        stack[sp] = r
-      elseif op == "LOCAL_SET" then
-        cells[a].v = stack[sp]
-        sp = sp - 1
-      elseif op == "JMPF" then
-        local v = stack[sp]
-        sp = sp - 1
-        if v == nil or v == false then pc = a * 2 + 1 end
-      elseif op == "INDEX" then
-        stack[sp - 1] = index(stack[sp - 1], stack[sp])
-        sp = sp - 1
-      elseif op == "SETINDEX" then
-        setindex(stack[sp - 2], stack[sp - 1], stack[sp])
-        sp = sp - 3
-      elseif op == "JMP" then
-        pc = a * 2 + 1
-      elseif op == "DECL" then
-        cells[a] = { v = stack[sp] }
-        sp = sp - 1
-      elseif op == "POP" then
-        sp = sp - 1
-      elseif op == "RET" then
-        depth = myd - 1
-        return stack[sp]
-      elseif op == "GLOBAL_GET" then
-        sp = sp + 1
-        stack[sp] = env[names[a + 1]]
-      elseif op == "GLOBAL_SET" then
-        env[names[a + 1]] = stack[sp]
-        sp = sp - 1
-      elseif op == "DUP" then
-        sp = sp + 1
-        stack[sp] = stack[sp - 1]
-      elseif op == "SWAP" then
-        stack[sp], stack[sp - 1] = stack[sp - 1], stack[sp]
-      elseif op == "UP_GET" then
-        sp = sp + 1
-        stack[sp] = ups[a + 1].v
-      elseif op == "UP_SET" then
-        ups[a + 1].v = stack[sp]
-        sp = sp - 1
-      elseif op == "UN" then
-        stack[sp] = ufn[a + 1](stack[sp])
-      elseif op == "JMPT" then
-        local v = stack[sp]
-        sp = sp - 1
-        if v ~= nil and v ~= false then pc = a * 2 + 1 end
-      elseif op == "CLOSURE" then
-        local child = protos[a + 1]
-        local child_ups = {}
-        for i = 1, #child.up do
-          local d = child.up[i]
-          if d[1] == 1 then child_ups[i] = cells[d[2]]
-          else child_ups[i] = ups[d[2] + 1] end
-        end
-        sp = sp + 1
-        stack[sp] = make_closure(a + 1, child_ups)
-      elseif op == "NEWTABLE" then
-        sp = sp + 1
-        stack[sp] = {}
       else
-        fail("operación desconocida")
+        if op <= 26 then
+          if op <= 22 then
+            if op <= 20 then
+              if op == 18 then -- DECL
+                cells[a] = stack[sp]
+                sp = sp - 1
+              elseif op == 19 then -- POP
+                sp = sp - 1
+              else -- RET (20)
+                depth = myd - 1
+                return stack[sp]
+              end
+            else
+              if op == 21 then -- BIN (general)
+                stack[sp - 1] = a(stack[sp - 1], stack[sp])
+                sp = sp - 1
+              else -- GGET (22)
+                sp = sp + 1
+                stack[sp] = env[a]
+              end
+            end
+          else
+            if op <= 24 then
+              if op == 23 then -- GSET
+                env[a] = stack[sp]
+                sp = sp - 1
+              else -- DUP (24)
+                sp = sp + 1
+                stack[sp] = stack[sp - 1]
+              end
+            else
+              if op == 25 then -- SWAP
+                stack[sp], stack[sp - 1] = stack[sp - 1], stack[sp]
+              else -- UPGET (26)
+                sp = sp + 1
+                stack[sp] = ups[a].v
+              end
+            end
+          end
+        else
+          if op <= 30 then
+            if op == 27 then -- UPSET
+              ups[a].v = stack[sp]
+              sp = sp - 1
+            elseif op == 28 then -- UN
+              stack[sp] = a(stack[sp])
+            elseif op == 29 then -- JMPT
+              local v = stack[sp]
+              sp = sp - 1
+              if v ~= nil and v ~= false then pc = a end
+            else -- CLOSURE (30): a = prototipo hijo
+              local cup = a.up
+              local child_ups = {}
+              for i = 1, #cup do
+                local d = cup[i]
+                if d[1] == 1 then child_ups[i] = cells[d[2]]
+                else child_ups[i] = ups[d[2] + 1] end
+              end
+              sp = sp + 1
+              stack[sp] = make_closure(a, child_ups)
+            end
+          else
+            if op == 31 then -- NEWTABLE
+              sp = sp + 1
+              stack[sp] = {}
+            elseif op == 32 then -- JMP
+              pc = a
+            elseif op == 33 then -- INDEX
+              stack[sp - 1] = index(stack[sp - 1], stack[sp])
+              sp = sp - 1
+            else -- SETINDEX (34)
+              setindex(stack[sp - 2], stack[sp - 1], stack[sp])
+              sp = sp - 3
+            end
+          end
+        end
       end
     end
   end
 
+  for i = 1, #protos do resolve(protos[i].code) end
   return run_proto(protos[1], {}, {}, 0)
 end
 `;
