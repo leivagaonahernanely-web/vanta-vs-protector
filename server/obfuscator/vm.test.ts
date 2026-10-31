@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parse } from "./parser";
 import { compile, CompileError } from "./compiler";
-import { encode, execute, RuntimeError, type Env } from "./vm";
+import { encode, execute, LuaTable, RuntimeError, type Env } from "./vm";
 
 // Compila y ejecuta un fragmento con una semilla de opcodes dada.
 function run(src: string, seed = 1, env: Env = {}) {
@@ -88,11 +88,92 @@ describe("compilador + VM", () => {
   });
 
   it("rechaza lo que aún no soporta el subconjunto", () => {
-    expect(() => compile(parse("local t = {}"))).toThrow(CompileError);
-    expect(() => compile(parse("local t = {} return t.x"))).toThrow(/tablas/);
-    expect(() => compile(parse("function f() end"))).toThrow(/funciones de usuario/);
-    expect(() => compile(parse("return ...", ))).toThrow(/varargs/);
+    expect(() => compile(parse("return ..."))).toThrow(/varargs/);
+    expect(() => compile(parse("local function f(...) end"))).toThrow(/varargs/);
     expect(() => compile(parse("return 1, 2"))).toThrow(/un valor de retorno/);
+    expect(() => compile(parse("for k, v in pairs({}) do end"))).toThrow(/for genérico/);
     expect(() => compile(parse("break"))).toThrow(/fuera de un bucle/);
+  });
+});
+
+describe("tablas", () => {
+  it("construye tablas posicionales, con nombre y con clave", () => {
+    expect(run("local t = {10, 20, x = 'a', ['y'] = 'b'} return t[1] + t[2]")).toBe(30);
+    expect(run("local t = {x = 'a', ['y'] = 'b'} return t.x .. t.y")).toBe("ab");
+  });
+
+  it("lee y escribe campos con punto y con corchetes", () => {
+    expect(run("local t = {} t.a = 1 t['b'] = 2 t[3] = 3 return t.a + t.b + t[3]")).toBe(6);
+    expect(run("local t = {v = 1} t.v = nil return t.v")).toBe(null);
+  });
+
+  it("calcula la longitud de una tabla secuencial y de un string", () => {
+    expect(run("return #{1, 2, 3}")).toBe(3);
+    expect(run('return #"hola"')).toBe(4);
+  });
+
+  it("asigna varios destinos incluyendo campos", () => {
+    expect(run("local t = {} local a t.x, a = 1, 2 return t.x * 10 + a")).toBe(12);
+  });
+
+  it("usa métodos con dos puntos", () => {
+    expect(run("local o = {n = 5} function o:suma(x) return self.n + x end return o:suma(3)")).toBe(8);
+  });
+
+  it("resuelve métodos de strings con la tabla string del entorno", () => {
+    const lib = new LuaTable();
+    lib.hash.set("len", (s: unknown) => (s as string).length);
+    expect(run('return ("abc"):len()', 1, { string: lib })).toBe(3);
+  });
+});
+
+describe("funciones y closures", () => {
+  it("llama funciones de usuario con parámetros y retorno", () => {
+    expect(run("local function sq(x) return x * x end return sq(7)")).toBe(49);
+    expect(run("function doble(x) return x * 2 end return doble(4)")).toBe(8);
+  });
+
+  it("soporta recursión", () => {
+    expect(run("local function fact(n) if n <= 1 then return 1 end return n * fact(n - 1) end return fact(6)")).toBe(720);
+  });
+
+  it("devuelve nil cuando la función no retorna nada", () => {
+    expect(run("local function f() end return f()")).toBe(null);
+  });
+
+  it("captura variables en closures que conservan su estado", () => {
+    const src = `
+      local function contador()
+        local n = 0
+        return function() n = n + 1 return n end
+      end
+      local c = contador()
+      c() c()
+      return c()`;
+    expect(run(src)).toBe(3);
+  });
+
+  it("crea una variable nueva por vuelta de bucle", () => {
+    const src = `
+      local fs = {}
+      for i = 1, 3 do fs[i] = function() return i end end
+      return fs[1]() * 100 + fs[2]() * 10 + fs[3]()`;
+    expect(run(src)).toBe(123);
+  });
+
+  it("funciona con métodos definidos sobre tablas anidadas", () => {
+    const src = `
+      local a = {b = {}}
+      function a.b.f(x) return x + 1 end
+      return a.b.f(41)`;
+    expect(run(src)).toBe(42);
+  });
+
+  it("corta la recursión infinita", () => {
+    expect(() => run("local function f() return f() end return f()")).toThrow(/desbordamiento/);
+  });
+
+  it("indica error al llamar algo que no es función", () => {
+    expect(() => run("local x = 1 return x()")).toThrow(/llamar a un valor de tipo number/);
   });
 });

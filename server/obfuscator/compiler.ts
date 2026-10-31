@@ -1,31 +1,36 @@
-// Compilador AST -> bytecode de máquina de pila.
-// Subconjunto actual: variables locales y globales, aritmética, comparaciones, concatenación,
-// and/or/not, if/while/for numérico/do/break/return, y llamadas a funciones nativas.
-// Tablas, funciones de usuario, varargs y retornos múltiples se rechazan explícitamente.
+// Compilador AST -> bytecode de máquina de pila con prototipos por función.
+// Cada variable local vive en una celda, así las funciones internas capturan referencias
+// correctas (closures). Soporta: locales, globales, upvalues, aritmética, comparaciones,
+// concatenación, and/or/not, tablas, indexación, llamadas y métodos (a:b()), funciones,
+// if/while/repeat/for numérico, break y return de un valor.
+// No soporta todavía: varargs, for genérico y retornos múltiples.
 import type { Block, Expr, Stmt } from "./parser";
 
-export type Instr =
-  | { op: "CONST"; a: number }   // empuja consts[a]
-  | { op: "LOCAL_GET"; a: number }
-  | { op: "LOCAL_SET"; a: number } // saca de la pila y guarda
-  | { op: "GLOBAL_GET"; a: number } // a = índice en names
-  | { op: "GLOBAL_SET"; a: number }
-  | { op: "BIN"; a: number }     // a = índice en ops binarios
-  | { op: "UN"; a: number }      // a = índice en ops unarios
-  | { op: "JMP"; a: number }
-  | { op: "JMPF"; a: number }    // salta si el tope es falso y lo saca
-  | { op: "JMPT"; a: number }    // salta si el tope es verdadero y lo saca
-  | { op: "DUP" }
-  | { op: "POP" }
-  | { op: "CALL"; a: number }    // a = número de argumentos; la función va debajo de ellos
-  | { op: "RET" };               // devuelve el tope
+export const OP_NAMES = [
+  "CONST", "LOCAL_GET", "LOCAL_SET", "DECL", "GLOBAL_GET", "GLOBAL_SET", "UP_GET", "UP_SET",
+  "BIN", "UN", "JMP", "JMPF", "JMPT", "DUP", "POP", "SWAP", "CALL", "RET", "CLOSURE",
+  "NEWTABLE", "INDEX", "SETINDEX",
+] as const;
+export type OpName = (typeof OP_NAMES)[number];
+
+export type Const = number | string | boolean | null;
+
+export type Instr = { op: OpName; a?: number };
+
+export type UpvalDesc = { fromLocal: boolean; index: number };
+
+export type Proto = {
+  code: Instr[];
+  params: number;
+  slots: number;
+  upvals: UpvalDesc[];
+};
 
 export type Program = {
-  code: Instr[];
-  consts: (number | string | boolean | null)[];
+  protos: Proto[]; // protos[0] es el fragmento principal
+  consts: Const[];
   names: string[];
   ops: string[]; // operadores binarios y unarios usados
-  slots: number;
 };
 
 export class CompileError extends Error {
@@ -37,47 +42,63 @@ export class CompileError extends Error {
   }
 }
 
-const UNSUPPORTED: Record<string, string> = {
-  Vararg: "varargs (...) todavía no soportados",
-  Table: "tablas todavía no soportadas",
-  Function: "funciones de usuario todavía no soportadas",
-  Index: "acceso a campos (a.b / a[b]) todavía no soportado",
-  MethodCall: "llamadas con dos puntos (obj:m()) todavía no soportadas",
+type FnState = {
+  code: Instr[];
+  scopes: Map<string, number>[];
+  slots: number;
+  loops: number[][];
+  upvals: UpvalDesc[];
+  upvalNames: Map<string, number>;
 };
 
+type Ref = { kind: "local" | "up" | "global"; a: number };
+
 export function compile(block: Block): Program {
-  return new Compiler().compileChunk(block);
+  return new Compiler().compileMain(block);
 }
 
 class Compiler {
-  private code: Instr[] = [];
-  private consts: Program["consts"] = [];
+  private consts: Const[] = [];
   private names: string[] = [];
   private ops: string[] = [];
-  private scopes: Map<string, number>[] = [new Map()];
-  private slots = 0;
-  private loops: number[][] = []; // listas de saltos pendientes de cada bucle
+  private protos: Proto[] = [];
+  private fns: FnState[] = [];
 
-  compileChunk(block: Block): Program {
-    this.block(block, false);
-    this.code.push({ op: "CONST", a: this.constIndex(null) }, { op: "RET" });
-    return { code: this.code, consts: this.consts, names: this.names, ops: this.ops, slots: this.slots };
+  compileMain(block: Block): Program {
+    this.functionProto([], block, false);
+    return { protos: this.protos, consts: this.consts, names: this.names, ops: this.ops };
   }
 
-  private emit(instr: Instr): number {
-    this.code.push(instr);
-    return this.code.length - 1;
+  private get fn(): FnState { return this.fns[this.fns.length - 1]; }
+
+  private emit(op: OpName, a?: number): number {
+    const instr: Instr = a === undefined ? { op } : { op, a };
+    this.fn.code.push(instr);
+    return this.fn.code.length - 1;
   }
+
+  private here(): number { return this.fn.code.length; }
 
   private patch(at: number, target: number) {
-    const instr = this.code[at];
-    if (instr.op !== "JMP" && instr.op !== "JMPF" && instr.op !== "JMPT") throw new Error("parche sobre instrucción no-salto");
-    instr.a = target;
+    this.fn.code[at].a = target;
   }
 
-  private here() { return this.code.length; }
+  // Compila una función y devuelve el índice de su prototipo.
+  private functionProto(params: string[], body: Block, isVararg: boolean, line?: number): number {
+    if (isVararg) throw new CompileError("varargs (...) todavía no soportados", line);
+    const index = this.protos.length;
+    this.protos.push(null as unknown as Proto); // reserva el índice antes de compilar anidadas
+    this.fns.push({ code: [], scopes: [new Map()], slots: 0, loops: [], upvals: [], upvalNames: new Map() });
+    for (const p of params) this.declareLocal(p);
+    this.block(body, false);
+    this.emit("CONST", this.constIndex(null));
+    this.emit("RET");
+    const state = this.fns.pop()!;
+    this.protos[index] = { code: state.code, params: params.length, slots: state.slots, upvals: state.upvals };
+    return index;
+  }
 
-  private constIndex(value: Program["consts"][number]): number {
+  private constIndex(value: Const): number {
     const i = this.consts.findIndex((c) => Object.is(c, value));
     if (i !== -1) return i;
     this.consts.push(value);
@@ -96,51 +117,132 @@ class Compiler {
     return i;
   }
 
-  private resolveLocal(name: string): number | undefined {
-    for (let i = this.scopes.length - 1; i >= 0; i--) {
-      const slot = this.scopes[i].get(name);
+  private findLocal(st: FnState, name: string): number | undefined {
+    for (let i = st.scopes.length - 1; i >= 0; i--) {
+      const slot = st.scopes[i].get(name);
       if (slot !== undefined) return slot;
     }
     return undefined;
   }
 
+  // Devuelve el índice de upvalue de `name` en el nivel `level`, o -1 si es global.
+  private upvalIndex(level: number, name: string): number {
+    const st = this.fns[level];
+    const known = st.upvalNames.get(name);
+    if (known !== undefined) return known;
+    if (level === 0) return -1;
+    const parent = this.fns[level - 1];
+    const local = this.findLocal(parent, name);
+    let desc: UpvalDesc;
+    if (local !== undefined) {
+      desc = { fromLocal: true, index: local };
+    } else {
+      const outer = this.upvalIndex(level - 1, name);
+      if (outer < 0) return -1;
+      desc = { fromLocal: false, index: outer };
+    }
+    st.upvals.push(desc);
+    const idx = st.upvals.length - 1;
+    st.upvalNames.set(name, idx);
+    return idx;
+  }
+
+  private lookup(name: string): Ref {
+    const top = this.fns.length - 1;
+    const slot = this.findLocal(this.fn, name);
+    if (slot !== undefined) return { kind: "local", a: slot };
+    const up = this.upvalIndex(top, name);
+    if (up >= 0) return { kind: "up", a: up };
+    return { kind: "global", a: this.nameIndex(name) };
+  }
+
   private declareLocal(name: string): number {
-    const slot = this.slots++;
-    this.scopes[this.scopes.length - 1].set(name, slot);
+    const slot = this.fn.slots++;
+    this.fn.scopes[this.fn.scopes.length - 1].set(name, slot);
     return slot;
   }
 
-  private newSlot(): number { return this.slots++; }
+  private newTemp(): number { return this.fn.slots++; }
 
   private block(stmts: Block, newScope = true) {
-    if (newScope) this.scopes.push(new Map());
+    if (newScope) this.fn.scopes.push(new Map());
     for (const s of stmts) this.statement(s);
-    if (newScope) this.scopes.pop();
+    if (newScope) this.fn.scopes.pop();
+  }
+
+  private storeName(name: string) {
+    const ref = this.lookup(name);
+    if (ref.kind === "local") this.emit("LOCAL_SET", ref.a);
+    else if (ref.kind === "up") this.emit("UP_SET", ref.a);
+    else this.emit("GLOBAL_SET", ref.a);
   }
 
   private statement(s: Stmt) {
     switch (s.kind) {
       case "Local": {
-        // Evalúa todos los valores antes de declarar, como en Lua.
-        this.pushValues(s.values, s.names.length, s.line);
+        this.pushValues(s.values, s.names.length);
         const slots = s.names.map((n) => this.declareLocal(n));
-        for (let i = slots.length - 1; i >= 0; i--) this.emit({ op: "LOCAL_SET", a: slots[i] });
+        for (let i = slots.length - 1; i >= 0; i--) this.emit("DECL", slots[i]);
         return;
       }
+      case "LocalFunction": {
+        // Se declara antes de compilar el cuerpo para que la función pueda llamarse a sí misma.
+        const slot = this.declareLocal(s.name);
+        this.emit("CONST", this.constIndex(null));
+        this.emit("DECL", slot);
+        const proto = this.functionProto(s.fn.params, s.fn.body, s.fn.isVararg, s.line);
+        this.emit("CLOSURE", proto);
+        this.emit("LOCAL_SET", slot);
+        return;
+      }
+      case "FunctionDecl": {
+        if (s.target.kind === "Name") {
+          const proto = this.functionProto(s.fn.params, s.fn.body, s.fn.isVararg, s.line);
+          this.emit("CLOSURE", proto);
+          this.storeName(s.target.name);
+          return;
+        }
+        if (s.target.kind === "Index") {
+          this.expr(s.target.object);
+          this.expr(s.target.key);
+          const proto = this.functionProto(s.fn.params, s.fn.body, s.fn.isVararg, s.line);
+          this.emit("CLOSURE", proto);
+          this.emit("SETINDEX");
+          return;
+        }
+        throw new CompileError("declaración de función no válida", s.line);
+      }
       case "Assign": {
-        this.pushValues(s.values, s.targets.length, s.line);
+        // Primero se evalúan los objetos y claves de los destinos, luego los valores.
+        const prepared: { obj?: number; key?: number }[] = s.targets.map((t) => {
+          if (t.kind === "Name") return {};
+          if (t.kind !== "Index") throw new CompileError("no se puede asignar a esta expresión", s.line);
+          this.expr(t.object);
+          const obj = this.newTemp();
+          this.emit("DECL", obj);
+          this.expr(t.key);
+          const key = this.newTemp();
+          this.emit("DECL", key);
+          return { obj, key };
+        });
+        this.pushValues(s.values, s.targets.length);
         for (let i = s.targets.length - 1; i >= 0; i--) {
           const t = s.targets[i];
-          if (t.kind !== "Name") throw new CompileError(UNSUPPORTED.Index, s.line);
-          const slot = this.resolveLocal(t.name);
-          if (slot !== undefined) this.emit({ op: "LOCAL_SET", a: slot });
-          else this.emit({ op: "GLOBAL_SET", a: this.nameIndex(t.name) });
+          const p = prepared[i];
+          if (t.kind === "Name") { this.storeName(t.name); continue; }
+          // El valor queda en la cima: lo guardamos y luego llamamos a SETINDEX con [obj, clave, valor].
+          const val = this.newTemp();
+          this.emit("DECL", val);
+          this.emit("LOCAL_GET", p.obj!);
+          this.emit("LOCAL_GET", p.key!);
+          this.emit("LOCAL_GET", val);
+          this.emit("SETINDEX");
         }
         return;
       }
       case "CallStmt":
         this.expr(s.call);
-        this.emit({ op: "POP" });
+        this.emit("POP");
         return;
       case "Do":
         this.block(s.body);
@@ -148,23 +250,23 @@ class Compiler {
       case "While": {
         const start = this.here();
         this.expr(s.cond);
-        const exit = this.emit({ op: "JMPF", a: -1 });
-        this.loops.push([]);
+        const exit = this.emit("JMPF", -1);
+        this.fn.loops.push([]);
         this.block(s.body);
-        this.emit({ op: "JMP", a: start });
+        this.emit("JMP", start);
         this.finishLoop(exit);
         return;
       }
       case "Repeat": {
         // El cuerpo y la condición comparten ámbito, como en Lua.
         const start = this.here();
-        this.scopes.push(new Map());
-        this.loops.push([]);
+        this.fn.scopes.push(new Map());
+        this.fn.loops.push([]);
         for (const st of s.body) this.statement(st);
         this.expr(s.cond);
-        this.emit({ op: "JMPF", a: start });
-        this.scopes.pop();
-        const breaks = this.loops.pop()!;
+        this.emit("JMPF", start);
+        this.fn.scopes.pop();
+        const breaks = this.fn.loops.pop()!;
         for (const b of breaks) this.patch(b, this.here());
         return;
       }
@@ -172,9 +274,9 @@ class Compiler {
         const endJumps: number[] = [];
         for (const clause of s.clauses) {
           this.expr(clause.cond);
-          const skip = this.emit({ op: "JMPF", a: -1 });
+          const skip = this.emit("JMPF", -1);
           this.block(clause.body);
-          endJumps.push(this.emit({ op: "JMP", a: -1 }));
+          endJumps.push(this.emit("JMP", -1));
           this.patch(skip, this.here());
         }
         if (s.orElse) this.block(s.orElse);
@@ -184,62 +286,61 @@ class Compiler {
       case "NumericFor": {
         const step = s.step;
         const negative = step?.kind === "Unary" && step.op === "-" && step.operand.kind === "Number";
-        if (step && !(step.kind === "Number" || negative)) throw new CompileError("el paso del for debe ser una constante numérica", s.line);
-        this.scopes.push(new Map());
+        if (step && !(step.kind === "Number" || negative)) {
+          throw new CompileError("el paso del for debe ser una constante numérica", s.line);
+        }
+        this.fn.scopes.push(new Map());
         this.expr(s.start);
-        const iSlot = this.newSlot();
-        this.emit({ op: "LOCAL_SET", a: iSlot });
+        const iSlot = this.newTemp();
+        this.emit("DECL", iSlot);
         this.expr(s.limit);
-        const limSlot = this.newSlot();
-        this.emit({ op: "LOCAL_SET", a: limSlot });
-        this.emit({ op: "CONST", a: this.constIndex(step ? this.numericValue(step) : 1) });
-        const stepSlot = this.newSlot();
-        this.emit({ op: "LOCAL_SET", a: stepSlot });
+        const limSlot = this.newTemp();
+        this.emit("DECL", limSlot);
+        this.emit("CONST", this.constIndex(step ? this.numericValue(step) : 1));
+        const stepSlot = this.newTemp();
+        this.emit("DECL", stepSlot);
         const start = this.here();
-        this.emit({ op: "LOCAL_GET", a: iSlot });
-        this.emit({ op: "LOCAL_GET", a: limSlot });
-        this.emit({ op: "BIN", a: this.opIndex(negative ? ">=" : "<=") });
-        const exit = this.emit({ op: "JMPF", a: -1 });
-        this.loops.push([]);
-        this.scopes.push(new Map());
+        this.emit("LOCAL_GET", iSlot);
+        this.emit("LOCAL_GET", limSlot);
+        this.emit("BIN", this.opIndex(negative ? ">=" : "<="));
+        const exit = this.emit("JMPF", -1);
+        this.fn.loops.push([]);
+        this.fn.scopes.push(new Map());
+        // La variable de control es nueva en cada vuelta (importa para closures).
         const varSlot = this.declareLocal(s.name);
-        this.emit({ op: "LOCAL_GET", a: iSlot });
-        this.emit({ op: "LOCAL_SET", a: varSlot });
+        this.emit("LOCAL_GET", iSlot);
+        this.emit("DECL", varSlot);
         this.block(s.body, false);
-        this.scopes.pop();
-        this.emit({ op: "LOCAL_GET", a: iSlot });
-        this.emit({ op: "LOCAL_GET", a: stepSlot });
-        this.emit({ op: "BIN", a: this.opIndex("+") });
-        this.emit({ op: "LOCAL_SET", a: iSlot });
-        this.emit({ op: "JMP", a: start });
+        this.fn.scopes.pop();
+        this.emit("LOCAL_GET", iSlot);
+        this.emit("LOCAL_GET", stepSlot);
+        this.emit("BIN", this.opIndex("+"));
+        this.emit("LOCAL_SET", iSlot);
+        this.emit("JMP", start);
         this.finishLoop(exit);
-        this.scopes.pop();
+        this.fn.scopes.pop();
         return;
       }
       case "GenericFor":
-        throw new CompileError("for genérico todavía no soportado (requiere tablas)", s.line);
-      case "FunctionDecl":
-      case "LocalFunction":
-        throw new CompileError(UNSUPPORTED.Function, s.line);
+        throw new CompileError("for genérico todavía no soportado (requiere retornos múltiples)", s.line);
       case "Return":
         if (s.values.length > 1) throw new CompileError("solo se soporta un valor de retorno por ahora", s.line);
-        if (s.values.length === 0) this.emit({ op: "CONST", a: this.constIndex(null) });
+        if (s.values.length === 0) this.emit("CONST", this.constIndex(null));
         else this.expr(s.values[0]);
-        this.emit({ op: "RET" });
+        this.emit("RET");
         return;
       case "Break": {
-        const loop = this.loops[this.loops.length - 1];
+        const loop = this.fn.loops[this.fn.loops.length - 1];
         if (!loop) throw new CompileError("'break' fuera de un bucle", s.line);
-        loop.push(this.emit({ op: "JMP", a: -1 }));
+        loop.push(this.emit("JMP", -1));
         return;
       }
     }
   }
 
-  // Cierra un bucle: parchea la salida y los break pendientes.
   private finishLoop(exit: number) {
     this.patch(exit, this.here());
-    const breaks = this.loops.pop()!;
+    const breaks = this.fn.loops.pop()!;
     for (const b of breaks) this.patch(b, this.here());
   }
 
@@ -250,60 +351,98 @@ class Compiler {
   }
 
   // Empuja exactamente `count` valores, rellenando con nil o descartando sobrantes.
-  private pushValues(values: Expr[], count: number, line: number) {
-    if (values.length > count) {
-      // Evalúa los extra y los descarta.
-      values.forEach((v, i) => { this.expr(v); if (i >= count) this.emit({ op: "POP" }); });
-      return;
-    }
-    values.forEach((v) => this.expr(v));
-    for (let i = values.length; i < count; i++) this.emit({ op: "CONST", a: this.constIndex(null) });
-    void line;
+  private pushValues(values: Expr[], count: number) {
+    values.forEach((v, i) => {
+      this.expr(v);
+      if (i >= count) this.emit("POP");
+    });
+    for (let i = values.length; i < count; i++) this.emit("CONST", this.constIndex(null));
   }
 
   private expr(e: Expr) {
-    if (e.kind in UNSUPPORTED) throw new CompileError(UNSUPPORTED[e.kind]);
     switch (e.kind) {
-      case "Nil": this.emit({ op: "CONST", a: this.constIndex(null) }); return;
-      case "True": this.emit({ op: "CONST", a: this.constIndex(true) }); return;
-      case "False": this.emit({ op: "CONST", a: this.constIndex(false) }); return;
+      case "Nil": this.emit("CONST", this.constIndex(null)); return;
+      case "True": this.emit("CONST", this.constIndex(true)); return;
+      case "False": this.emit("CONST", this.constIndex(false)); return;
       case "Number":
       case "String":
-        this.emit({ op: "CONST", a: this.constIndex(e.value) });
+        this.emit("CONST", this.constIndex(e.value));
         return;
+      case "Vararg":
+        throw new CompileError("varargs (...) todavía no soportados");
       case "Name": {
-        const slot = this.resolveLocal(e.name);
-        if (slot !== undefined) this.emit({ op: "LOCAL_GET", a: slot });
-        else this.emit({ op: "GLOBAL_GET", a: this.nameIndex(e.name) });
+        const ref = this.lookup(e.name);
+        if (ref.kind === "local") this.emit("LOCAL_GET", ref.a);
+        else if (ref.kind === "up") this.emit("UP_GET", ref.a);
+        else this.emit("GLOBAL_GET", ref.a);
         return;
       }
+      case "Index":
+        this.expr(e.object);
+        this.expr(e.key);
+        this.emit("INDEX");
+        return;
       case "Paren":
         this.expr(e.expr);
         return;
       case "Unary":
         this.expr(e.operand);
-        this.emit({ op: "UN", a: this.opIndex(e.op) });
+        this.emit("UN", this.opIndex(e.op));
         return;
       case "Binary":
         if (e.op === "and" || e.op === "or") {
           // Cortocircuito: si el izquierdo decide, se queda en la pila.
           this.expr(e.left);
-          this.emit({ op: "DUP" });
-          const jump = this.emit({ op: e.op === "and" ? "JMPF" : "JMPT", a: -1 });
-          this.emit({ op: "POP" });
+          this.emit("DUP");
+          const jump = this.emit(e.op === "and" ? "JMPF" : "JMPT", -1);
+          this.emit("POP");
           this.expr(e.right);
           this.patch(jump, this.here());
           return;
         }
         this.expr(e.left);
         this.expr(e.right);
-        this.emit({ op: "BIN", a: this.opIndex(e.op) });
+        this.emit("BIN", this.opIndex(e.op));
         return;
       case "Call":
         this.expr(e.callee);
         for (const a of e.args) this.expr(a);
-        this.emit({ op: "CALL", a: e.args.length });
+        this.emit("CALL", e.args.length);
         return;
+      case "MethodCall":
+        // obj:m(args) == obj.m(obj, args)
+        this.expr(e.object);
+        this.emit("DUP");
+        this.emit("CONST", this.constIndex(e.method));
+        this.emit("INDEX");
+        this.emit("SWAP");
+        for (const a of e.args) this.expr(a);
+        this.emit("CALL", e.args.length + 1);
+        return;
+      case "Function": {
+        const proto = this.functionProto(e.params, e.body, e.isVararg, e.line);
+        this.emit("CLOSURE", proto);
+        return;
+      }
+      case "Table": {
+        this.emit("NEWTABLE");
+        let position = 1;
+        for (const item of e.items) {
+          this.emit("DUP");
+          if (item.kind === "Positional") {
+            this.emit("CONST", this.constIndex(position++));
+            this.expr(item.value);
+          } else if (item.kind === "Named") {
+            this.emit("CONST", this.constIndex(item.key));
+            this.expr(item.value);
+          } else {
+            this.expr(item.key);
+            this.expr(item.value);
+          }
+          this.emit("SETINDEX");
+        }
+        return;
+      }
     }
     throw new CompileError(`expresión no soportada: ${(e as { kind: string }).kind}`);
   }
