@@ -91,11 +91,8 @@ export const RUNTIME_LUA = `local function nx_run(P)
     ["not"] = function(v) return v == nil or v == false end,
     ["#"] = function(v)
       if type(v) == "string" then return string.len(v) end
-      if type(v) == "table" then
-        local n = 0
-        while v[n + 1] ~= nil do n = n + 1 end
-        return n
-      end
+      -- Operador nativo de Lua: O(log n). Un bucle manual sobre t[n+1] hacía t[#t+1]=x cuadrático.
+      if type(v) == "table" then return #v end
       fail("intento de obtener longitud de un valor de tipo " .. typename(v))
     end,
   }
@@ -115,8 +112,11 @@ export const RUNTIME_LUA = `local function nx_run(P)
   end
 
   run_proto = function(proto, ups, args, nargs)
-    depth = depth + 1
-    if depth > MAX_DEPTH then fail("desbordamiento de la pila de llamadas") end
+    -- La profundidad de este marco se deriva de quien llama (CALL la fija antes de llamar),
+    -- no de un contador global: así un error capturado con pcall no deja la cuenta inflada.
+    local myd = depth + 1
+    if myd > MAX_DEPTH then fail("desbordamiento de la pila de llamadas") end
+    depth = myd
 
     local code = proto.code
     -- Las celdas se crean al declarar cada local (DECL); solo los parámetros se crean aquí.
@@ -145,6 +145,7 @@ export const RUNTIME_LUA = `local function nx_run(P)
         if type(callee) ~= "function" then
           fail("se intentó llamar a un valor de tipo " .. typename(callee))
         end
+        depth = myd
         local r = callee(unpack(stack, sp - a + 1, sp))
         sp = sp - a
         stack[sp] = r
@@ -169,7 +170,7 @@ export const RUNTIME_LUA = `local function nx_run(P)
       elseif op == "POP" then
         sp = sp - 1
       elseif op == "RET" then
-        depth = depth - 1
+        depth = myd - 1
         return stack[sp]
       elseif op == "GLOBAL_GET" then
         sp = sp + 1

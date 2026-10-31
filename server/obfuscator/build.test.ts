@@ -120,6 +120,18 @@ describe("salida ofuscada con macros: equivalencia en Lua", () => {
         "return total",
       ].join("\n"),
     ],
+    // Regresiones: '#' debe ser O(log n) y pcall no debe dejar inflada la profundidad de llamadas.
+    ["longitud en bucle de append", "local t = {}\nfor i = 1, 3000 do t[#t + 1] = i end\nreturn #t"],
+    [
+      "pcall no deja la profundidad inflada",
+      [
+        "local function bad() error('x') end",
+        "local function good() return 42 end",
+        "for i = 1, 1500 do pcall(bad) end",
+        "if pcall(good) then return 'OK' end",
+        "return 'FALLA'",
+      ].join("\n"),
+    ],
   ];
 
   for (const [name, src] of cases) {

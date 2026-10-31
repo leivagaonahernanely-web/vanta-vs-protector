@@ -57,10 +57,15 @@ export function compile(block: Block): Program {
   return new Compiler().compileMain(block);
 }
 
+const NEG_ZERO_KEY = Symbol("-0");
+
 class Compiler {
   private consts: Const[] = [];
   private names: string[] = [];
   private ops: string[] = [];
+  private constMap = new Map<unknown, number>();
+  private nameMap = new Map<string, number>();
+  private opMap = new Map<string, number>();
   private protos: Proto[] = [];
   private fns: FnState[] = [];
 
@@ -98,23 +103,32 @@ class Compiler {
     return index;
   }
 
+  // Búsquedas en O(1) con Map: antes eran indexOf/findIndex lineales, cuadráticas en scripts grandes.
+  // Map compara con SameValueZero, que trata +0 y -0 como iguales; Object.is (la semántica original)
+  // no. Por eso -0 usa una clave reservada.
   private constIndex(value: Const): number {
-    const i = this.consts.findIndex((c) => Object.is(c, value));
-    if (i !== -1) return i;
+    const key: unknown = Object.is(value, -0) ? NEG_ZERO_KEY : value;
+    const known = this.constMap.get(key);
+    if (known !== undefined) return known;
     this.consts.push(value);
+    this.constMap.set(key, this.consts.length - 1);
     return this.consts.length - 1;
   }
 
   private nameIndex(name: string): number {
-    let i = this.names.indexOf(name);
-    if (i === -1) { this.names.push(name); i = this.names.length - 1; }
-    return i;
+    const known = this.nameMap.get(name);
+    if (known !== undefined) return known;
+    this.names.push(name);
+    this.nameMap.set(name, this.names.length - 1);
+    return this.names.length - 1;
   }
 
   private opIndex(op: string): number {
-    let i = this.ops.indexOf(op);
-    if (i === -1) { this.ops.push(op); i = this.ops.length - 1; }
-    return i;
+    const known = this.opMap.get(op);
+    if (known !== undefined) return known;
+    this.ops.push(op);
+    this.opMap.set(op, this.ops.length - 1);
+    return this.ops.length - 1;
   }
 
   private findLocal(st: FnState, name: string): number | undefined {
