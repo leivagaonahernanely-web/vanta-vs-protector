@@ -5,7 +5,6 @@ import type { Bytecode } from "./vm";
 export type EmitOptions = {
   // Si es true, el script devuelve el resultado; si no, lo imprime (usado en pruebas).
   printResult?: boolean;
-  maxSteps?: number;
 };
 
 // Literal de cadena Lua con escapes decimales sobre los bytes UTF-8, válido en Lua 5.1.
@@ -50,7 +49,6 @@ export function emitLua(bc: Bytecode, options: EmitOptions = {}): string {
     `names=${luaList(bc.names.map(luaString))},` +
     `ops=${luaList(bc.ops.map(luaString))},` +
     `protos=${luaList(protos)}` +
-    (options.maxSteps ? `,max_steps=${options.maxSteps}` : "") +
     `}`;
   const run = options.printResult ? "print(nx_run(P))" : "return nx_run(P)";
   return `-- NextOfuscator\n${RUNTIME_LUA}\n${payload}\n${run}\n`;

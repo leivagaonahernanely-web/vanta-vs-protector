@@ -1,14 +1,15 @@
-// Runtime de la VM escrito en Lua 5.1. Se incrusta en cada archivo de salida junto con el
-// bytecode. Debe ser compatible con Lua 5.1: sin goto, sin enteros, sin operadores de bits.
-// Replica la semántica de la VM de referencia en vm.ts.
+// Runtime de la VM en Lua 5.1, incrustado en cada archivo de salida junto con el bytecode.
+// Sin límite de pasos: los scripts del cliente pueden ejecutarse indefinidamente.
+// Replica la semántica de la VM de referencia (vm.ts), pero optimizado para velocidad:
+// operadores resueltos una sola vez al cargar, pila con puntero y sin closures por frame.
 export const RUNTIME_LUA = `local function nx_run(P)
-  local protos, consts, names, bops = P.protos, P.consts, P.names, P.ops
-  local opnames = P.opnames
-  local max_steps = P.max_steps or 1000000
+  local protos, consts, names = P.protos, P.consts, P.names
+  local opnames, bopnames = P.opnames, P.ops
+  local env = _G
   local unpack = unpack or table.unpack
   local fmt = string.format
-  local env = _G
-  local depth, steps = 0, 0
+  local MAX_DEPTH = 1000
+  local depth = 0
   local run_proto
 
   local function fail(msg) error(msg, 0) end
@@ -18,7 +19,7 @@ export const RUNTIME_LUA = `local function nx_run(P)
     return type(v)
   end
 
-  local function number(v, what)
+  local function num(v, what)
     if type(v) ~= "number" then
       fail("intento de " .. what .. " sobre un valor de tipo " .. typename(v))
     end
@@ -36,52 +37,6 @@ export const RUNTIME_LUA = `local function nx_run(P)
   local function concatpart(v)
     if type(v) == "string" or type(v) == "number" then return tostr(v) end
     fail("intento de concatenar un valor de tipo " .. typename(v))
-  end
-
-  local function truthy(v)
-    return v ~= nil and v ~= false
-  end
-
-  local function binary(op, l, r)
-    if op == "+" then return number(l, "sumar") + number(r, "sumar")
-    elseif op == "-" then return number(l, "restar") - number(r, "restar")
-    elseif op == "*" then return number(l, "multiplicar") * number(r, "multiplicar")
-    elseif op == "/" then return number(l, "dividir") / number(r, "dividir")
-    elseif op == "%" then
-      local a = number(l, "calcular módulo")
-      local b = number(r, "calcular módulo")
-      return a - math.floor(a / b) * b
-    elseif op == "^" then return number(l, "elevar") ^ number(r, "elevar")
-    elseif op == ".." then return concatpart(l) .. concatpart(r)
-    elseif op == "==" then return l == r
-    elseif op == "~=" then return l ~= r
-    elseif op == "<" or op == "<=" or op == ">" or op == ">=" then
-      local tl, tr = type(l), type(r)
-      if tl ~= tr or (tl ~= "number" and tl ~= "string") then
-        fail("no se puede comparar " .. typename(l) .. " con " .. typename(r))
-      end
-      if op == "<" then return l < r
-      elseif op == "<=" then return l <= r
-      elseif op == ">" then return l > r
-      end
-      return l >= r
-    end
-    fail("operador binario desconocido " .. tostring(op))
-  end
-
-  local function unary(op, v)
-    if op == "-" then return -number(v, "negar") end
-    if op == "not" then return not truthy(v) end
-    if op == "#" then
-      if type(v) == "string" then return string.len(v) end
-      if type(v) == "table" then
-        local n = 0
-        while v[n + 1] ~= nil do n = n + 1 end
-        return n
-      end
-      fail("intento de obtener longitud de un valor de tipo " .. typename(v))
-    end
-    fail("operador unario desconocido " .. tostring(op))
   end
 
   local function index(obj, key)
@@ -103,11 +58,53 @@ export const RUNTIME_LUA = `local function nx_run(P)
     obj[key] = value
   end
 
-  local function call(callee, args, n)
-    if type(callee) ~= "function" then
-      fail("se intentó llamar a un valor de tipo " .. typename(callee))
+  local cmp_check
+  local binary_impl = {
+    ["+"] = function(l, r) return num(l, "sumar") + num(r, "sumar") end,
+    ["-"] = function(l, r) return num(l, "restar") - num(r, "restar") end,
+    ["*"] = function(l, r) return num(l, "multiplicar") * num(r, "multiplicar") end,
+    ["/"] = function(l, r) return num(l, "dividir") / num(r, "dividir") end,
+    ["%"] = function(l, r)
+      local a, b = num(l, "calcular módulo"), num(r, "calcular módulo")
+      return a - math.floor(a / b) * b
+    end,
+    ["^"] = function(l, r) return num(l, "elevar") ^ num(r, "elevar") end,
+    [".."] = function(l, r) return concatpart(l) .. concatpart(r) end,
+    ["=="] = function(l, r) return l == r end,
+    ["~="] = function(l, r) return l ~= r end,
+    ["<"] = function(l, r) return cmp_check(l, r) and l < r end,
+    ["<="] = function(l, r) return cmp_check(l, r) and l <= r end,
+    [">"] = function(l, r) return cmp_check(l, r) and l > r end,
+    [">="] = function(l, r) return cmp_check(l, r) and l >= r end,
+  }
+
+  cmp_check = function(l, r)
+    local tl, tr = type(l), type(r)
+    if tl ~= tr or (tl ~= "number" and tl ~= "string") then
+      fail("no se puede comparar " .. typename(l) .. " con " .. typename(r))
     end
-    return (callee(unpack(args, 1, n)))
+    return true
+  end
+
+  local unary_impl = {
+    ["-"] = function(v) return -num(v, "negar") end,
+    ["not"] = function(v) return v == nil or v == false end,
+    ["#"] = function(v)
+      if type(v) == "string" then return string.len(v) end
+      if type(v) == "table" then
+        local n = 0
+        while v[n + 1] ~= nil do n = n + 1 end
+        return n
+      end
+      fail("intento de obtener longitud de un valor de tipo " .. typename(v))
+    end,
+  }
+
+  -- Resuelve cada operador una sola vez, en lugar de compararlo en cada ejecución.
+  local bfn, ufn = {}, {}
+  for i = 1, #bopnames do
+    bfn[i] = binary_impl[bopnames[i]]
+    ufn[i] = unary_impl[bopnames[i]]
   end
 
   local function make_closure(index_, ups)
@@ -119,70 +116,84 @@ export const RUNTIME_LUA = `local function nx_run(P)
 
   run_proto = function(proto, ups, args, nargs)
     depth = depth + 1
-    if depth > 200 then fail("desbordamiento de la pila de llamadas") end
+    if depth > MAX_DEPTH then fail("desbordamiento de la pila de llamadas") end
 
     local code = proto.code
+    -- Las celdas se crean al declarar cada local (DECL); solo los parámetros se crean aquí.
     local cells = {}
-    for i = 0, proto.slots - 1 do cells[i] = {} end
     for i = 0, proto.params - 1 do cells[i] = { v = args[i + 1] } end
 
     local stack, sp = {}, 0
-    local function push(v)
-      sp = sp + 1
-      stack[sp] = v
-    end
-    local function pop()
-      if sp == 0 then fail("pila vacía") end
-      local v = stack[sp]
-      stack[sp] = nil
-      sp = sp - 1
-      return v
-    end
+    local pc = 1 -- índice plano: código[pc] = operación, código[pc + 1] = argumento
 
-    local pc = 0
     while true do
-      steps = steps + 1
-      if steps > max_steps then fail("límite de ejecución superado") end
-      local id, a = code[2 * pc + 1], code[2 * pc + 2]
-      pc = pc + 1
-      local op = opnames[id + 1]
+      local op = opnames[code[pc] + 1]
+      local a = code[pc + 1]
+      pc = pc + 2
 
-      if op == "CONST" then push(consts[a + 1])
-      elseif op == "LOCAL_GET" then push(cells[a].v)
-      elseif op == "LOCAL_SET" then cells[a].v = pop()
-      elseif op == "DECL" then cells[a] = { v = pop() }
-      elseif op == "GLOBAL_GET" then push(env[names[a + 1]])
-      elseif op == "GLOBAL_SET" then env[names[a + 1]] = pop()
-      elseif op == "UP_GET" then push(ups[a + 1].v)
-      elseif op == "UP_SET" then ups[a + 1].v = pop()
+      if op == "LOCAL_GET" then
+        sp = sp + 1
+        stack[sp] = cells[a].v
+      elseif op == "CONST" then
+        sp = sp + 1
+        stack[sp] = consts[a + 1]
       elseif op == "BIN" then
-        local r = pop()
-        local l = pop()
-        push(binary(bops[a + 1], l, r))
-      elseif op == "UN" then push(unary(bops[a + 1], pop()))
-      elseif op == "JMP" then pc = a
-      elseif op == "JMPF" then
-        if not truthy(pop()) then pc = a end
-      elseif op == "JMPT" then
-        if truthy(pop()) then pc = a end
-      elseif op == "DUP" then
-        local v = pop()
-        push(v)
-        push(v)
-      elseif op == "POP" then pop()
-      elseif op == "SWAP" then
-        local b = pop()
-        local c = pop()
-        push(b)
-        push(c)
+        stack[sp - 1] = bfn[a + 1](stack[sp - 1], stack[sp])
+        sp = sp - 1
       elseif op == "CALL" then
-        local args_ = {}
-        for i = a, 1, -1 do args_[i] = pop() end
-        local callee = pop()
-        push(call(callee, args_, a))
+        local callee = stack[sp - a]
+        if type(callee) ~= "function" then
+          fail("se intentó llamar a un valor de tipo " .. typename(callee))
+        end
+        local r = callee(unpack(stack, sp - a + 1, sp))
+        sp = sp - a
+        stack[sp] = r
+      elseif op == "LOCAL_SET" then
+        cells[a].v = stack[sp]
+        sp = sp - 1
+      elseif op == "JMPF" then
+        local v = stack[sp]
+        sp = sp - 1
+        if v == nil or v == false then pc = a * 2 + 1 end
+      elseif op == "INDEX" then
+        stack[sp - 1] = index(stack[sp - 1], stack[sp])
+        sp = sp - 1
+      elseif op == "SETINDEX" then
+        setindex(stack[sp - 2], stack[sp - 1], stack[sp])
+        sp = sp - 3
+      elseif op == "JMP" then
+        pc = a * 2 + 1
+      elseif op == "DECL" then
+        cells[a] = { v = stack[sp] }
+        sp = sp - 1
+      elseif op == "POP" then
+        sp = sp - 1
       elseif op == "RET" then
         depth = depth - 1
-        return pop()
+        return stack[sp]
+      elseif op == "GLOBAL_GET" then
+        sp = sp + 1
+        stack[sp] = env[names[a + 1]]
+      elseif op == "GLOBAL_SET" then
+        env[names[a + 1]] = stack[sp]
+        sp = sp - 1
+      elseif op == "DUP" then
+        sp = sp + 1
+        stack[sp] = stack[sp - 1]
+      elseif op == "SWAP" then
+        stack[sp], stack[sp - 1] = stack[sp - 1], stack[sp]
+      elseif op == "UP_GET" then
+        sp = sp + 1
+        stack[sp] = ups[a + 1].v
+      elseif op == "UP_SET" then
+        ups[a + 1].v = stack[sp]
+        sp = sp - 1
+      elseif op == "UN" then
+        stack[sp] = ufn[a + 1](stack[sp])
+      elseif op == "JMPT" then
+        local v = stack[sp]
+        sp = sp - 1
+        if v ~= nil and v ~= false then pc = a * 2 + 1 end
       elseif op == "CLOSURE" then
         local child = protos[a + 1]
         local child_ups = {}
@@ -191,19 +202,13 @@ export const RUNTIME_LUA = `local function nx_run(P)
           if d[1] == 1 then child_ups[i] = cells[d[2]]
           else child_ups[i] = ups[d[2] + 1] end
         end
-        push(make_closure(a + 1, child_ups))
-      elseif op == "NEWTABLE" then push({})
-      elseif op == "INDEX" then
-        local key = pop()
-        local obj = pop()
-        push(index(obj, key))
-      elseif op == "SETINDEX" then
-        local value = pop()
-        local key = pop()
-        local obj = pop()
-        setindex(obj, key, value)
+        sp = sp + 1
+        stack[sp] = make_closure(a + 1, child_ups)
+      elseif op == "NEWTABLE" then
+        sp = sp + 1
+        stack[sp] = {}
       else
-        fail("operación desconocida " .. tostring(id))
+        fail("operación desconocida")
       end
     end
   end

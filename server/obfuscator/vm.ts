@@ -38,7 +38,7 @@ export class LuaFunction {
 }
 
 const DEFAULT_MAX_STEPS = 1_000_000;
-const MAX_DEPTH = 200;
+const MAX_DEPTH = 1000;
 
 // Generador pseudoaleatorio determinista (mulberry32): la misma semilla da el mismo mapa.
 function prng(seed: number) {
