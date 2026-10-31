@@ -3,7 +3,7 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
+import { registerObfuscateApi } from "../apiObfuscate";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -33,7 +33,7 @@ async function startServer() {
   // El límite cubre sources Lua grandes enviadas al ofuscador.
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  registerOAuthRoutes(app);
+  registerObfuscateApi(app);
   // tRPC API
   app.use(
     "/api/trpc",

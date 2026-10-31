@@ -37,19 +37,24 @@ function luaList(items: string[]): string {
   return "{" + items.join(",") + "}";
 }
 
-export function emitLua(bc: Bytecode, options: EmitOptions = {}): string {
+// Literal de tabla Lua con el bytecode de un programa, listo para nx_run.
+export function payloadLiteral(bc: Bytecode): string {
   const protos = bc.protos.map((p) =>
     `{code=${luaList(p.code.map(String))},params=${p.params},slots=${p.slots},` +
     `up=${luaList(p.upvals.map((u) => `{${u.fromLocal ? 1 : 0},${u.index}}`))}}`,
   );
-  const payload =
-    `local P={` +
+  return (
+    `{` +
     `opnames=${luaList(bc.opTable.map(luaString))},` +
     `consts=${luaList(bc.consts.map(luaValue))},` +
     `names=${luaList(bc.names.map(luaString))},` +
     `ops=${luaList(bc.ops.map(luaString))},` +
     `protos=${luaList(protos)}` +
-    `}`;
+    `}`
+  );
+}
+
+export function emitLua(bc: Bytecode, options: EmitOptions = {}): string {
   const run = options.printResult ? "print(nx_run(P))" : "return nx_run(P)";
-  return `-- NextOfuscator\n${RUNTIME_LUA}\n${payload}\n${run}\n`;
+  return `-- NextOfuscator\n${RUNTIME_LUA}\nlocal P=${payloadLiteral(bc)}\n${run}\n`;
 }
