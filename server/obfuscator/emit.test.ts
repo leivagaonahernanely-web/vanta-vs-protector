@@ -56,7 +56,24 @@ const PROGRAMS: string[] = [
   'return ("abc"):len() + #"hola"',
   'return ("abc"):upper()',
   "x = 5 y = x * 2 return y",
+  'local s = "hola mundo \\"ñ\\"" g = s .. "!" return g',
 ];
+
+describe("emisión Lua: cadenas cifradas", () => {
+  it("no deja en claro nombres globales ni constantes de texto del script", () => {
+    const src = 'classifiedGlobal = "topsecret_text" .. "_more" return classifiedGlobal';
+    const code = emitLua(encode(compile(parse(src)), 11), { printResult: true });
+    expect(code).not.toContain("classifiedGlobal");
+    expect(code).not.toContain("topsecret");
+  });
+
+  it("produce salidas distintas para semillas distintas", () => {
+    const src = 'g = "x" return g';
+    const a = emitLua(encode(compile(parse(src)), 1));
+    const b = emitLua(encode(compile(parse(src)), 2));
+    expect(a).not.toBe(b);
+  });
+});
 
 describe("emisión Lua: equivalencia con la VM de referencia", () => {
   const available = luaAvailable();

@@ -5,6 +5,22 @@
 export const RUNTIME_LUA = `local function nx_run(P)
   local protos, consts, names = P.protos, P.consts, P.names
   local opnames, bopnames = P.opnames, P.ops
+  -- Descifrado de cadenas (ver emit.ts): byte - clave - salt, módulo 256. Mismos salts que SALT.
+  local K, KN = P.k, #P.k
+  local string_byte, string_char = string.byte, string.char
+  local function decstr(s, salt)
+    local out = {}
+    for i = 1, #s do
+      out[i] = string_char((string_byte(s, i) - K[(i - 1) % KN + 1] - salt) % 256)
+    end
+    return table.concat(out)
+  end
+  for i = 1, #opnames do opnames[i] = decstr(opnames[i], 4000000 + i) end
+  for i = 1, #bopnames do bopnames[i] = decstr(bopnames[i], 1000000 + i) end
+  for i = 1, #names do names[i] = decstr(names[i], 2000000 + i) end
+  for i = 1, P.nconsts do
+    if type(consts[i]) == "string" then consts[i] = decstr(consts[i], 3000000 + i) end
+  end
   local env = _G
   local unpack = unpack or table.unpack
   local fmt = string.format
