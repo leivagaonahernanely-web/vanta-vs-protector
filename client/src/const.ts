@@ -29,9 +29,3 @@ export const startLogin = () => {
 
   window.location.href = url.toString();
 };
-
-/** Inicia el acceso de Vanta.vs usando Discord como proveedor principal. */
-export const startDiscordLogin = () => {
-  const origin = window.location.origin;
-  window.location.assign(`/api/discord/start?origin=${encodeURIComponent(origin)}`);
-};
