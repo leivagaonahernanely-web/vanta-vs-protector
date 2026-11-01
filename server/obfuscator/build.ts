@@ -12,6 +12,7 @@ import { compile } from "./compiler";
 import { stripComments } from "./comments";
 import { payloadLiteral } from "./emit";
 import { LuaSyntaxError } from "./lexer";
+import { PRELUDE_LUA } from "./prelude";
 import { RUNTIME_LUA } from "./runtime";
 import { parse } from "./parser";
 import type { Block, Expr, Stmt } from "./parser";
@@ -193,7 +194,7 @@ export function buildLua(source: string, seed: number, options: { printResult?: 
   });
 
   return {
-    code: `-- NextOfuscator\n${RUNTIME_LUA}\n${chunks.join("\n")}\n`,
+    code: `-- NextOfuscator\n${PRELUDE_LUA}${RUNTIME_LUA}\n${chunks.join("\n")}\n`,
     segments: segments.length,
   };
 }
