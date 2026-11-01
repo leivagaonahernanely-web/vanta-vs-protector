@@ -27,6 +27,14 @@ export class RuntimeError extends Error {}
 
 export class LuaTable {
   readonly hash = new Map<unknown, unknown>();
+  metatable: LuaTable | null = null;
+}
+
+// Metamétodo de `t`, o null si no tiene metatabla o no lo define.
+function metamethod(t: unknown, name: string): unknown {
+  if (!(t instanceof LuaTable) || !t.metatable) return null;
+  const v = t.metatable.hash.get(name);
+  return v === undefined ? null : v;
 }
 
 export class LuaFunction {
@@ -72,10 +80,47 @@ export function encode(program: Program, seed: number): Bytecode {
   return { protos, opTable, consts: program.consts, names: program.names, ops: program.ops };
 }
 
-type Ctx = { steps: number; maxSteps: number; env: Env; depth: number };
+type Ctx = { steps: number; maxSteps: number; env: Env; depth: number; bc: Bytecode };
+
+// Funciones nativas de metatablas: en el runtime real (Lua) llegan gratis vía _G;
+// aquí hay que darlas explícitamente para que la VM de referencia sea equivalente.
+// `tostring` necesita el contexto para poder invocar un __tostring definido por el usuario.
+function makeMetatableBuiltins(ctx: Ctx): Env {
+  return {
+    setmetatable: (t: unknown, mt: unknown) => {
+      if (!(t instanceof LuaTable)) throw new RuntimeError("bad argument #1 to 'setmetatable' (table expected)");
+      if (mt !== null && mt !== undefined && !(mt instanceof LuaTable)) {
+        throw new RuntimeError("bad argument #2 to 'setmetatable' (nil or table expected)");
+      }
+      t.metatable = (mt as LuaTable | null) ?? null;
+      return t;
+    },
+    getmetatable: (t: unknown) => (t instanceof LuaTable ? t.metatable : null),
+    rawget: (t: unknown, k: unknown) => {
+      if (!(t instanceof LuaTable)) throw new RuntimeError("bad argument #1 to 'rawget' (table expected)");
+      const v = t.hash.get(k);
+      return v === undefined ? null : v;
+    },
+    rawset: (t: unknown, k: unknown, v: unknown) => {
+      if (!(t instanceof LuaTable)) throw new RuntimeError("bad argument #1 to 'rawset' (table expected)");
+      if (v === null || v === undefined) t.hash.delete(k); else t.hash.set(k, v);
+      return t;
+    },
+    rawequal: (a: unknown, b: unknown) => a === b,
+    tostring: (v: unknown) => {
+      const mm = metamethod(v, "__tostring");
+      if (mm !== null) return first(call(ctx.bc, mm, [v], ctx));
+      return tostr(v);
+    },
+  };
+}
 
 export function execute(bc: Bytecode, env: Env, maxSteps = DEFAULT_MAX_STEPS): unknown {
-  const ctx: Ctx = { steps: 0, maxSteps, env, depth: 0 };
+  const ctx: Ctx = { steps: 0, maxSteps, env, depth: 0, bc };
+  // Se agregan solo si el llamador no los definió ya, y sobre el mismo objeto: los
+  // llamadores leen `env` después de ejecutar (por ejemplo, para ver globales escritas).
+  const builtins = makeMetatableBuiltins(ctx);
+  for (const k in builtins) if (!(k in env)) env[k] = builtins[k];
   const results = runFunction(bc, new LuaFunction(bc.protos[0], []), [], ctx);
   return results.length > 0 ? results[0] : null;
 }
@@ -134,10 +179,10 @@ function runFunction(bc: Bytecode, fn: LuaFunction, args: unknown[], ctx: Ctx): 
         case "BIN": {
           const right = pop();
           const left = pop();
-          push(binary(bc.ops[a], left, right));
+          push(binary(ctx, bc.ops[a], left, right));
           break;
         }
-        case "UN": push(unary(bc.ops[a], pop())); break;
+        case "UN": push(unary(ctx, bc.ops[a], pop())); break;
         case "JMP": pc = a; break;
         case "JMPF": if (!truthy(pop())) pc = a; break;
         case "JMPT": if (truthy(pop())) pc = a; break;
@@ -184,7 +229,7 @@ function runFunction(bc: Bytecode, fn: LuaFunction, args: unknown[], ctx: Ctx): 
           const vals = popN(countOf());
           const start = pop() as number;
           const t = pop();
-          vals.forEach((v, j) => setIndex(t, start + j, v));
+          vals.forEach((v, j) => setIndex(ctx, t, start + j, v));
           break;
         }
         case "RET": return [pop()];
@@ -205,7 +250,7 @@ function runFunction(bc: Bytecode, fn: LuaFunction, args: unknown[], ctx: Ctx): 
           const value = pop();
           const key = pop();
           const obj = pop();
-          setIndex(obj, key, value);
+          setIndex(ctx, obj, key, value);
           break;
         }
         default: throw new RuntimeError(`operación desconocida ${id}`);
@@ -223,6 +268,8 @@ function call(bc: Bytecode, callee: unknown, args: unknown[], ctx: Ctx): unknown
     const result = callee(...args);
     return result === undefined ? [] : [result];
   }
+  const mm = metamethod(callee, "__call");
+  if (mm !== null) return call(bc, mm, [callee, ...args], ctx);
   throw new RuntimeError(`se intentó llamar a un valor de tipo ${typeName(callee)}`);
 }
 
@@ -234,7 +281,11 @@ function first(results: unknown[]): unknown {
 function index(ctx: Ctx, obj: unknown, key: unknown): unknown {
   if (obj instanceof LuaTable) {
     const v = obj.hash.get(key);
-    return v === undefined ? null : v;
+    if (v !== undefined) return v;
+    const mm = metamethod(obj, "__index");
+    if (mm instanceof LuaTable) return index(ctx, mm, key);
+    if (mm !== null) return first(call(ctx.bc, mm, [obj, key], ctx));
+    return null;
   }
   if (typeof obj === "string") {
     // Los strings usan la tabla "string" como metatabla, como en Lua.
@@ -245,10 +296,15 @@ function index(ctx: Ctx, obj: unknown, key: unknown): unknown {
   throw new RuntimeError(`intento de indexar un valor de tipo ${typeName(obj)}`);
 }
 
-function setIndex(obj: unknown, key: unknown, value: unknown) {
+function setIndex(ctx: Ctx, obj: unknown, key: unknown, value: unknown) {
   if (!(obj instanceof LuaTable)) throw new RuntimeError(`intento de asignar a un valor de tipo ${typeName(obj)}`);
   if (key === null || key === undefined) throw new RuntimeError("índice nil");
   if (typeof key === "number" && Number.isNaN(key)) throw new RuntimeError("índice NaN");
+  if (!obj.hash.has(key)) {
+    const mm = metamethod(obj, "__newindex");
+    if (mm instanceof LuaTable) return setIndex(ctx, mm, key, value);
+    if (mm !== null) { call(ctx.bc, mm, [obj, key, value], ctx); return; }
+  }
   if (value === null || value === undefined) obj.hash.delete(key);
   else obj.hash.set(key, value);
 }
@@ -290,49 +346,98 @@ function num(v: unknown, what: string): number {
   throw new RuntimeError(`intento de ${what} sobre un valor de tipo ${typeName(v)}`);
 }
 
-function binary(op: string, l: unknown, r: unknown): unknown {
+// Nombre del metamétodo aritmético/concat de cada operador binario.
+const ARITH_MM: Record<string, string> = {
+  "+": "__add", "-": "__sub", "*": "__mul", "/": "__div", "%": "__mod", "^": "__pow", "..": "__concat",
+};
+
+// Busca el metamétodo en l y, si no está, en r (orden de Lua 5.1).
+function binMeta(name: string, l: unknown, r: unknown): unknown {
+  const mm = metamethod(l, name);
+  return mm !== null ? mm : metamethod(r, name);
+}
+
+function binary(ctx: Ctx, op: string, l: unknown, r: unknown): unknown {
   switch (op) {
-    case "+": return num(l, "sumar") + num(r, "sumar");
-    case "-": return num(l, "restar") - num(r, "restar");
-    case "*": return num(l, "multiplicar") * num(r, "multiplicar");
-    case "/": return num(l, "dividir") / num(r, "dividir");
-    case "%": {
-      const a = num(l, "calcular módulo"), b = num(r, "calcular módulo");
-      return a - Math.floor(a / b) * b;
+    case "+": case "-": case "*": case "/": case "%": case "^": {
+      if (typeof l === "number" && typeof r === "number") return arith(op, l, r);
+      const mm = binMeta(ARITH_MM[op], l, r);
+      if (mm !== null) return first(call(ctx.bc, mm, [l, r], ctx));
+      const what = { "+": "sumar", "-": "restar", "*": "multiplicar", "/": "dividir", "%": "calcular módulo", "^": "elevar" }[op]!;
+      return arith(op, num(l, what), num(r, what)); // lanza si l o r no es número
     }
-    case "^": return Math.pow(num(l, "elevar"), num(r, "elevar"));
-    case "..": return concatPart(l) + concatPart(r);
-    case "==": return l === r;
-    case "~=": return l !== r;
+    case "..": {
+      if ((typeof l === "string" || typeof l === "number") && (typeof r === "string" || typeof r === "number")) {
+        return concatPart(l) + concatPart(r);
+      }
+      const mm = binMeta("__concat", l, r);
+      if (mm !== null) return first(call(ctx.bc, mm, [l, r], ctx));
+      return concatPart(l) + concatPart(r); // lanza con el mensaje correcto
+    }
+    case "==":
+    case "~=": {
+      let eq = l === r;
+      if (!eq && l instanceof LuaTable && r instanceof LuaTable) {
+        const mm = binMeta("__eq", l, r);
+        if (mm !== null) eq = truthy(first(call(ctx.bc, mm, [l, r], ctx)));
+      }
+      return op === "==" ? eq : !eq;
+    }
     case "<":
     case "<=":
     case ">":
     case ">=": {
-      if (typeof l !== typeof r || (typeof l !== "number" && typeof l !== "string")) {
-        throw new RuntimeError(`no se puede comparar ${typeName(l)} con ${typeName(r)}`);
+      // a > b y a >= b son b < a y b <= a, como en Lua.
+      const [a, b, le] = op === ">" ? [r, l, false] : op === ">=" ? [r, l, true] : [l, r, op === "<="];
+      if (typeof a === typeof b && (typeof a === "number" || typeof a === "string")) {
+        return le ? (a as number | string) <= (b as number | string) : (a as number | string) < (b as number | string);
       }
-      const a = l as number | string, b = r as number | string;
-      if (op === "<") return a < b;
-      if (op === "<=") return a <= b;
-      if (op === ">") return a > b;
-      return a >= b;
+      const name = le ? "__le" : "__lt";
+      let mm = binMeta(name, a, b);
+      if (mm !== null) return truthy(first(call(ctx.bc, mm, [a, b], ctx)));
+      if (le) {
+        // Lua 5.1: si no hay __le, usa "not (b < a)" con __lt.
+        mm = binMeta("__lt", a, b);
+        if (mm !== null) return !truthy(first(call(ctx.bc, mm, [b, a], ctx)));
+      }
+      throw new RuntimeError(`no se puede comparar ${typeName(l)} con ${typeName(r)}`);
     }
     default: throw new RuntimeError(`operador binario desconocido ${op}`);
   }
 }
 
-function unary(op: string, v: unknown): unknown {
+function arith(op: string, a: number, b: number): number {
   switch (op) {
-    case "-": return -num(v, "negar");
+    case "+": return a + b;
+    case "-": return a - b;
+    case "*": return a * b;
+    case "/": return a / b;
+    case "%": return a - Math.floor(a / b) * b;
+    case "^": return Math.pow(a, b);
+    default: throw new RuntimeError(`operador aritmético desconocido ${op}`);
+  }
+}
+
+function unary(ctx: Ctx, op: string, v: unknown): unknown {
+  switch (op) {
+    case "-": {
+      if (typeof v === "number") return -v;
+      const mm = metamethod(v, "__unm");
+      if (mm !== null) return first(call(ctx.bc, mm, [v, v], ctx));
+      return -num(v, "negar");
+    }
     case "not": return !truthy(v);
-    case "#":
+    case "#": {
       if (typeof v === "string") return v.length;
       if (v instanceof LuaTable) {
+        const mm = metamethod(v, "__len");
+        if (mm !== null) return first(call(ctx.bc, mm, [v], ctx));
         let n = 0;
         while (v.hash.has(n + 1)) n++;
         return n;
       }
       throw new RuntimeError(`intento de obtener longitud de un valor de tipo ${typeName(v)}`);
+    }
     default: throw new RuntimeError(`operador unario desconocido ${op}`);
   }
 }

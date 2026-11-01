@@ -31,7 +31,14 @@ Las pruebas de equivalencia con Lua real se activan con `NX_LUA_BIN=lua5.1 pnpm 
 - Variables locales y globales, tablas (constructores, `.`, `[]`, `#`), métodos con `:`.
 - Control de flujo: `if`/`elseif`/`else`, `while`, `repeat`/`until`, `for` numérico, `for` genérico (`in`), `break`.
 - Funciones, recursión, closures con captura de variables, `...` (varargs), retornos múltiples y expansión de listas en llamadas, tablas y asignaciones.
+- Metatablas completas: `setmetatable`/`getmetatable`/`rawget`/`rawset`/`rawequal`, herencia con `__index`
+  (tabla o función), `__newindex`, y sobrecarga de operadores (`__add`, `__sub`, `__mul`, `__div`, `__mod`,
+  `__pow`, `__unm`, `__concat`, `__eq`, `__lt`, `__le`, `__len`, `__call`, `__tostring`). Esto es lo que
+  necesita cualquier patrón de clases/herencia en Lua 5.1 (`setmetatable({}, {__index = Base})`).
 - Cadenas de los opcodes, nombres globales y constantes de texto van cifrados en la salida.
+
+No soportado todavía: sintaxis de Lua 5.2+ (`goto`/etiquetas, escapes `\x`/`\z`), de Lua 5.3+
+(operadores bitwise, `//`) ni de Lua 5.4 (atributos `<const>`/`<close>`). El objetivo actual es Lua 5.1.
 
 ## Límites conocidos
 

@@ -79,40 +79,132 @@ export const RUNTIME_LUA = `local function nx_run(P)
     obj[key] = value
   end
 
+  -- Una tabla con __call en su metatabla es invocable, igual que en Lua real (que resuelve
+  -- la llamada por su cuenta una vez pasa este chequeo).
+  local function is_callable(v)
+    if type(v) == "function" then return true end
+    if type(v) == "table" then
+      local mt = getmetatable(v)
+      return mt ~= nil and mt.__call ~= nil
+    end
+    return false
+  end
+
+  -- Operadores nativos sin verificar: delegan en Lua real, que ya resuelve metamétodos
+  -- (__add, __lt, __concat, etc.) por su cuenta. Solo se usan cuando hay una tabla de por
+  -- medio (camino lento), nunca en el camino rápido numérico.
+  local native_bin = {
+    ["+"] = function(l, r) return l + r end,
+    ["-"] = function(l, r) return l - r end,
+    ["*"] = function(l, r) return l * r end,
+    ["/"] = function(l, r) return l / r end,
+    ["%"] = function(l, r) return l % r end,
+    ["^"] = function(l, r) return l ^ r end,
+    [".."] = function(l, r) return l .. r end,
+    ["<"] = function(l, r) return l < r end,
+    ["<="] = function(l, r) return l <= r end,
+    [">"] = function(l, r) return l > r end,
+    [">="] = function(l, r) return l >= r end,
+  }
+
+  -- Intenta el metamétodo correspondiente (vía el operador nativo de Lua) cuando algún
+  -- operando es tabla; si no hay metamétodo, Lua lanza su propio error y caemos al mensaje
+  -- propio más abajo.
+  local function try_meta(opname, l, r)
+    if type(l) == "table" or type(r) == "table" then
+      local ok, res = pcall(native_bin[opname], l, r)
+      if ok then return true, res end
+    end
+    return false, nil
+  end
+
   local cmp_check
   local binary_impl = {
-    ["+"] = function(l, r) return num(l, "sumar") + num(r, "sumar") end,
-    ["-"] = function(l, r) return num(l, "restar") - num(r, "restar") end,
-    ["*"] = function(l, r) return num(l, "multiplicar") * num(r, "multiplicar") end,
-    ["/"] = function(l, r) return num(l, "dividir") / num(r, "dividir") end,
+    ["+"] = function(l, r)
+      if type(l) == "number" and type(r) == "number" then return l + r end
+      local ok, res = try_meta("+", l, r); if ok then return res end
+      return num(l, "sumar") + num(r, "sumar")
+    end,
+    ["-"] = function(l, r)
+      if type(l) == "number" and type(r) == "number" then return l - r end
+      local ok, res = try_meta("-", l, r); if ok then return res end
+      return num(l, "restar") - num(r, "restar")
+    end,
+    ["*"] = function(l, r)
+      if type(l) == "number" and type(r) == "number" then return l * r end
+      local ok, res = try_meta("*", l, r); if ok then return res end
+      return num(l, "multiplicar") * num(r, "multiplicar")
+    end,
+    ["/"] = function(l, r)
+      if type(l) == "number" and type(r) == "number" then return l / r end
+      local ok, res = try_meta("/", l, r); if ok then return res end
+      return num(l, "dividir") / num(r, "dividir")
+    end,
     ["%"] = function(l, r)
+      if type(l) == "number" and type(r) == "number" then
+        return l - math.floor(l / r) * r
+      end
+      local ok, res = try_meta("%", l, r); if ok then return res end
       local a, b = num(l, "calcular módulo"), num(r, "calcular módulo")
       return a - math.floor(a / b) * b
     end,
-    ["^"] = function(l, r) return num(l, "elevar") ^ num(r, "elevar") end,
-    [".."] = function(l, r) return concatpart(l) .. concatpart(r) end,
+    ["^"] = function(l, r)
+      if type(l) == "number" and type(r) == "number" then return l ^ r end
+      local ok, res = try_meta("^", l, r); if ok then return res end
+      return num(l, "elevar") ^ num(r, "elevar")
+    end,
+    [".."] = function(l, r)
+      if (type(l) == "string" or type(l) == "number") and (type(r) == "string" or type(r) == "number") then
+        return concatpart(l) .. concatpart(r)
+      end
+      local ok, res = try_meta("..", l, r); if ok then return res end
+      return concatpart(l) .. concatpart(r)
+    end,
     ["=="] = function(l, r) return l == r end,
     ["~="] = function(l, r) return l ~= r end,
-    ["<"] = function(l, r) return cmp_check(l, r) and l < r end,
-    ["<="] = function(l, r) return cmp_check(l, r) and l <= r end,
-    [">"] = function(l, r) return cmp_check(l, r) and l > r end,
-    [">="] = function(l, r) return cmp_check(l, r) and l >= r end,
+    ["<"] = function(l, r)
+      if cmp_check(l, r) then return l < r end
+      local ok, res = try_meta("<", l, r); if ok then return res end
+      fail("no se puede comparar " .. typename(l) .. " con " .. typename(r))
+    end,
+    ["<="] = function(l, r)
+      if cmp_check(l, r) then return l <= r end
+      local ok, res = try_meta("<=", l, r); if ok then return res end
+      fail("no se puede comparar " .. typename(l) .. " con " .. typename(r))
+    end,
+    [">"] = function(l, r)
+      if cmp_check(l, r) then return l > r end
+      local ok, res = try_meta(">", l, r); if ok then return res end
+      fail("no se puede comparar " .. typename(l) .. " con " .. typename(r))
+    end,
+    [">="] = function(l, r)
+      if cmp_check(l, r) then return l >= r end
+      local ok, res = try_meta(">=", l, r); if ok then return res end
+      fail("no se puede comparar " .. typename(l) .. " con " .. typename(r))
+    end,
   }
 
+  -- true/false en vez de fail(): el camino lento decide si intenta un metamétodo antes
+  -- de fallar con el mensaje propio.
   cmp_check = function(l, r)
     local tl, tr = type(l), type(r)
-    if tl ~= tr or (tl ~= "number" and tl ~= "string") then
-      fail("no se puede comparar " .. typename(l) .. " con " .. typename(r))
-    end
-    return true
+    return tl == tr and (tl == "number" or tl == "string")
   end
 
   local unary_impl = {
-    ["-"] = function(v) return -num(v, "negar") end,
+    ["-"] = function(v)
+      if type(v) == "number" then return -v end
+      if type(v) == "table" then
+        local ok, res = pcall(function(x) return -x end, v)
+        if ok then return res end
+      end
+      return -num(v, "negar")
+    end,
     ["not"] = function(v) return v == nil or v == false end,
     ["#"] = function(v)
       if type(v) == "string" then return string.len(v) end
-      -- Operador nativo de Lua: O(log n). Un bucle manual sobre t[n+1] hacía t[#t+1]=x cuadrático.
+      -- Operador nativo de Lua: O(log n) y ya respeta __len. Un bucle manual sobre t[n+1]
+      -- hacía t[#t+1]=x cuadrático.
       if type(v) == "table" then return #v end
       fail("intento de obtener longitud de un valor de tipo " .. typename(v))
     end,
@@ -296,7 +388,7 @@ export const RUNTIME_LUA = `local function nx_run(P)
               sp = sp - 1
             elseif op == 12 then -- CALL
               local callee = stack[sp - a]
-              if type(callee) ~= "function" then
+              if not is_callable(callee) then
                 fail("se intentó llamar a un valor de tipo " .. typename(callee))
               end
               depth = myd
@@ -400,7 +492,7 @@ export const RUNTIME_LUA = `local function nx_run(P)
               sp = sp - 3
             elseif op == 35 then -- CALLM: args fijos, resultados variables (callee en sp - a)
               local callee = stack[sp - a]
-              if type(callee) ~= "function" then
+              if not is_callable(callee) then
                 fail("se intentó llamar a un valor de tipo " .. typename(callee))
               end
               depth = myd
@@ -416,7 +508,7 @@ export const RUNTIME_LUA = `local function nx_run(P)
               local k = stack[sp]
               sp = sp - 1
               local callee = stack[sp - k]
-              if type(callee) ~= "function" then
+              if not is_callable(callee) then
                 fail("se intentó llamar a un valor de tipo " .. typename(callee))
               end
               depth = myd
@@ -427,7 +519,7 @@ export const RUNTIME_LUA = `local function nx_run(P)
               local k = stack[sp]
               sp = sp - 1
               local callee = stack[sp - k]
-              if type(callee) ~= "function" then
+              if not is_callable(callee) then
                 fail("se intentó llamar a un valor de tipo " .. typename(callee))
               end
               depth = myd

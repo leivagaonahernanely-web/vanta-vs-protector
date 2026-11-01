@@ -174,3 +174,52 @@ describe("funciones y closures", () => {
     expect(() => run("local x = 1 return x()")).toThrow(/llamar a un valor de tipo number/);
   });
 });
+
+describe("metatablas", () => {
+  it("resuelve __index encadenado (herencia) y __newindex", () => {
+    const src = `
+      local Base = {}
+      Base.__index = Base
+      function Base:greet() return "hola " .. self.name end
+      local function new(name) return setmetatable({name = name}, Base) end
+      local o = new("ana")
+      return o:greet()`;
+    expect(run(src)).toBe("hola ana");
+  });
+
+  it("__index como función y __newindex interceptando asignaciones", () => {
+    expect(run("local t = setmetatable({}, {__index = function(_, k) return 'def:' .. k end}) return t.x")).toBe("def:x");
+    const src = `
+      local log = {}
+      local t = setmetatable({}, {__newindex = function(_, k, v) log[#log + 1] = k end})
+      t.a = 1
+      return log[1]`;
+    expect(run(src)).toBe("a");
+  });
+
+  it("sobrecarga operadores aritméticos, de comparación y de concatenación", () => {
+    expect(run("local mt = {__add = function(a,b) return a.v + b.v end} local a = setmetatable({v=3}, mt) local b = setmetatable({v=4}, mt) return a + b")).toBe(7);
+    expect(run("local mt = {__lt = function(a,b) return a.v < b.v end} local a = setmetatable({v=1}, mt) local b = setmetatable({v=2}, mt) return a < b")).toBe(true);
+    expect(run("local mt = {__concat = function(a,b) return 'x' end} local a = setmetatable({}, mt) return a .. 'y'")).toBe("x");
+  });
+
+  it("respeta __eq, __len, __call y __tostring", () => {
+    expect(run("local mt = {__eq = function(a,b) return a.v == b.v end} local a = setmetatable({v=1}, mt) local b = setmetatable({v=1}, mt) return a == b")).toBe(true);
+    expect(run("local t = setmetatable({}, {__len = function() return 9 end}) return #t")).toBe(9);
+    expect(run("local t = setmetatable({}, {__call = function(self, x) return x * 2 end}) return t(21)")).toBe(42);
+    expect(run("local t = setmetatable({}, {__tostring = function() return 'custom' end}) return tostring(t)")).toBe("custom");
+  });
+
+  it("rawget/rawset/rawequal esquivan los metamétodos", () => {
+    expect(run("local t = setmetatable({}, {__index = {x = 5}}) return rawget(t, 'x')")).toBe(null);
+    expect(run("local t = setmetatable({}, {__newindex = function() error('no debería llamarse') end}) rawset(t, 'x', 1) return t.x")).toBe(1);
+    expect(run("local mt = {__eq = function() return true end} local a, b = setmetatable({}, mt), setmetatable({}, mt) return rawequal(a, b)")).toBe(false);
+  });
+
+  it("falla sin el metamétodo correspondiente", () => {
+    expect(() => run("return {} + 1")).toThrow(/sumar/);
+    expect(() => run("local t = {} return t()")).toThrow(/llamar a un valor de tipo table/);
+    expect(() => run("return {} < {}")).toThrow(/comparar/);
+    expect(() => run("return {} .. 'x'")).toThrow(/concatenar/);
+  });
+});

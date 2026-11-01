@@ -75,6 +75,19 @@ const PROGRAMS: string[] = [
   "local function f(...) local a, b = ... return a + b end return f(4, 5, 6)",
   "local function g(...) return ... end local x, y = g(8, 9) return x * y",
   "local function it(t, i) i = i + 1 if t[i] then return i end end local n = 0 for i in it, {1, 2, 3, 4}, 0 do if i == 3 then break end n = n + i end return n",
+  // Metatablas: herencia con __index, __newindex, sobrecarga de operadores, __call, __tostring.
+  "local Animal = {} Animal.__index = Animal function Animal.new(n) return setmetatable({name = n}, Animal) end function Animal:speak() return self.name .. ' habla' end local a = Animal.new('gato') return a:speak()",
+  "local Base = {} Base.__index = Base function Base:greet() return 'base' end local Child = setmetatable({}, {__index = Base}) Child.__index = Child local c = setmetatable({}, Child) return c:greet()",
+  "local t = setmetatable({}, {__index = function(_, k) return 'def:' .. k end}) return t.missing",
+  "local log = {} local t = setmetatable({}, {__newindex = function(_, k, v) log[#log + 1] = k end}) t.x = 1 t.y = 2 return log[1] .. log[2]",
+  "local mt = {__add = function(a, b) return a.v + b.v end} local a = setmetatable({v = 3}, mt) local b = setmetatable({v = 4}, mt) return a + b",
+  "local mt = {__eq = function(a, b) return a.v == b.v end} local a = setmetatable({v = 1}, mt) local b = setmetatable({v = 1}, mt) return a == b",
+  "local mt = {__lt = function(a, b) return a.v < b.v end} local a = setmetatable({v = 1}, mt) local b = setmetatable({v = 2}, mt) return a < b and 1 or 0",
+  "local mt = {__concat = function(a, b) return 'cc' end} local a = setmetatable({}, mt) return a .. 'x'",
+  "local mt = {__call = function(self, x) return x * 2 end} local t = setmetatable({}, mt) return t(21)",
+  "local mt = {__tostring = function() return 'custom' end} local t = setmetatable({}, mt) return tostring(t)",
+  "local mt = {__len = function() return 7 end} local t = setmetatable({}, mt) return #t",
+  "local t = setmetatable({}, {__index = {x = 5}}) return rawget(t, 'x')",
 ];
 
 describe("emisión Lua: cadenas cifradas", () => {
@@ -114,6 +127,38 @@ describe("emisión Lua: equivalencia con la VM de referencia", () => {
         writeFileSync(file, emitLua(bc, { printResult: true }));
         const actual = execFileSync(LUA, [file], { encoding: "utf8" }).trimEnd();
         expect(actual).toBe(expected);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+  }
+
+  // Sin el metamétodo correspondiente, el runtime emitido debe fallar con su propio mensaje
+  // (no uno genérico del motor de Lua), igual que la VM de referencia.
+  const ERROR_PROGRAMS: [string, RegExp][] = [
+    ["return {} + 1", /sumar/],
+    ["local t = {} return t()", /llamar a un valor de tipo table/],
+    ["return {} < {}", /comparar/],
+    ["return {} .. 'x'", /concatenar/],
+    ["return -{}", /negar/],
+  ];
+
+  for (const [src, msg] of ERROR_PROGRAMS) {
+    runIt(`falla con su propio mensaje sin metamétodo: ${src}`, () => {
+      const bc = encode(compile(parse(src)), 7);
+      const dir = mkdtempSync(join(tmpdir(), "nx-emit-err-"));
+      try {
+        const file = join(dir, "out.lua");
+        writeFileSync(file, emitLua(bc, { printResult: true }));
+        let failed = false;
+        try {
+          execFileSync(LUA, [file], { encoding: "utf8" }); // el mensaje de error sale por stdout
+        } catch (e) {
+          failed = true;
+          const output = (e as { stdout?: string }).stdout ?? "";
+          expect(output).toMatch(msg);
+        }
+        expect(failed).toBe(true);
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }
