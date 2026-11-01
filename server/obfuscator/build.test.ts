@@ -193,3 +193,11 @@ describe("reparto automático sin macros", () => {
     expect(code).toContain("nx_run");
   });
 });
+
+describe("salida sin comentarios", () => {
+  it("el archivo generado no contiene comentarios Lua", () => {
+    const src = "local n = 0\nfor i = 1, 3 do n = n + i end -- comentario\n--[[ bloque ]] print(n)";
+    const { code } = buildLua(src, 4);
+    expect(code.split("\n").some((l) => l.includes("--"))).toBe(false);
+  });
+});

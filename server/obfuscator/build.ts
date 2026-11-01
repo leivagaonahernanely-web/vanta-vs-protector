@@ -274,7 +274,8 @@ export function buildLua(source: string, seed: number, options: { printResult?: 
   });
 
   return {
-    code: `-- NextOfuscator\n${PRELUDE_LUA}${RUNTIME_LUA}\n${chunks.join("\n")}\n`,
+    // Prelude y runtime sin comentarios ni líneas vacías (no tienen cadenas largas, así que es seguro).
+    code: `${stripComments(PRELUDE_LUA + RUNTIME_LUA).split("\n").filter((l) => l.trim() !== "").join("\n")}\n${chunks.join("\n")}\n`,
     segments: segments.length,
   };
 }
