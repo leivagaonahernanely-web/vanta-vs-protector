@@ -26,7 +26,9 @@ export const RUNTIME_LUA = `local function nx_run(P)
   for i = 1, P.nconsts do
     if type(consts[i]) == "string" then consts[i] = decstr(consts[i], 3000000 + i) end
   end
-  local env = _G
+  -- Globales del script: en Roblox, _G no contiene game, Enum, Color3, task... (solo el entorno
+  -- del script los tiene). getfenv() devuelve ese entorno; en Lua 5.1 estándar es _G.
+  local env = (type(getfenv) == "function" and getfenv()) or _G
   local unpack = unpack or table.unpack
   local fmt = string.format
   local MAX_DEPTH = 1000

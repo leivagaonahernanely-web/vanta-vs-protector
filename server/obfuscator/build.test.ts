@@ -202,3 +202,25 @@ describe("salida sin comentarios", () => {
     expect(code.split("\n")[0]).toBe("--Protect by NextOfuscator");
   });
 });
+
+describe("globales del entorno del script", () => {
+  const runIt = luaAvailable() ? it : it.skip;
+
+  runIt("lee globales que solo existen en el entorno del script (como game o Enum en Roblox)", () => {
+    const { code } = buildLua("return marker * 2", 6);
+    const dir = mkdtempSync(join(tmpdir(), "nx-env-"));
+    try {
+      const file = join(dir, "env.lua");
+      // Simula Roblox: 'marker' está en el entorno del script y no en _G.
+      writeFileSync(
+        file,
+        `local E = setmetatable({ marker = 21 }, { __index = _G })\n` +
+          `_G.getfenv = function() return E end\n` +
+          `local __r = (function()\n${code}\nend)()\nprint(__r)\n`,
+      );
+      expect(execFileSync(LUA, [file], { encoding: "utf8" }).trim()).toBe("42");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
