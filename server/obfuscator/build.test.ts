@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { BuildError, buildLua, splitSegments } from "./build";
+import { autoSegments, BuildError, buildLua, splitSegments } from "./build";
 
 const LUA = process.env.NX_LUA_BIN ?? "lua5.1";
 function luaAvailable(): boolean {
@@ -169,4 +169,27 @@ describe("salida ofuscada con macros: equivalencia en Lua", () => {
       }
     });
   }
+});
+
+describe("reparto automático sin macros", () => {
+  it("un bucle que solo usa globales va nativo", () => {
+    const segs = autoSegments("print('inicio')\nfor i = 1, 3 do print(i) end\nprint('fin')");
+    expect(segs.map((s) => s.kind)).toEqual(["protected", "native", "protected"]);
+  });
+
+  it("un callback con una función literal va nativo si no comparte locales", () => {
+    const segs = autoSegments("x = 1\nbutton.Click:Connect(function() print('hola') end)");
+    expect(segs.map((s) => s.kind)).toEqual(["protected", "native"]);
+  });
+
+  it("un bucle que usa una local del script no se separa del resto", () => {
+    const segs = autoSegments("local n = 0\nfor i = 1, 3 do n = n + i end\nprint(n)");
+    expect(segs.every((s) => s.kind === "protected")).toBe(true);
+  });
+
+  it("genera el archivo con el runtime aunque haya bloques nativos", () => {
+    const src = "local n = 0\nfor i = 1, 3 do n = n + i end\nreturn n";
+    const { code } = buildLua(src, 9);
+    expect(code).toContain("nx_run");
+  });
 });

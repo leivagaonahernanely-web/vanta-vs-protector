@@ -30,7 +30,7 @@ export type Stmt =
   | { kind: "Local"; names: string[]; values: Expr[]; line: number }
   | { kind: "Assign"; targets: Expr[]; values: Expr[]; line: number }
   | { kind: "CallStmt"; call: Expr; line: number }
-  | { kind: "Do"; body: Block }
+  | { kind: "Do"; body: Block; line: number }
   | { kind: "While"; cond: Expr; body: Block; line: number }
   | { kind: "Repeat"; body: Block; cond: Expr; line: number }
   | { kind: "If"; clauses: { cond: Expr; body: Block }[]; orElse: Block | null; line: number }
@@ -182,7 +182,7 @@ class Parser {
           this.pos++;
           const body = this.parseBlock();
           this.expect("end", "do");
-          return { kind: "Do", body };
+          return { kind: "Do", body, line };
         }
         case "for": return this.parseFor();
         case "repeat": {
