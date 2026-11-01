@@ -221,6 +221,15 @@ export function autoSegments(source: string): Segment[] {
   return segments;
 }
 
+// Quita comentarios, sangría y líneas vacías. Solo se usa en el prelude y el runtime, que no tienen cadenas largas.
+function compactLua(src: string): string {
+  return stripComments(src)
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l !== "")
+    .join("\n");
+}
+
 // Construye el archivo Lua final a partir del código fuente.
 // Con macros, el reparto lo marca el usuario; sin macros, lo decide autoSegments.
 export function buildLua(source: string, seed: number, options: { printResult?: boolean } = {}): Built {
@@ -274,8 +283,8 @@ export function buildLua(source: string, seed: number, options: { printResult?: 
   });
 
   return {
-    // Prelude y runtime sin comentarios ni líneas vacías (no tienen cadenas largas, así que es seguro).
-    code: `${stripComments(PRELUDE_LUA + RUNTIME_LUA).split("\n").filter((l) => l.trim() !== "").join("\n")}\n${chunks.join("\n")}\n`,
+    // Cabecera exacta; prelude y runtime sin comentarios, sangría ni líneas vacías (no tienen cadenas largas).
+    code: `--Protect by NextOfuscator\n${compactLua(PRELUDE_LUA + RUNTIME_LUA)}\n${chunks.join("\n")}\n`,
     segments: segments.length,
   };
 }
