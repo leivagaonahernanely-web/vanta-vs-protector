@@ -39,6 +39,9 @@ const cases: [string, string, string][] = [
   ["escape \\z", 'return "a\\z    b"', "ab"],
   ["for con anotación", "local s = 0 for i: number = 1, 3 do s += i end return s", "6"],
   ["continue como nombre", "local continue = 4 return continue", "4"],
+  ["for con paso variable", "local st=2 local s=0 for i=1,7,st do s=s+i end return s", "16"],
+  ["for con paso variable negativo", "local st=-1 local s='' for i=3,1,st do s=s..i end return s", "321"],
+  ["for con paso como expresión", "local s=0 for i=1,10,1+1 do s=s+i end return s", "25"],
 ];
 
 describe("sintaxis de Luau", () => {

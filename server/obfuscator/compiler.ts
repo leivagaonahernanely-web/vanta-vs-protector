@@ -333,9 +333,8 @@ class Compiler {
       case "NumericFor": {
         const step = s.step;
         const negative = step?.kind === "Unary" && step.op === "-" && step.operand.kind === "Number";
-        if (step && !(step.kind === "Number" || negative)) {
-          throw new CompileError("el paso del for debe ser una constante numérica", s.line);
-        }
+        // Con paso constante la comparación se elige al compilar; con paso variable se comprueba el signo en cada vuelta.
+        const constStep = !step || step.kind === "Number" || negative;
         this.fn.scopes.push(new Map());
         this.expr(s.start);
         const iSlot = this.newTemp();
@@ -343,14 +342,34 @@ class Compiler {
         this.expr(s.limit);
         const limSlot = this.newTemp();
         this.emit("DECL", limSlot);
-        this.emit("CONST", this.constIndex(step ? this.numericValue(step) : 1));
+        if (constStep) this.emit("CONST", this.constIndex(step ? this.numericValue(step) : 1));
+        else this.expr(step!);
         const stepSlot = this.newTemp();
         this.emit("DECL", stepSlot);
         const start = this.here();
-        this.emit("LOCAL_GET", iSlot);
-        this.emit("LOCAL_GET", limSlot);
-        this.emit("BIN", this.opIndex(negative ? ">=" : "<="));
-        const exit = this.emit("JMPF", -1);
+        let exit: number;
+        if (constStep) {
+          this.emit("LOCAL_GET", iSlot);
+          this.emit("LOCAL_GET", limSlot);
+          this.emit("BIN", this.opIndex(negative ? ">=" : "<="));
+          exit = this.emit("JMPF", -1);
+        } else {
+          // Paso >= 0: sigue mientras i <= límite. Paso < 0: sigue mientras i >= límite.
+          this.emit("LOCAL_GET", stepSlot);
+          this.emit("CONST", this.constIndex(0));
+          this.emit("BIN", this.opIndex(">="));
+          const toNegative = this.emit("JMPF", -1);
+          this.emit("LOCAL_GET", iSlot);
+          this.emit("LOCAL_GET", limSlot);
+          this.emit("BIN", this.opIndex("<="));
+          const toCheck = this.emit("JMP", -1);
+          this.patch(toNegative, this.here());
+          this.emit("LOCAL_GET", iSlot);
+          this.emit("LOCAL_GET", limSlot);
+          this.emit("BIN", this.opIndex(">="));
+          this.patch(toCheck, this.here());
+          exit = this.emit("JMPF", -1);
+        }
         this.fn.loops.push([]);
         this.fn.continues.push([]);
         this.fn.scopes.push(new Map());
