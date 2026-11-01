@@ -54,6 +54,7 @@ type FnState = {
   scopes: Map<string, number>[];
   slots: number;
   loops: number[][];
+  continues: number[][]; // saltos de 'continue' pendientes de cada bucle, en el mismo orden que loops
   upvals: UpvalDesc[];
   upvalNames: Map<string, number>;
   captured: Set<number>; // slots de esta función que usa alguna closure hija
@@ -105,7 +106,7 @@ class Compiler {
     this.fns.push({
       // Los slots empiezan en 1: el runtime guarda las celdas en una tabla de array (1..n),
       // y el índice 0 caería en la parte hash, más lenta.
-      code: [], scopes: [new Map()], slots: 1, loops: [], upvals: [], upvalNames: new Map(),
+      code: [], scopes: [new Map()], slots: 1, loops: [], continues: [], upvals: [], upvalNames: new Map(),
       captured: new Set(), vararg: isVararg,
     });
     for (const p of params) this.declareLocal(p);
@@ -292,7 +293,9 @@ class Compiler {
         this.expr(s.cond);
         const exit = this.emit("JMPF", -1);
         this.fn.loops.push([]);
+        this.fn.continues.push([]);
         this.block(s.body);
+        for (const c of this.fn.continues.pop()!) this.patch(c, start);
         this.emit("JMP", start);
         this.finishLoop(exit);
         return;
@@ -302,7 +305,11 @@ class Compiler {
         const start = this.here();
         this.fn.scopes.push(new Map());
         this.fn.loops.push([]);
+        this.fn.continues.push([]);
         for (const st of s.body) this.statement(st);
+        // 'continue' en un repeat salta a la condición.
+        const condAt = this.here();
+        for (const c of this.fn.continues.pop()!) this.patch(c, condAt);
         this.expr(s.cond);
         this.emit("JMPF", start);
         this.fn.scopes.pop();
@@ -345,6 +352,7 @@ class Compiler {
         this.emit("BIN", this.opIndex(negative ? ">=" : "<="));
         const exit = this.emit("JMPF", -1);
         this.fn.loops.push([]);
+        this.fn.continues.push([]);
         this.fn.scopes.push(new Map());
         // La variable de control es nueva en cada vuelta (importa para closures).
         const varSlot = this.declareLocal(s.name);
@@ -352,6 +360,9 @@ class Compiler {
         this.emit("DECL", varSlot);
         this.block(s.body, false);
         this.fn.scopes.pop();
+        // 'continue' en un for numérico salta al incremento.
+        const incAt = this.here();
+        for (const c of this.fn.continues.pop()!) this.patch(c, incAt);
         this.emit("LOCAL_GET", iSlot);
         this.emit("LOCAL_GET", stepSlot);
         this.emit("BIN", this.opIndex("+"));
@@ -389,7 +400,10 @@ class Compiler {
         this.emit("LOCAL_GET", slots[0]);
         this.emit("LOCAL_SET", control);
         this.fn.loops.push([]);
+        this.fn.continues.push([]);
         this.block(s.body, false);
+        // 'continue' en un for genérico vuelve a llamar al iterador.
+        for (const c of this.fn.continues.pop()!) this.patch(c, start);
         this.emit("JMP", start);
         this.finishLoop(exit);
         this.fn.scopes.pop();
@@ -417,6 +431,12 @@ class Compiler {
         const loop = this.fn.loops[this.fn.loops.length - 1];
         if (!loop) throw new CompileError("'break' fuera de un bucle", s.line);
         loop.push(this.emit("JMP", -1));
+        return;
+      }
+      case "Continue": {
+        const conts = this.fn.continues[this.fn.continues.length - 1];
+        if (!conts) throw new CompileError("'continue' fuera de un bucle", s.line);
+        conts.push(this.emit("JMP", -1));
         return;
       }
     }
@@ -563,6 +583,20 @@ class Compiler {
         // En contexto de un solo valor: la llamada se queda con el primer resultado.
         this.emitCall(e, false);
         return;
+      case "IfExpr": {
+        // Luau: if c then a elseif d then b else e. Solo se evalúa la rama que corresponde.
+        const endJumps: number[] = [];
+        for (const clause of e.clauses) {
+          this.expr(clause.cond);
+          const skip = this.emit("JMPF", -1);
+          this.expr(clause.value);
+          endJumps.push(this.emit("JMP", -1));
+          this.patch(skip, this.here());
+        }
+        this.expr(e.orElse);
+        for (const j of endJumps) this.patch(j, this.here());
+        return;
+      }
       case "Function": {
         const proto = this.functionProto(e.params, e.body, e.isVararg, e.line);
         this.emit("CLOSURE", proto);

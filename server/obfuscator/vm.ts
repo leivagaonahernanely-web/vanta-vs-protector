@@ -366,6 +366,11 @@ function binary(ctx: Ctx, op: string, l: unknown, r: unknown): unknown {
       const what = { "+": "sumar", "-": "restar", "*": "multiplicar", "/": "dividir", "%": "calcular módulo", "^": "elevar" }[op]!;
       return arith(op, num(l, what), num(r, what)); // lanza si l o r no es número
     }
+    case "//": {
+      // División entera de Luau: redondea hacia -infinito.
+      if (typeof l === "number" && typeof r === "number") return Math.floor(l / r);
+      return Math.floor(num(l, "dividir") / num(r, "dividir")); // lanza si l o r no es número
+    }
     case "..": {
       if ((typeof l === "string" || typeof l === "number") && (typeof r === "string" || typeof r === "number")) {
         return concatPart(l) + concatPart(r);

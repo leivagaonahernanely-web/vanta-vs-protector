@@ -153,6 +153,11 @@ export const RUNTIME_LUA = `local function nx_run(P)
       local ok, res = try_meta("^", l, r); if ok then return res end
       return num(l, "elevar") ^ num(r, "elevar")
     end,
+    ["//"] = function(l, r)
+      -- División entera de Luau: redondea hacia -infinito.
+      if type(l) == "number" and type(r) == "number" then return math.floor(l / r) end
+      return math.floor(num(l, "dividir") / num(r, "dividir"))
+    end,
     [".."] = function(l, r)
       if (type(l) == "string" or type(l) == "number") and (type(r) == "string" or type(r) == "number") then
         return concatpart(l) .. concatpart(r)

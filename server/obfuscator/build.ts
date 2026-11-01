@@ -111,6 +111,10 @@ export function namesOf(block: Block): { declared: Set<string>; referenced: Set<
       case "Binary": visitExpr(e.left); visitExpr(e.right); return;
       case "Unary": visitExpr(e.operand); return;
       case "Paren": visitExpr(e.expr); return;
+      case "IfExpr":
+        for (const c of e.clauses) { visitExpr(c.cond); visitExpr(c.value); }
+        visitExpr(e.orElse);
+        return;
       default: return;
     }
   };

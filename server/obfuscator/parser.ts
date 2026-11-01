@@ -1,4 +1,6 @@
-// Parser de Lua 5.1 por descenso recursivo. Produce un AST sencillo de objetos con "kind".
+// Parser de Lua 5.1 con las extensiones de Luau que usa Roblox, por descenso recursivo.
+// Las anotaciones de tipo se leen y se descartan; los operadores compuestos (+=, ..=) se
+// convierten en asignaciones; `if` como expresión e interpolación con backticks producen AST normal.
 import { LuaSyntaxError, tokenize, type Token } from "./lexer";
 
 export type Expr =
@@ -16,7 +18,8 @@ export type Expr =
   | { kind: "Table"; items: TableItem[] }
   | { kind: "Binary"; op: string; left: Expr; right: Expr; line: number }
   | { kind: "Unary"; op: string; operand: Expr; line: number }
-  | { kind: "Paren"; expr: Expr };
+  | { kind: "Paren"; expr: Expr }
+  | { kind: "IfExpr"; clauses: { cond: Expr; value: Expr }[]; orElse: Expr; line: number };
 
 export type TableItem =
   | { kind: "Positional"; value: Expr }
@@ -36,20 +39,26 @@ export type Stmt =
   | { kind: "FunctionDecl"; target: Expr; isMethod: boolean; fn: Expr & { kind: "Function" }; line: number }
   | { kind: "LocalFunction"; name: string; fn: Expr & { kind: "Function" }; line: number }
   | { kind: "Return"; values: Expr[]; line: number }
-  | { kind: "Break"; line: number };
+  | { kind: "Break"; line: number }
+  | { kind: "Continue"; line: number };
 
 export type Block = Stmt[];
 
-// Precedencia de operadores binarios de Lua 5.1: [izquierda, derecha]. Mayor = se liga más fuerte.
+// Precedencia de operadores binarios de Lua 5.1 (más // de Luau): [izquierda, derecha]. Mayor = se liga más fuerte.
 const BINARY_PRECEDENCE: Record<string, [number, number]> = {
   or: [1, 1], and: [2, 2],
   "<": [3, 3], ">": [3, 3], "<=": [3, 3], ">=": [3, 3], "~=": [3, 3], "==": [3, 3],
   "..": [5, 4], // asociatividad derecha
   "+": [6, 6], "-": [6, 6],
-  "*": [7, 7], "/": [7, 7], "%": [7, 7],
+  "*": [7, 7], "/": [7, 7], "//": [7, 7], "%": [7, 7],
   "^": [10, 9], // asociatividad derecha, más fuerte que el unario
 };
 const UNARY_PRECEDENCE = 8;
+
+// Operadores compuestos de Luau y el operador binario que representan.
+const COMPOUND_OPS: Record<string, string> = {
+  "+=": "+", "-=": "-", "*=": "*", "/=": "/", "%=": "%", "^=": "^", "..=": "..",
+};
 
 const BLOCK_END = new Set(["end", "else", "elseif", "until", "<eof>"]);
 
@@ -101,6 +110,13 @@ class Parser {
     return block;
   }
 
+  // Expresión completa: no puede quedar nada detrás (usado para interpolaciones).
+  parseWholeExpr(): Expr {
+    const e = this.parseExpr();
+    if (this.current.type !== "eof") this.fail(`se esperaba fin de la expresión y se encontró ${describe(this.current)}`);
+    return e;
+  }
+
   private parseBlock(): Block {
     const stmts: Stmt[] = [];
     while (!(this.current.type === "eof" || (this.current.type === "keyword" && BLOCK_END.has(this.current.value as string)))) {
@@ -134,6 +150,23 @@ class Parser {
 
     if (t.type === "op" && t.value === ";") { this.pos++; return null; }
 
+    // Luau: `continue` es sentencia salvo que se use como nombre (continue = 1, continue(), continue.x).
+    if (t.type === "name" && t.value === "continue" && this.continueIsStatement()) {
+      this.pos++;
+      return { kind: "Continue", line };
+    }
+
+    // Luau: alias de tipo (`type X = ...`, `export type X = ...`). No generan código.
+    if (t.type === "name" && t.value === "export" && this.isTypeAliasAt(this.pos + 1)) {
+      this.pos++;
+      this.skipTypeAlias();
+      return null;
+    }
+    if (t.type === "name" && t.value === "type" && this.isTypeAliasAt(this.pos)) {
+      this.skipTypeAlias();
+      return null;
+    }
+
     if (t.type === "keyword") {
       switch (t.value) {
         case "if": return this.parseIf();
@@ -163,10 +196,11 @@ class Parser {
           this.pos++;
           if (this.accept("function")) {
             const name = this.expectName();
+            this.skipGenerics();
             return { kind: "LocalFunction", name, fn: this.parseFunctionBody(line), line };
           }
-          const names = [this.expectName()];
-          while (this.accept(",")) names.push(this.expectName());
+          const names = [this.parseTypedName()];
+          while (this.accept(",")) names.push(this.parseTypedName());
           const values = this.accept("=") ? this.parseExprList() : [];
           return { kind: "Local", names, values, line };
         }
@@ -176,6 +210,35 @@ class Parser {
     }
 
     return this.parseExprStatement();
+  }
+
+  // `continue` cuenta como sentencia si no lo sigue un token que lo convierta en expresión o en asignación.
+  private continueIsStatement(): boolean {
+    const n = this.tokens[this.pos + 1];
+    if (!n) return true;
+    if (n.type === "string" || n.type === "tstring") return false;
+    if (n.type === "op") {
+      return !["=", ",", ".", "[", ":", "(", "{", ...Object.keys(COMPOUND_OPS)].includes(n.value as string);
+    }
+    return true;
+  }
+
+  // ¿Hay `type Nombre =` o `type Nombre<...> =` empezando en esa posición?
+  private isTypeAliasAt(index: number): boolean {
+    const kw = this.tokens[index];
+    const name = this.tokens[index + 1];
+    const after = this.tokens[index + 2];
+    if (!kw || kw.type !== "name" || kw.value !== "type") return false;
+    if (!name || name.type !== "name") return false;
+    return after !== undefined && after.type === "op" && (after.value === "=" || after.value === "<");
+  }
+
+  private skipTypeAlias(): void {
+    this.pos++; // 'type'
+    this.expectName();
+    this.skipGenerics();
+    this.expect("=");
+    this.skipType();
   }
 
   private parseIf(): Stmt {
@@ -204,7 +267,7 @@ class Parser {
 
   private parseFor(): Stmt {
     const line = this.next().line; // 'for'
-    const first = this.expectName();
+    const first = this.parseTypedName();
     if (this.accept("=")) {
       const start = this.parseExpr();
       this.expect(",");
@@ -216,7 +279,7 @@ class Parser {
       return { kind: "NumericFor", name: first, start, limit, step, body, line };
     }
     const names = [first];
-    while (this.accept(",")) names.push(this.expectName());
+    while (this.accept(",")) names.push(this.parseTypedName());
     this.expect("in");
     const iterators = this.parseExprList();
     this.expect("do");
@@ -235,30 +298,84 @@ class Parser {
       target = { kind: "Index", object: target, key: { kind: "String", value: key } };
       if (sep === ":") { isMethod = true; break; }
     }
+    this.skipGenerics();
     const fn = this.parseFunctionBody(line, isMethod);
     return { kind: "FunctionDecl", target, isMethod, fn, line };
   }
 
-  // Parsea "(params) body end". Con método, "self" se añade como primer parámetro.
+  // Parsea "(params): tipo? body end". Con método, "self" se añade como primer parámetro.
   private parseFunctionBody(line: number, isMethod = false): Expr & { kind: "Function" } {
     this.expect("(");
     const params: string[] = isMethod ? ["self"] : [];
     let isVararg = false;
     if (!this.check(")")) {
       do {
-        if (this.accept("...")) { isVararg = true; break; }
-        params.push(this.expectName());
+        if (this.accept("...")) {
+          isVararg = true;
+          if (this.accept(":")) this.skipType();
+          break;
+        }
+        params.push(this.parseTypedName());
       } while (this.accept(","));
     }
     this.expect(")");
+    if (this.accept(":")) this.skipType(); // tipo de retorno
     const body = this.parseBlock();
     this.expect("end", "function");
     return { kind: "Function", params, isVararg, body, line };
   }
 
+  // Nombre con anotación opcional de tipo (`x: number`). La anotación se descarta.
+  private parseTypedName(): string {
+    const name = this.expectName();
+    if (this.accept(":")) this.skipType();
+    return name;
+  }
+
+  // Salta un bloque de genéricos `<T, U>` si lo hay.
+  private skipGenerics(): void {
+    if (!this.check("<")) return;
+    let depth = 0;
+    do {
+      if (this.check("<")) depth++;
+      else if (this.check(">")) depth--;
+      else if (this.current.type === "eof") this.fail("genéricos sin cerrar");
+      this.pos++;
+    } while (depth > 0);
+  }
+
+  // Salta una anotación de tipo de Luau. Se detiene en el primer token que no puede formar parte del tipo:
+  // una coma, un cierre, `=`, un salto de línea seguido de otra sentencia, o una palabra clave.
+  private skipType(): void {
+    let depth = 0;
+    let prev = this.tokens[this.pos - 1];
+    const continuation = new Set(["|", "&", "?", "->"]);
+    while (true) {
+      const t = this.current;
+      if (t.type === "eof") return;
+      if (depth === 0) {
+        if (t.type === "keyword" && !["nil", "true", "false"].includes(t.value as string)) return;
+        if (t.type === "op" && [",", "=", ";", ")", "]", "}", ">"].includes(t.value as string)) return;
+        if (t.line > prev.line && !(t.type === "op" && continuation.has(t.value as string))) return;
+      }
+      if (t.type === "op" && ["(", "{", "[", "<"].includes(t.value as string)) depth++;
+      else if (t.type === "op" && [")", "}", "]", ">"].includes(t.value as string)) depth--;
+      prev = t;
+      this.pos++;
+    }
+  }
+
   private parseExprStatement(): Stmt {
     const line = this.current.line;
     const first = this.parseSuffixedExpr();
+    // Luau: `a += b` equivale a `a = a + b` (si `a` tiene efectos, se evalúa dos veces).
+    const compound = this.current.type === "op" ? COMPOUND_OPS[this.current.value as string] : undefined;
+    if (compound) {
+      if (first.kind !== "Name" && first.kind !== "Index") this.fail("no se puede asignar a esta expresión");
+      this.pos++;
+      const rhs = this.parseExpr();
+      return { kind: "Assign", targets: [first], values: [{ kind: "Binary", op: compound, left: first, right: rhs, line }], line };
+    }
     if (this.check("=") || this.check(",")) {
       const targets = [first];
       while (this.accept(",")) targets.push(this.parseSuffixedExpr());
@@ -290,6 +407,11 @@ class Parser {
     } else {
       left = this.parseSimpleExpr();
     }
+    // Luau: conversiones de tipo `x :: T` también después de literales.
+    while (this.check("::")) {
+      this.pos++;
+      this.skipType();
+    }
 
     while (true) {
       const op = this.current;
@@ -308,11 +430,13 @@ class Parser {
     switch (t.type) {
       case "number": this.pos++; return { kind: "Number", value: t.value as number };
       case "string": this.pos++; return { kind: "String", value: t.value as string };
+      case "tstring": this.pos++; return this.parseInterpolated(t);
       case "keyword":
         if (t.value === "nil") { this.pos++; return { kind: "Nil" }; }
         if (t.value === "true") { this.pos++; return { kind: "True" }; }
         if (t.value === "false") { this.pos++; return { kind: "False" }; }
         if (t.value === "function") { this.pos++; return this.parseFunctionBody(t.line); }
+        if (t.value === "if") return this.parseIfExpr();
         break;
       case "op":
         if (t.value === "...") { this.pos++; return { kind: "Vararg" }; }
@@ -321,6 +445,64 @@ class Parser {
       default: break;
     }
     return this.parseSuffixedExpr();
+  }
+
+  // Luau: `if c then a elseif d then b else e` como expresión.
+  private parseIfExpr(): Expr {
+    const line = this.next().line; // 'if'
+    const clauses: { cond: Expr; value: Expr }[] = [];
+    const cond = this.parseExpr();
+    this.expect("then");
+    clauses.push({ cond, value: this.parseExpr() });
+    while (this.accept("elseif")) {
+      const c = this.parseExpr();
+      this.expect("then");
+      clauses.push({ cond: c, value: this.parseExpr() });
+    }
+    this.expect("else", "la expresión if");
+    const orElse = this.parseExpr();
+    return { kind: "IfExpr", clauses, orElse, line };
+  }
+
+  // Luau: interpolación con backticks. `a{x}b` se convierte en "a" .. tostring(x) .. "b".
+  private parseInterpolated(t: Token): Expr {
+    const raw = t.value as string;
+    const escapes: Record<string, string> = { n: "\n", t: "\t", r: "\r", "\\": "\\", "`": "`", "{": "{", "}": "}", '"': '"', "'": "'" };
+    const parts: Expr[] = [];
+    let text = "";
+    const flush = () => {
+      if (text) { parts.push({ kind: "String", value: text }); text = ""; }
+    };
+    let i = 0;
+    while (i < raw.length) {
+      const c = raw[i];
+      if (c === "\\") {
+        const e = raw[i + 1];
+        if (!(e in escapes)) throw new LuaSyntaxError(`escape inválido \\${e} en cadena con backticks`, t.line, t.col);
+        text += escapes[e];
+        i += 2;
+        continue;
+      }
+      if (c === "{") {
+        let depth = 0;
+        let j = i;
+        for (; j < raw.length; j++) {
+          if (raw[j] === "{") depth++;
+          else if (raw[j] === "}" && --depth === 0) break;
+        }
+        if (j >= raw.length) throw new LuaSyntaxError("llave sin cerrar en cadena con backticks", t.line, t.col);
+        flush();
+        const inner = new Parser(tokenize(raw.slice(i + 1, j))).parseWholeExpr();
+        parts.push({ kind: "Call", callee: { kind: "Name", name: "tostring", line: t.line }, args: [inner], line: t.line });
+        i = j + 1;
+        continue;
+      }
+      text += c;
+      i++;
+    }
+    flush();
+    if (parts.length === 0) return { kind: "String", value: "" };
+    return parts.reduce<Expr>((left, right) => ({ kind: "Binary", op: "..", left, right, line: t.line }));
   }
 
   private parsePrimaryExpr(): Expr {
@@ -350,8 +532,12 @@ class Parser {
         this.pos++;
         const method = this.expectName();
         expr = { kind: "MethodCall", object: expr, method, args: this.parseCallArgs(), line: t.line };
-      } else if ((t.type === "op" && (t.value === "(" || t.value === "{")) || t.type === "string") {
+      } else if ((t.type === "op" && (t.value === "(" || t.value === "{")) || t.type === "string" || t.type === "tstring") {
         expr = { kind: "Call", callee: expr, args: this.parseCallArgs(), line: t.line };
+      } else if (t.type === "op" && t.value === "::") {
+        // Luau: conversión de tipo `x :: T`. Solo se descarta el tipo.
+        this.pos++;
+        this.skipType();
       } else {
         return expr;
       }
@@ -361,6 +547,7 @@ class Parser {
   private parseCallArgs(): Expr[] {
     const t = this.current;
     if (t.type === "string") { this.pos++; return [{ kind: "String", value: t.value as string }]; }
+    if (t.type === "tstring") { this.pos++; return [this.parseInterpolated(t)]; }
     if (t.type === "op" && t.value === "{") return [this.parseTable()];
     if (this.accept("(")) {
       if (this.accept(")")) return [];
@@ -396,7 +583,7 @@ class Parser {
 
 function describe(t: Token): string {
   if (t.type === "eof") return "fin del archivo";
-  if (t.type === "string") return "una cadena";
+  if (t.type === "string" || t.type === "tstring") return "una cadena";
   if (t.type === "number") return `el número ${t.value}`;
   return `'${t.value}'`;
 }
