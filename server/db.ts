@@ -77,6 +77,41 @@ export async function getUserByApiKeyHash(hash: string) {
   return rows[0];
 }
 
+// true si ya existe al menos una cuenta. Se usa para el arranque: antes de que exista cualquier
+// cuenta no hay forma de generar una NX_KEY (solo un admin puede hacerlo), así que la primera
+// cuenta tiene que poder crearse sin una.
+export async function hasAnyUser(): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const rows = await db.select({ id: users.id }).from(users).limit(1);
+  return rows.length > 0;
+}
+
+// Crea una cuenta admin Premium sin NX_KEY. Solo debe llamarse para destrabar el arranque:
+// o el correo coincide con OWNER_OPEN_ID, o todavía no existe ninguna cuenta en la base de datos
+// (ver auth.register en routers.ts). A partir de ahí hasAnyUser() ya devuelve true y toda cuenta
+// nueva vuelve a exigir una NX_KEY como siempre.
+export async function createBootstrapAdmin(input: { email: string; passwordHash: string }): Promise<"ok" | "email_taken"> {
+  const db = await getDb();
+  if (!db) throw new Error("Base de datos no disponible");
+
+  try {
+    await db.insert(users).values({
+      openId: `email:${input.email}`,
+      email: input.email,
+      passwordHash: input.passwordHash,
+      loginMethod: "email",
+      role: "admin",
+      plan: "premium",
+      lastSignedIn: new Date(),
+    });
+    return "ok";
+  } catch (error) {
+    if ((error as { code?: string })?.code === "ER_DUP_ENTRY") return "email_taken";
+    throw error;
+  }
+}
+
 // Filas afectadas por un UPDATE/INSERT del driver mysql2.
 function affectedRows(result: unknown): number {
   const header = Array.isArray(result) ? result[0] : result;
