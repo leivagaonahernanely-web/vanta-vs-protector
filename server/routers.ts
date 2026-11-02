@@ -55,9 +55,10 @@ export const appRouter = router({
   auth: router({
     me: publicProcedure.query(opts => (opts.ctx.user ? publicUser(opts.ctx.user) : null)),
 
-    // Crear cuenta: exige una NX_KEY de Premium válida y no usada.
+    // Crear cuenta: exige una NX_KEY de Premium válida y no usada, salvo en el arranque
+    // (ver bootstrap más abajo), donde la primera cuenta se crea sin NX_KEY.
     register: publicProcedure
-      .input(z.object({ email: emailInput, password: z.string(), nxKey: z.string() }))
+      .input(z.object({ email: emailInput, password: z.string(), nxKey: z.string().optional() }))
       .mutation(async ({ input, ctx }) => {
         const ip = clientIp(ctx.req);
         if (!nxKeyLimiter.check(`ip:${ip}`).allowed) {
@@ -65,6 +66,23 @@ export const appRouter = router({
         }
         const passwordError = passwordPolicyError(input.password);
         if (passwordError) throw new TRPCError({ code: "BAD_REQUEST", message: passwordError });
+
+        // Arranque: sin esto nadie podría crear jamás la primera cuenta (hace falta un admin para
+        // emitir una NX_KEY, y hace falta una cuenta para ser admin). Se permite sin NX_KEY cuando
+        // el correo coincide con OWNER_OPEN_ID, o cuando todavía no existe ninguna cuenta.
+        const openId = `email:${input.email}`;
+        const isConfiguredOwner = Boolean(ENV.ownerOpenId) && openId === ENV.ownerOpenId;
+        if (isConfiguredOwner || !(await db.hasAnyUser())) {
+          const result = await db.createBootstrapAdmin({
+            email: input.email,
+            passwordHash: hashPassword(input.password),
+          });
+          if (result === "email_taken") {
+            throw new TRPCError({ code: "CONFLICT", message: "No se pudo crear la cuenta con esos datos." });
+          }
+          nxKeyLimiter.recordSuccess(`ip:${ip}`);
+          return { success: true } as const;
+        }
 
         if (!isWellFormedNxKey(input.nxKey)) {
           nxKeyLimiter.recordFailure(`ip:${ip}`);

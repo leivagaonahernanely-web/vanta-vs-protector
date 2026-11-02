@@ -2,6 +2,23 @@
 
 Ofuscador de scripts Lua. Compila el código a bytecode de una VM propia y genera un archivo Lua autocontenido que contiene el runtime y el bytecode, con una tabla de opcodes distinta en cada ejecución.
 
+## Puesta en marcha
+
+```bash
+cp .env.example .env   # completa DATABASE_URL, JWT_SECRET y NX_KEY_SECRET
+pnpm install
+pnpm dev                # http://localhost:3000
+```
+
+El ofuscador web vive detrás de una cuenta con plan Premium. Para crear la primera cuenta
+(sin tener aún ninguna NX_KEY), entra a "Crear cuenta" y deja el campo NX_KEY vacío: si
+configuraste `OWNER_OPEN_ID` con tu correo, o si todavía no existe ninguna cuenta en la base
+de datos, esa cuenta se crea directamente como admin Premium. Desde el panel de admin ya
+puedes generar NX_KEY para el resto de cuentas. Más detalles en `.env.example`.
+
+Si solo quieres usar el motor de ofuscación sin la web ni cuentas, `scripts/ofuscar.ts` lo
+expone como CLI: `tsx scripts/ofuscar.ts entrada.lua salida.lua`.
+
 ## Estructura
 
 - `server/obfuscator/`: motor de ofuscación (lexer, parser, compilador, VM de referencia, runtime Lua y generador de archivos).
@@ -48,6 +65,5 @@ No soportado todavía: sintaxis de Lua 5.2+ (`goto`/etiquetas, escapes `\x`/`\z`
 
 ## Pendiente
 
-- Cuentas con email y contraseña, NX_KEY para Premium, API key única por cuenta con regeneración y dominio, panel de admin para generar keys.
 - Reducir el costo por llamada en la VM: cada cierre crea una tabla `{...}` y usa `select`. Los argumentos extra ya no se copian, pero el costo principal es el despacho de instrucciones, que es estructural en un intérprete escrito en Lua.
 - Migración de base de datos para el nuevo esquema de `users` (generar con `pnpm db:push` en un entorno con base de datos).

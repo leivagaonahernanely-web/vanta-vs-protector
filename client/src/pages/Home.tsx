@@ -59,13 +59,17 @@ function AccessScreen({ onDone }: { onDone: () => void }) {
         <input className={field} type="email" placeholder="Correo" value={email} onChange={(e) => setEmail(e.target.value)} required />
         <input className={field} type="password" placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} required />
         {mode === "register" && (
-          <input className={field} placeholder="NX_KEY-XXXX-XXXX-XXXX-XXXX" value={nxKey} onChange={(e) => setNxKey(e.target.value)} required />
+          <input className={field} placeholder="NX_KEY-XXXX-XXXX-XXXX-XXXX (opcional para la primera cuenta)" value={nxKey} onChange={(e) => setNxKey(e.target.value)} />
         )}
         <Button type="submit" className="bg-white text-black hover:bg-neutral-200" disabled={login.isPending || register.isPending}>
           {mode === "login" ? "Entrar" : "Crear cuenta"}
         </Button>
       </form>
-      {mode === "register" && <p className="max-w-sm text-center text-sm text-white/60">Necesitas una NX_KEY Premium para crear cuenta. Se escribe exactamente como la recibiste.</p>}
+      {mode === "register" && (
+        <p className="max-w-sm text-center text-sm text-white/60">
+          Necesitas una NX_KEY Premium para crear cuenta, salvo que seas el propietario del servidor o la primera cuenta del sistema (entonces puedes dejarla vacía). Se escribe exactamente como la recibiste.
+        </p>
+      )}
     </main>
   );
 }
