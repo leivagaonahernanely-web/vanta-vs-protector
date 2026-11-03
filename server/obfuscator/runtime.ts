@@ -35,16 +35,12 @@ export const RUNTIME_LUA = `local function nx_run(P)
   local depth = 0
   local run_proto
 
-  local function fail(msg) error(msg, 0) end
+  local function fail() error("error", 0) end
 
-  local function typename(v)
-    if v == nil then return "nil" end
-    return type(v)
-  end
 
-  local function num(v, what)
+  local function num(v)
     if type(v) ~= "number" then
-      fail("intento de " .. what .. " sobre un valor de tipo " .. typename(v))
+      fail()
     end
     return v
   end
@@ -59,7 +55,7 @@ export const RUNTIME_LUA = `local function nx_run(P)
 
   local function concatpart(v)
     if type(v) == "string" or type(v) == "number" then return tostr(v) end
-    fail("intento de concatenar un valor de tipo " .. typename(v))
+    fail()
   end
 
   local function index(obj, key)
@@ -69,15 +65,15 @@ export const RUNTIME_LUA = `local function nx_run(P)
       if type(lib) == "table" then return lib[key] end
       return nil
     end
-    fail("intento de indexar un valor de tipo " .. typename(obj))
+    fail()
   end
 
   local function setindex(obj, key, value)
     if type(obj) ~= "table" then
-      fail("intento de asignar a un valor de tipo " .. typename(obj))
+      fail()
     end
-    if key == nil then fail("índice nil") end
-    if key ~= key then fail("índice NaN") end
+    if key == nil then fail() end
+    if key ~= key then fail() end
     obj[key] = value
   end
 
@@ -125,40 +121,40 @@ export const RUNTIME_LUA = `local function nx_run(P)
     ["+"] = function(l, r)
       if type(l) == "number" and type(r) == "number" then return l + r end
       local ok, res = try_meta("+", l, r); if ok then return res end
-      return num(l, "sumar") + num(r, "sumar")
+      return num(l) + num(r)
     end,
     ["-"] = function(l, r)
       if type(l) == "number" and type(r) == "number" then return l - r end
       local ok, res = try_meta("-", l, r); if ok then return res end
-      return num(l, "restar") - num(r, "restar")
+      return num(l) - num(r)
     end,
     ["*"] = function(l, r)
       if type(l) == "number" and type(r) == "number" then return l * r end
       local ok, res = try_meta("*", l, r); if ok then return res end
-      return num(l, "multiplicar") * num(r, "multiplicar")
+      return num(l) * num(r)
     end,
     ["/"] = function(l, r)
       if type(l) == "number" and type(r) == "number" then return l / r end
       local ok, res = try_meta("/", l, r); if ok then return res end
-      return num(l, "dividir") / num(r, "dividir")
+      return num(l) / num(r)
     end,
     ["%"] = function(l, r)
       if type(l) == "number" and type(r) == "number" then
         return l - math.floor(l / r) * r
       end
       local ok, res = try_meta("%", l, r); if ok then return res end
-      local a, b = num(l, "calcular módulo"), num(r, "calcular módulo")
+      local a, b = num(l), num(r)
       return a - math.floor(a / b) * b
     end,
     ["^"] = function(l, r)
       if type(l) == "number" and type(r) == "number" then return l ^ r end
       local ok, res = try_meta("^", l, r); if ok then return res end
-      return num(l, "elevar") ^ num(r, "elevar")
+      return num(l) ^ num(r)
     end,
     ["//"] = function(l, r)
       -- División entera de Luau: redondea hacia -infinito.
       if type(l) == "number" and type(r) == "number" then return math.floor(l / r) end
-      return math.floor(num(l, "dividir") / num(r, "dividir"))
+      return math.floor(num(l) / num(r))
     end,
     [".."] = function(l, r)
       if (type(l) == "string" or type(l) == "number") and (type(r) == "string" or type(r) == "number") then
@@ -172,22 +168,22 @@ export const RUNTIME_LUA = `local function nx_run(P)
     ["<"] = function(l, r)
       if cmp_check(l, r) then return l < r end
       local ok, res = try_meta("<", l, r); if ok then return res end
-      fail("no se puede comparar " .. typename(l) .. " con " .. typename(r))
+      fail()
     end,
     ["<="] = function(l, r)
       if cmp_check(l, r) then return l <= r end
       local ok, res = try_meta("<=", l, r); if ok then return res end
-      fail("no se puede comparar " .. typename(l) .. " con " .. typename(r))
+      fail()
     end,
     [">"] = function(l, r)
       if cmp_check(l, r) then return l > r end
       local ok, res = try_meta(">", l, r); if ok then return res end
-      fail("no se puede comparar " .. typename(l) .. " con " .. typename(r))
+      fail()
     end,
     [">="] = function(l, r)
       if cmp_check(l, r) then return l >= r end
       local ok, res = try_meta(">=", l, r); if ok then return res end
-      fail("no se puede comparar " .. typename(l) .. " con " .. typename(r))
+      fail()
     end,
   }
 
@@ -205,7 +201,7 @@ export const RUNTIME_LUA = `local function nx_run(P)
         local ok, res = pcall(function(x) return -x end, v)
         if ok then return res end
       end
-      return -num(v, "negar")
+      return -num(v)
     end,
     ["not"] = function(v) return v == nil or v == false end,
     ["#"] = function(v)
@@ -213,7 +209,7 @@ export const RUNTIME_LUA = `local function nx_run(P)
       -- Operador nativo de Lua: O(log n) y ya respeta __len. Un bucle manual sobre t[n+1]
       -- hacía t[#t+1]=x cuadrático.
       if type(v) == "table" then return #v end
-      fail("intento de obtener longitud de un valor de tipo " .. typename(v))
+      fail()
     end,
   }
 
@@ -281,7 +277,7 @@ export const RUNTIME_LUA = `local function nx_run(P)
       elseif name == "VARARG" then kind = K.VARARG
       elseif name == "VARARG1" then kind = K.VARARG1
       elseif name == "SETLIST" then kind = K.SETLIST
-      else fail("operación desconocida") end
+      else fail() end
       code[pc], code[pc + 1] = kind, arg
     end
   end
@@ -303,7 +299,7 @@ export const RUNTIME_LUA = `local function nx_run(P)
     -- La profundidad de este marco se deriva de quien llama (CALL la fija antes de llamar),
     -- no de un contador global: así un error capturado con pcall no deja la cuenta inflada.
     local myd = depth + 1
-    if myd > MAX_DEPTH then fail("desbordamiento de la pila de llamadas") end
+    if myd > MAX_DEPTH then fail() end
     depth = myd
 
     local code = proto.code
@@ -398,7 +394,7 @@ export const RUNTIME_LUA = `local function nx_run(P)
             elseif op == 12 then -- CALL
               local callee = stack[sp - a]
               if not is_callable(callee) then
-                fail("se intentó llamar a un valor de tipo " .. typename(callee))
+                fail()
               end
               depth = myd
               local r = callee(unpack(stack, sp - a + 1, sp))
@@ -502,7 +498,7 @@ export const RUNTIME_LUA = `local function nx_run(P)
             elseif op == 35 then -- CALLM: args fijos, resultados variables (callee en sp - a)
               local callee = stack[sp - a]
               if not is_callable(callee) then
-                fail("se intentó llamar a un valor de tipo " .. typename(callee))
+                fail()
               end
               depth = myd
               local res = pack(callee(unpack(stack, sp - a + 1, sp)))
@@ -518,7 +514,7 @@ export const RUNTIME_LUA = `local function nx_run(P)
               sp = sp - 1
               local callee = stack[sp - k]
               if not is_callable(callee) then
-                fail("se intentó llamar a un valor de tipo " .. typename(callee))
+                fail()
               end
               depth = myd
               local r = callee(unpack(stack, sp - k + 1, sp))
@@ -529,7 +525,7 @@ export const RUNTIME_LUA = `local function nx_run(P)
               sp = sp - 1
               local callee = stack[sp - k]
               if not is_callable(callee) then
-                fail("se intentó llamar a un valor de tipo " .. typename(callee))
+                fail()
               end
               depth = myd
               local res = pack(callee(unpack(stack, sp - k + 1, sp)))
