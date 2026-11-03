@@ -55,7 +55,8 @@ export function tokenize(source: string): Token[] {
 
   const col = () => pos - lineStart + 1;
   const peek = (offset = 0) => source[pos + offset] ?? "";
-  const fail = (message: string): never => {
+  // Anotación explícita en la referencia: así TypeScript estrecha los tipos tras `if (!m) fail(...)`.
+  const fail: (message: string) => never = (message) => {
     throw new LuaSyntaxError(message, line, col());
   };
 

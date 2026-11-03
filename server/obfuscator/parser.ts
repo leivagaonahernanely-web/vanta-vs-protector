@@ -502,7 +502,7 @@ class Parser {
     }
     flush();
     if (parts.length === 0) return { kind: "String", value: "" };
-    return parts.reduce<Expr>((left, right) => ({ kind: "Binary", op: "..", left, right, line: t.line }));
+    return parts.reduce((left, right): Expr => ({ kind: "Binary", op: "..", left, right, line: t.line }));
   }
 
   private parsePrimaryExpr(): Expr {
