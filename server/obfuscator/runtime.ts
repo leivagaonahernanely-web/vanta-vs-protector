@@ -59,7 +59,9 @@ export const RUNTIME_LUA = `local function nx_run(P)
   end
 
   local function index(obj, key)
-    if type(obj) == "table" then return obj[key] end
+    -- Userdata (Instance, Vector3, CFrame, ...): Roblox resuelve su __index; Lua lanza su propio error si no existe.
+    local tobj = type(obj)
+    if tobj == "table" or tobj == "userdata" then return obj[key] end
     if type(obj) == "string" then
       local lib = env.string
       if type(lib) == "table" then return lib[key] end
@@ -69,7 +71,8 @@ export const RUNTIME_LUA = `local function nx_run(P)
   end
 
   local function setindex(obj, key, value)
-    if type(obj) ~= "table" then
+    local tobj = type(obj)
+    if tobj ~= "table" and tobj ~= "userdata" then
       fail()
     end
     if key == nil then fail() end
@@ -80,7 +83,7 @@ export const RUNTIME_LUA = `local function nx_run(P)
   -- Una tabla con __call en su metatabla es invocable, igual que en Lua real (que resuelve
   -- la llamada por su cuenta una vez pasa este chequeo).
   local function is_callable(v)
-    if type(v) == "function" then return true end
+    if type(v) == "function" or type(v) == "userdata" then return true end
     if type(v) == "table" then
       local mt = getmetatable(v)
       return mt ~= nil and mt.__call ~= nil
@@ -109,7 +112,8 @@ export const RUNTIME_LUA = `local function nx_run(P)
   -- operando es tabla; si no hay metamétodo, Lua lanza su propio error y caemos al mensaje
   -- propio más abajo.
   local function try_meta(opname, l, r)
-    if type(l) == "table" or type(r) == "table" then
+    local tl, tr = type(l), type(r)
+    if tl == "table" or tr == "table" or tl == "userdata" or tr == "userdata" then
       local ok, res = pcall(native_bin[opname], l, r)
       if ok then return true, res end
     end
@@ -197,7 +201,7 @@ export const RUNTIME_LUA = `local function nx_run(P)
   local unary_impl = {
     ["-"] = function(v)
       if type(v) == "number" then return -v end
-      if type(v) == "table" then
+      if type(v) == "table" or type(v) == "userdata" then
         local ok, res = pcall(function(x) return -x end, v)
         if ok then return res end
       end
