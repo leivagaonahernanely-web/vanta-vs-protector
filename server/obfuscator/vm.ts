@@ -433,7 +433,7 @@ function unary(ctx: Ctx, op: string, v: unknown): unknown {
     }
     case "not": return !truthy(v);
     case "#": {
-      if (typeof v === "string") return v.length;
+      if (typeof v === "string") return Buffer.byteLength(v, "utf8"); // Lua cuenta bytes, no unidades UTF-16
       if (v instanceof LuaTable) {
         const mm = metamethod(v, "__len");
         if (mm !== null) return first(call(ctx.bc, mm, [v], ctx));
