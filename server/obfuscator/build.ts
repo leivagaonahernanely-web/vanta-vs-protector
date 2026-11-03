@@ -14,7 +14,6 @@ import { payloadLiteral } from "./emit";
 import { LuaSyntaxError } from "./lexer";
 import { PRELUDE_LUA } from "./prelude";
 import { RUNTIME_LUA } from "./runtime";
-import { minifyLua } from "./minify";
 import { parse } from "./parser";
 import type { Block, Expr, Stmt } from "./parser";
 import { encode } from "./vm";
@@ -222,12 +221,13 @@ export function autoSegments(source: string): Segment[] {
   return segments;
 }
 
-// Quita comentarios, sangría y líneas vacías. Solo se usa en el prelude y el runtime, que no tienen cadenas largas.
+// Quita comentarios y líneas vacías, pero conserva la sangría y los nombres originales del código.
+// Solo se usa en el prelude y el runtime, que no tienen cadenas largas, así que la sangría no cambia nada.
 function compactLua(src: string): string {
   return stripComments(src)
     .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l !== "")
+    .map((l) => l.replace(/\s+$/, ""))
+    .filter((l) => l.trim() !== "")
     .join("\n");
 }
 
@@ -285,7 +285,7 @@ export function buildLua(source: string, seed: number, options: { printResult?: 
 
   return {
     // Cabecera exacta; prelude y runtime sin comentarios, sangría ni líneas vacías (no tienen cadenas largas).
-    code: `--Protect by NextOfuscator\n${compactLua(PRELUDE_LUA)}\n${minifyLua(compactLua(RUNTIME_LUA))}\n${chunks.join("\n")}\n`,
+    code: `--Protect by NextOfuscator\n${compactLua(PRELUDE_LUA)}\n${compactLua(RUNTIME_LUA)}\n${chunks.join("\n")}\n`,
     segments: segments.length,
   };
 }
