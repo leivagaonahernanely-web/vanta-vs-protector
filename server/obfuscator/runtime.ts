@@ -69,13 +69,15 @@ export const RUNTIME_LUA = `local function nx_run(P)
       if type(lib) == "table" then return lib[key] end
       return nil
     end
-    -- Userdata (p. ej. Instances de Roblox: game, script, workspace): se indexa el objeto nativo.
-    if type(obj) == "userdata" then return obj[key] end
+    -- Tipos nativos de Roblox (Instances = userdata, Vector3/CFrame = vector, buffer): se indexan nativamente.
+    local t = type(obj)
+    if t == "userdata" or t == "vector" or t == "buffer" then return obj[key] end
     fail("intento de indexar un valor de tipo " .. typename(obj))
   end
 
   local function setindex(obj, key, value)
-    if type(obj) == "userdata" then obj[key] = value return end
+    local t = type(obj)
+    if t == "userdata" or t == "vector" or t == "buffer" then obj[key] = value return end
     if type(obj) ~= "table" then
       fail("intento de asignar a un valor de tipo " .. typename(obj))
     end
