@@ -92,10 +92,11 @@ describe("macros de optimización y protección", () => {
 
   it("el bloque previo espera dos Heartbeat en Roblox y usa sintaxis Lua 5.1", () => {
     const { code } = buildLua("return 1", 1);
-    expect(code).toContain("until RanTimes >= 2");
-    expect(code).toContain("RanTimes = RanTimes + 1");
+    expect(code).toContain("task.wait()");
+    expect(code).toContain("Heartbeat:Connect");
     expect(code).not.toContain("+=");
-    expect(code.indexOf("until RanTimes") < code.indexOf("local function nx_run")).toBe(true);
+    expect(code).not.toContain("RanTimes");
+    expect(code.indexOf("task.wait()") < code.indexOf("local function nx_run")).toBe(true);
   });
 });
 

@@ -307,7 +307,7 @@ function buildOnce(source: string, seed: number, options: BuildOptions): Built {
 
   return {
     // Cabecera exacta; prelude y runtime sin comentarios, sangría ni líneas vacías (no tienen cadenas largas).
-    code: `--Protect by NextOfuscator\n${compactLua(PRELUDE_LUA)}\n${minifyLua(compactLua(runtimeLua(fields)))}\n${chunks.join("\n")}\n`,
+    code: `--Protect by NextOfuscator\n${minifyLua(compactLua(PRELUDE_LUA))}\n${minifyLua(compactLua(runtimeLua(fields)))}\n${chunks.join("\n")}\n`,
     segments: segments.length,
   };
 }
