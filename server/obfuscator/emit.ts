@@ -4,7 +4,7 @@
 // descifra al cargar. OJO: la clave viaja en el mismo archivo, así que esto oculta las cadenas
 // de un vistazo (grep, strings) pero no es un secreto frente a quien lea el runtime.
 import { createHash } from "node:crypto";
-import { runtimeLua } from "./runtime";
+import { kindsFor, runtimeLua, type Kinds } from "./runtime";
 import { fieldMap, type FieldMap } from "./fields";
 import type { Bytecode } from "./vm";
 
@@ -65,7 +65,7 @@ function luaList(items: string[]): string {
 }
 
 // Literal de tabla Lua con el bytecode de un programa, listo para nx_run.
-export function payloadLiteral(bc: Bytecode, fields: FieldMap = fieldMap(0)): string {
+export function payloadLiteral(bc: Bytecode, fields: FieldMap = fieldMap(0), kinds: Kinds = kindsFor(0)): string {
   const key = deriveKey(bc);
   const f = fields;
   // Índices base 1, igual que en Lua: el salt de cada cadena es base + índice.
@@ -80,7 +80,8 @@ export function payloadLiteral(bc: Bytecode, fields: FieldMap = fieldMap(0)): st
   return (
     `{` +
     `${f.k}=${luaList(key.map(String))},` +
-    `${f.opnames}=${luaList(bc.opTable.map((s, i) => enc(s, SALT.opnames, i)))},` +
+    // Tipos de instrucción como números (sin cifrar): el runtime los compara con sus propios números.
+    `${f.opnames}=${luaList(bc.opTable.map((s) => String(kinds.ops[s])))},` +
     `${f.nconsts}=${bc.consts.length},` +
     // Solo las cadenas van cifradas; el runtime distingue cadenas por tipo.
     `${f.consts}=${luaList(bc.consts.map((v, i) => (typeof v === "string" ? enc(v, SALT.consts, i) : luaValue(v))))},` +
@@ -94,5 +95,6 @@ export function payloadLiteral(bc: Bytecode, fields: FieldMap = fieldMap(0)): st
 export function emitLua(bc: Bytecode, options: EmitOptions = {}): string {
   const run = options.printResult ? "print(nx_run(P))" : "return nx_run(P)";
   const fields = fieldMap(0);
-  return `-- NextOfuscator\n${runtimeLua(fields)}\nlocal P=${payloadLiteral(bc, fields)}\n${run}\n`;
+  const kinds = kindsFor(0);
+  return `-- NextOfuscator\n${runtimeLua(fields, kinds)}\nlocal P=${payloadLiteral(bc, fields, kinds)}\n${run}\n`;
 }

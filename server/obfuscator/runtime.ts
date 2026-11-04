@@ -21,7 +21,6 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
     end
     return table.concat(out)
   end
-  for i = 1, #opnames do opnames[i] = decstr(opnames[i], 4000000 + i) end
   for i = 1, #bopnames do bopnames[i] = decstr(bopnames[i], 1000000 + i) end
   for i = 1, #names do names[i] = decstr(names[i], 2000000 + i) end
   for i = 1, P.nconsts do
@@ -597,11 +596,60 @@ end
 `;
 
 
-// Runtime con los campos del payload renombrados según el mapa de la compilación.
-// Sin mapa, devuelve el runtime tal cual (nombres legibles).
-export function runtimeLua(fields?: FieldMap): string {
-  if (!fields) return RUNTIME_LUA_TEMPLATE;
-  return RUNTIME_LUA_TEMPLATE.replace(/\.(protos|consts|names|ops|opnames|k|nconsts|slots|code|params|bp|up)\b/g,
-    (_, name: string) => "." + fields[name as keyof FieldMap]);
+// Identificadores que cambian en cada compilación: nombres de campos del payload, tipos de
+// instrucción (como números aleatorios en vez de palabras como "CALL") y claves internas del runtime.
+export type Kinds = { ops: Record<string, number>; internal: Record<string, number> };
+
+const OP_LIST = [
+  "CONST", "LOCAL_GET", "LOCAL_SET", "DECL", "GLOBAL_GET", "GLOBAL_SET", "UP_GET", "UP_SET",
+  "BIN", "UN", "JMP", "JMPF", "JMPT", "DUP", "POP", "SWAP", "CALL", "RET", "CLOSURE",
+  "NEWTABLE", "INDEX", "SETINDEX", "BOX_GET", "BOX_SET", "BOX_DECL",
+  "CALLM", "CALLV", "CALLVM", "ADJ", "ADDCOUNT", "RETV", "VARARG", "VARARG1", "SETLIST",
+];
+
+function uniqueIds(count: number, seed: number): number[] {
+  let s = seed >>> 0;
+  const rand = () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const used = new Set<number>();
+  const out: number[] = [];
+  while (out.length < count) {
+    const n = 1000 + Math.floor(rand() * 90000);
+    if (!used.has(n)) { used.add(n); out.push(n); }
+  }
+  return out;
 }
-export const RUNTIME_LUA = RUNTIME_LUA_TEMPLATE;
+
+export function kindsFor(seed: number): Kinds {
+  const internalNames = [...RUNTIME_LUA_TEMPLATE.slice(RUNTIME_LUA_TEMPLATE.indexOf("local K = {"))
+    .split("\n  }")[0].matchAll(/\b([A-Z][A-Z_0-9]*) = \d+/g)].map((m) => m[1]);
+  const ids = uniqueIds(OP_LIST.length + internalNames.length, seed ^ 0xc0de);
+  const ops: Record<string, number> = {};
+  const internal: Record<string, number> = {};
+  OP_LIST.forEach((n, i) => { ops[n] = ids[i]; });
+  internalNames.forEach((n, i) => { internal[n] = ids[OP_LIST.length + i]; });
+  return { ops, internal };
+}
+
+// Runtime con los nombres de campos y de instrucciones de esta compilación.
+export function runtimeLua(fields: FieldMap, kinds: Kinds): string {
+  let out = RUNTIME_LUA_TEMPLATE;
+  // Nombres de instrucción entre comillas -> su número.
+  out = out.replace(/"([A-Z][A-Z_0-9]*)"/g, (m, n: string) => (n in kinds.ops ? String(kinds.ops[n]) : m));
+  // Tabla K: claves con número y accesos K.NOMBRE -> K[número].
+  const start = out.indexOf("local K = {");
+  const end = out.indexOf("\n  }", start);
+  const kDef = out.slice(start, end).replace(/\b([A-Z][A-Z_0-9]*) = (\d+)/g,
+    (_, n: string, v: string) => `[${kinds.internal[n]}] = ${v}`);
+  out = out.slice(0, start) + kDef + out.slice(end);
+  out = out.replace(/\bK\.([A-Z][A-Z_0-9]*)\b/g, (m, n: string) => (n in kinds.internal ? `K[${kinds.internal[n]}]` : m));
+  // Campos del payload.
+  out = out.replace(/\.(protos|consts|names|ops|opnames|k|nconsts|slots|code|params|bp|up)\b/g,
+    (_, name: string) => "." + fields[name as keyof FieldMap]);
+  return out;
+}

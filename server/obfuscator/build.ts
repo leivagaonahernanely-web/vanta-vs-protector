@@ -13,7 +13,7 @@ import { stripComments } from "./comments";
 import { payloadLiteral } from "./emit";
 import { LuaSyntaxError } from "./lexer";
 import { PRELUDE_LUA } from "./prelude";
-import { runtimeLua } from "./runtime";
+import { kindsFor, runtimeLua } from "./runtime";
 import { fieldMap } from "./fields";
 import { minifyLua } from "./minify";
 import { parse } from "./parser";
@@ -288,6 +288,7 @@ function buildOnce(source: string, seed: number, options: BuildOptions): Built {
   });
 
   const fields = fieldMap(seed);
+  const kinds = kindsFor(seed);
   const chunks: string[] = [];
   segments.forEach((seg, i) => {
     const last = i === segments.length - 1;
@@ -306,12 +307,12 @@ function buildOnce(source: string, seed: number, options: BuildOptions): Built {
     }
     const bytecode = encode(program, seed + i);
     const run = last && options.printResult ? "print(nx_run(P))" : last ? "return nx_run(P)" : "nx_run(P)";
-    chunks.push(`do local P=${payloadLiteral(bytecode, fields)} ${run} end`);
+    chunks.push(`do local P=${payloadLiteral(bytecode, fields, kinds)} ${run} end`);
   });
 
   return {
     // Cabecera exacta; prelude y runtime sin comentarios, sangría ni líneas vacías (no tienen cadenas largas).
-    code: `--Protect by NextOfuscator\n${minifyLua(compactLua(PRELUDE_LUA))}\n${minifyLua(compactLua(runtimeLua(fields)))}\n${chunks.join("\n")}\n`,
+    code: `--Protect by NextOfuscator\n${minifyLua(compactLua(PRELUDE_LUA))}\n${minifyLua(compactLua(runtimeLua(fields, kinds)))}\n${chunks.join("\n")}\n`,
     segments: segments.length,
   };
 }
