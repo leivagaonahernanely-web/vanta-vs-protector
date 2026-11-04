@@ -1,3 +1,4 @@
+import type { FieldMap } from "./fields";
 // Runtime de la VM en Lua 5.1, incrustado en cada archivo de salida junto con el bytecode.
 // Sin límite de pasos: los scripts del cliente pueden ejecutarse indefinidamente.
 // Replica la semántica de la VM de referencia (vm.ts). Rendimiento:
@@ -7,7 +8,7 @@
 // - El despacho es un árbol binario de comparaciones (≈6 comparaciones por instrucción).
 // - Las locales son valores directos; solo las capturadas por closures viven en una caja {v=...}.
 // - Aritmética y comparación tienen camino rápido para números.
-export const RUNTIME_LUA = `local function nx_run(P)
+export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
   local protos, consts, names = P.protos, P.consts, P.names
   local opnames, bopnames = P.opnames, P.ops
   -- Descifrado de cadenas (ver emit.ts): byte - clave - salt, módulo 256. Mismos salts que SALT.
@@ -594,3 +595,13 @@ export const RUNTIME_LUA = `local function nx_run(P)
   return run_proto(protos[1], {}, {}, 0)
 end
 `;
+
+
+// Runtime con los campos del payload renombrados según el mapa de la compilación.
+// Sin mapa, devuelve el runtime tal cual (nombres legibles).
+export function runtimeLua(fields?: FieldMap): string {
+  if (!fields) return RUNTIME_LUA_TEMPLATE;
+  return RUNTIME_LUA_TEMPLATE.replace(/\.(protos|consts|names|ops|opnames|k|nconsts|slots|code|params|bp|up)\b/g,
+    (_, name: string) => "." + fields[name as keyof FieldMap]);
+}
+export const RUNTIME_LUA = RUNTIME_LUA_TEMPLATE;

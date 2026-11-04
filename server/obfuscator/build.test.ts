@@ -250,3 +250,12 @@ describe("ofuscación en varias pasadas y código muerto", () => {
     }
   });
 });
+
+describe("nombres de campos del payload", () => {
+  it("no deja en la salida los nombres internos del payload", () => {
+    const code = buildLua('print("hola")', 3).code;
+    for (const name of ["opnames", "nconsts", "protos", "params", "bp"]) {
+      expect(code).not.toContain(name);
+    }
+  });
+});

@@ -4,7 +4,8 @@
 // descifra al cargar. OJO: la clave viaja en el mismo archivo, así que esto oculta las cadenas
 // de un vistazo (grep, strings) pero no es un secreto frente a quien lea el runtime.
 import { createHash } from "node:crypto";
-import { RUNTIME_LUA } from "./runtime";
+import { runtimeLua } from "./runtime";
+import { fieldMap, type FieldMap } from "./fields";
 import type { Bytecode } from "./vm";
 
 export type EmitOptions = {
@@ -64,32 +65,34 @@ function luaList(items: string[]): string {
 }
 
 // Literal de tabla Lua con el bytecode de un programa, listo para nx_run.
-export function payloadLiteral(bc: Bytecode): string {
+export function payloadLiteral(bc: Bytecode, fields: FieldMap = fieldMap(0)): string {
   const key = deriveKey(bc);
+  const f = fields;
   // Índices base 1, igual que en Lua: el salt de cada cadena es base + índice.
   const enc = (s: string, base: number, i: number) =>
     luaBytes(encryptBytes(Buffer.from(s, "latin1"), base + i + 1, key));
 
   const protos = bc.protos.map((p) =>
-    `{code=${luaList(p.code.map(String))},params=${p.params},slots=${p.slots},` +
-    `up=${luaList(p.upvals.map((u) => `{${u.fromLocal ? 1 : 0},${u.index}}`))},` +
-    `bp=${luaList(p.boxedParams.map(String))}}`,
+    `{${f.code}=${luaList(p.code.map(String))},${f.params}=${p.params},${f.slots}=${p.slots},` +
+    `${f.up}=${luaList(p.upvals.map((u) => `{${u.fromLocal ? 1 : 0},${u.index}}`))},` +
+    `${f.bp}=${luaList(p.boxedParams.map(String))}}`,
   );
   return (
     `{` +
-    `k=${luaList(key.map(String))},` +
-    `opnames=${luaList(bc.opTable.map((s, i) => enc(s, SALT.opnames, i)))},` +
-    `nconsts=${bc.consts.length},` +
+    `${f.k}=${luaList(key.map(String))},` +
+    `${f.opnames}=${luaList(bc.opTable.map((s, i) => enc(s, SALT.opnames, i)))},` +
+    `${f.nconsts}=${bc.consts.length},` +
     // Solo las cadenas van cifradas; el runtime distingue cadenas por tipo.
-    `consts=${luaList(bc.consts.map((v, i) => (typeof v === "string" ? enc(v, SALT.consts, i) : luaValue(v))))},` +
-    `names=${luaList(bc.names.map((s, i) => enc(s, SALT.names, i)))},` +
-    `ops=${luaList(bc.ops.map((s, i) => enc(s, SALT.ops, i)))},` +
-    `protos=${luaList(protos)}` +
+    `${f.consts}=${luaList(bc.consts.map((v, i) => (typeof v === "string" ? enc(v, SALT.consts, i) : luaValue(v))))},` +
+    `${f.names}=${luaList(bc.names.map((s, i) => enc(s, SALT.names, i)))},` +
+    `${f.ops}=${luaList(bc.ops.map((s, i) => enc(s, SALT.ops, i)))},` +
+    `${f.protos}=${luaList(protos)}` +
     `}`
   );
 }
 
 export function emitLua(bc: Bytecode, options: EmitOptions = {}): string {
   const run = options.printResult ? "print(nx_run(P))" : "return nx_run(P)";
-  return `-- NextOfuscator\n${RUNTIME_LUA}\nlocal P=${payloadLiteral(bc)}\n${run}\n`;
+  const fields = fieldMap(0);
+  return `-- NextOfuscator\n${runtimeLua(fields)}\nlocal P=${payloadLiteral(bc, fields)}\n${run}\n`;
 }
