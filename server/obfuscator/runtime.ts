@@ -42,8 +42,11 @@ export const RUNTIME_LUA = `local function nx_run(P)
     return type(v)
   end
 
+  -- Números y tipos nativos de Roblox con operadores (Vector3 = vector; CFrame, Vector2, Color3 = userdata):
+  -- la aritmética se deja al operador nativo; cualquier otra cosa (tabla, nil, string) sigue fallando.
   local function num(v, what)
-    if type(v) ~= "number" then
+    local t = type(v)
+    if t ~= "number" and t ~= "vector" and t ~= "userdata" then
       fail("intento de " .. what .. " sobre un valor de tipo " .. typename(v))
     end
     return v
