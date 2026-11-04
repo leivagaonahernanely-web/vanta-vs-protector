@@ -26,6 +26,7 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
   for i = 1, P.nconsts do
     if type(consts[i]) == "string" then consts[i] = decstr(consts[i], 3000000 + i) end
   end
+  --@MSG
   -- Globales del script: en Roblox, _G no contiene game, Enum, Color3, task... (solo el entorno
   -- del script los tiene). getfenv() devuelve ese entorno; en Lua 5.1 estándar es _G.
   local env = (type(getfenv) == "function" and getfenv()) or _G
@@ -598,7 +599,7 @@ end
 
 // Identificadores que cambian en cada compilación: nombres de campos del payload, tipos de
 // instrucción (como números aleatorios en vez de palabras como "CALL") y claves internas del runtime.
-export type Kinds = { ops: Record<string, number>; internal: Record<string, number> };
+export type Kinds = { ops: Record<string, number>; internal: Record<string, number>; msgKey: number[] };
 
 const OP_LIST = [
   "CONST", "LOCAL_GET", "LOCAL_SET", "DECL", "GLOBAL_GET", "GLOBAL_SET", "UP_GET", "UP_SET",
@@ -633,12 +634,44 @@ export function kindsFor(seed: number): Kinds {
   const internal: Record<string, number> = {};
   OP_LIST.forEach((n, i) => { ops[n] = ids[i]; });
   internalNames.forEach((n, i) => { internal[n] = ids[OP_LIST.length + i]; });
-  return { ops, internal };
+  const msgKey = uniqueIds(16, seed ^ 0x3e55).map((n) => n % 256);
+  return { ops, internal, msgKey };
+}
+
+// Bytes como escapes decimales de Lua (cadena de bytes en un literal).
+function luaByteLiteral(bytes: number[]): string {
+  return '"' + bytes.map((b) => (b >= 32 && b < 127 && b !== 34 && b !== 92 ? String.fromCharCode(b) : "\\" + String(b).padStart(3, "0"))).join("") + '"';
+}
+
+// Mensajes y nombres de operación legibles del runtime: se guardan cifrados y se descifran al
+// cargar, así no aparecen como texto en el archivo.
+const VERBS = new Set(["sumar", "restar", "multiplicar", "dividir", "elevar", "negar"]);
+function isMessage(lit: string): boolean {
+  return lit.length > 0 && (/ /.test(lit) || /[^\x00-\x7f]/.test(lit) || VERBS.has(lit));
 }
 
 // Runtime con los nombres de campos y de instrucciones de esta compilación.
 export function runtimeLua(fields: FieldMap, kinds: Kinds): string {
   let out = RUNTIME_LUA_TEMPLATE;
+  // Mensajes: cada literal legible se sustituye por MS[i], que se descifra al cargar.
+  const messages: string[] = [];
+  const indexOf = new Map<string, number>();
+  out = out.replace(/"((?:[^"\\\n]|\\.)*)"/g, (m, lit: string) => {
+    if (!isMessage(lit)) return m;
+    if (!indexOf.has(lit)) { messages.push(lit); indexOf.set(lit, messages.length); }
+    return `MS[${indexOf.get(lit)}]`;
+  });
+  const enc = messages.map((text, i) =>
+    luaByteLiteral([...Buffer.from(text, "utf8")].map((b, j) => (b + kinds.msgKey[j % kinds.msgKey.length] + 5000000 + i + 1) % 256)));
+  const setup = `local MK = {${kinds.msgKey.join(",")}}\n` +
+    `local MSENC = {${enc.join(",")}}\n` +
+    `local MS = {}\n` +
+    `for i = 1, #MSENC do\n` +
+    `  local s, o = MSENC[i], {}\n` +
+    `  for j = 1, #s do o[j] = string.char((string.byte(s, j) - MK[(j - 1) % #MK + 1] - 5000000 - i) % 256) end\n` +
+    `  MS[i] = table.concat(o)\n` +
+    `end`;
+  out = out.replace("--@MSG", setup);
   // Nombres de instrucción entre comillas -> su número.
   out = out.replace(/"([A-Z][A-Z_0-9]*)"/g, (m, n: string) => (n in kinds.ops ? String(kinds.ops[n]) : m));
   // Tabla K: claves con número y accesos K.NOMBRE -> K[número].
