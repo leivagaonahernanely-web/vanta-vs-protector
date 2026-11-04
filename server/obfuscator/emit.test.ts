@@ -126,7 +126,8 @@ describe("emisión Lua: equivalencia con la VM de referencia", () => {
         const file = join(dir, "out.lua");
         writeFileSync(file, emitLua(bc, { printResult: true }));
         const actual = execFileSync(LUA, [file], { encoding: "utf8" }).trimEnd();
-        expect(actual).toBe(expected);
+        // La VM de referencia guarda cadenas como bytes (un carácter por byte); Lua imprime UTF-8.
+        expect(actual).toBe(Buffer.from(expected, "latin1").toString("utf8"));
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }

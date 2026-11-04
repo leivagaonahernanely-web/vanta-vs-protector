@@ -47,7 +47,10 @@ const isHexDigit = (c: string) => /[0-9a-fA-F]/.test(c);
 const isNameStart = (c: string) => /[A-Za-z_]/.test(c);
 const isNameChar = (c: string) => /[A-Za-z0-9_]/.test(c);
 
-export function tokenize(source: string): Token[] {
+export function tokenize(utf8Source: string): Token[] {
+  // Lua trabaja con bytes: cada carácter del fuente es un byte (UTF-8 codificado como latin1).
+  // Así las cadenas con tildes y los escapes \ddd producen los mismos bytes que en Lua.
+  const source = Buffer.from(utf8Source, "utf8").toString("latin1");
   const tokens: Token[] = [];
   let pos = 0;
   let line = 1;
@@ -139,7 +142,7 @@ export function tokenize(source: string): Token[] {
         if (!m) fail("escape \\u inválido (se espera \\u{XXXX})");
         const code = Number.parseInt(m[1], 16);
         if (code > 0x10ffff) fail("escape \\u fuera de rango");
-        out += String.fromCodePoint(code);
+        out += Buffer.from(String.fromCodePoint(code), "utf8").toString("latin1");
         pos += 1 + m[0].length;
         continue;
       }

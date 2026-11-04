@@ -224,3 +224,29 @@ describe("globales del entorno del script", () => {
     }
   });
 });
+
+describe("ofuscación en varias pasadas y código muerto", () => {
+  const SRC = 'local t = {}\nfor i = 1, 3 do t[#t + 1] = i * i end\nprint(table.concat(t, ","))\nprint("operación ✓")';
+
+  it("inserta ramas muertas en los bloques protegidos", () => {
+    const withDead = buildLua(SRC, 7, { deadCodeRate: 1 }).code;
+    const without = buildLua(SRC, 7, { deadCodeRate: 0 }).code;
+    expect(withDead.length).toBeGreaterThan(without.length);
+  });
+
+  it("dos pasadas dan el mismo resultado que una", () => {
+    if (!luaAvailable()) return;
+    const dir = mkdtempSync(join(tmpdir(), "nx-pasadas-"));
+    try {
+      const one = join(dir, "uno.lua");
+      const two = join(dir, "dos.lua");
+      writeFileSync(one, buildLua(SRC, 9, { printResult: true, passes: 1 }).code);
+      writeFileSync(two, buildLua(SRC, 9, { printResult: true, passes: 2, deadCodeRate: 0.5 }).code);
+      const expected = "1,4,9\noperación ✓\n";
+      expect(execFileSync(LUA, [one], { encoding: "utf8" }).replace(/nil\n$/, "")).toBe(expected);
+      expect(execFileSync(LUA, [two], { encoding: "utf8" }).replace(/nil\n$/, "")).toBe(expected);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

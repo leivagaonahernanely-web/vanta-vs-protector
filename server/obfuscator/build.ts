@@ -18,6 +18,7 @@ import { minifyLua } from "./minify";
 import { parse } from "./parser";
 import type { Block, Expr, Stmt } from "./parser";
 import { encode } from "./vm";
+import { injectDeadCode } from "./deadcode";
 
 export class BuildError extends Error {
   readonly line?: number;
@@ -233,7 +234,26 @@ function compactLua(src: string): string {
 
 // Construye el archivo Lua final a partir del código fuente.
 // Con macros, el reparto lo marca el usuario; sin macros, lo decide autoSegments.
-export function buildLua(source: string, seed: number, options: { printResult?: boolean } = {}): Built {
+export type BuildOptions = {
+  printResult?: boolean;
+  // Probabilidad (0 a 1) de insertar una rama muerta antes de cada sentencia protegida.
+  deadCodeRate?: number;
+  // Número de pasadas: la salida de una pasada se vuelve a ofuscar. Por defecto, 1.
+  passes?: number;
+};
+
+export function buildLua(source: string, seed: number, options: BuildOptions = {}): Built {
+  const passes = Math.max(1, Math.floor(options.passes ?? 1));
+  let current = buildOnce(source, seed, options);
+  for (let p = 1; p < passes; p++) {
+    // La pasada siguiente no vuelve a imprimir el resultado; usa otra semilla derivada.
+    current = buildOnce(current.code, seed + 7919 * p, { ...options, printResult: false });
+  }
+  return current;
+}
+
+function buildOnce(source: string, seed: number, options: BuildOptions): Built {
+  const deadCodeRate = options.deadCodeRate ?? 0.3;
   const hasMacros = source.split(/\r\n|\n|\r/).some((l) => ANY_MACRO.test(l));
   const segments = hasMacros ? splitSegments(source) : autoSegments(source);
   if (segments.length === 0) throw new BuildError("el script está vacío");
@@ -273,7 +293,7 @@ export function buildLua(source: string, seed: number, options: { printResult?: 
     }
     let program;
     try {
-      program = compile(parsed[i]);
+      program = compile(injectDeadCode(parsed[i], seed + i, deadCodeRate));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new BuildError(message.replace(/^línea \d+: /, ""), seg.line + ((error as { line?: number }).line ?? 1) - 1);

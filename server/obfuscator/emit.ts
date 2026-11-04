@@ -42,7 +42,7 @@ function luaBytes(bytes: Buffer): string {
 }
 
 export function luaString(s: string): string {
-  return luaBytes(Buffer.from(s, "utf8"));
+  return luaBytes(Buffer.from(s, "latin1"));
 }
 
 function luaNumber(n: number): string {
@@ -68,7 +68,7 @@ export function payloadLiteral(bc: Bytecode): string {
   const key = deriveKey(bc);
   // Índices base 1, igual que en Lua: el salt de cada cadena es base + índice.
   const enc = (s: string, base: number, i: number) =>
-    luaBytes(encryptBytes(Buffer.from(s, "utf8"), base + i + 1, key));
+    luaBytes(encryptBytes(Buffer.from(s, "latin1"), base + i + 1, key));
 
   const protos = bc.protos.map((p) =>
     `{code=${luaList(p.code.map(String))},params=${p.params},slots=${p.slots},` +
