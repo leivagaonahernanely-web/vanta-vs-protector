@@ -19,6 +19,8 @@ import { minifyLua } from "./minify";
 import { parse } from "./parser";
 import type { Block, Expr, Stmt } from "./parser";
 import { encode } from "./vm";
+import { NativePrinter } from "./printer";
+import { tokenize } from "./lexer";
 import { injectDeadCode } from "./deadcode";
 
 export class BuildError extends Error {
@@ -290,7 +292,9 @@ function buildOnce(source: string, seed: number, options: BuildOptions): Built {
   segments.forEach((seg, i) => {
     const last = i === segments.length - 1;
     if (seg.kind === "native") {
-      chunks.push(`do\n${stripComments(seg.source)}\nend`);
+      // Se escribe de nuevo con variables renombradas (alcance correcto); sin comentarios.
+      const avoid = new Set(tokenize(seg.source).filter((t) => t.type === "name").map((t) => String(t.value)));
+      chunks.push(`do\n${new NativePrinter(avoid).print(parsed[i])}\nend`);
       return;
     }
     let program;
