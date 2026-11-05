@@ -14,7 +14,28 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
   -- Descifrado de cadenas (ver emit.ts): byte - clave - salt, módulo 256. Mismos salts que SALT.
   local KEYB, KN = P.k, #P.k
   local string_byte, string_char = string.byte, string.char
+  local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+  local B64MAP = {}
+  for i = 1, 64 do B64MAP[string.byte(B64, i)] = i - 1 end
+  local function b64dec(s)
+    local out, n, bits, nb = {}, 0, 0, 0
+    for i = 1, #s do
+      local v = B64MAP[string.byte(s, i)]
+      if v then
+        bits = bits * 64 + v
+        nb = nb + 6
+        if nb >= 8 then
+          nb = nb - 8
+          n = n + 1
+          out[n] = string.char(math.floor(bits / 2 ^ nb) % 256)
+          bits = bits % 2 ^ nb
+        end
+      end
+    end
+    return table.concat(out)
+  end
   local function decstr(s, salt)
+    s = b64dec(s)
     local out = {}
     for i = 1, #s do
       out[i] = string_char((string_byte(s, i) - KEYB[(i - 1) % KN + 1] - salt) % 256)
@@ -640,7 +661,7 @@ export function kindsFor(seed: number): Kinds {
 
 // Bytes como escapes decimales de Lua (cadena de bytes en un literal).
 function luaByteLiteral(bytes: number[]): string {
-  return '"' + bytes.map((b) => (b >= 32 && b < 127 && b !== 34 && b !== 92 ? String.fromCharCode(b) : "\\" + String(b).padStart(3, "0"))).join("") + '"';
+  return `"${Buffer.from(bytes).toString("base64")}"`;
 }
 
 // Mensajes y nombres de operación legibles del runtime: se guardan cifrados y se descifran al
@@ -667,7 +688,7 @@ export function runtimeLua(fields: FieldMap, kinds: Kinds): string {
     `local MSENC = {${enc.join(",")}}\n` +
     `local MS = {}\n` +
     `for i = 1, #MSENC do\n` +
-    `  local s, o = MSENC[i], {}\n` +
+    `  local s, o = b64dec(MSENC[i]), {}\n` +
     `  for j = 1, #s do o[j] = string.char((string.byte(s, j) - MK[(j - 1) % #MK + 1] - 5000000 - i) % 256) end\n` +
     `  MS[i] = table.concat(o)\n` +
     `end`;

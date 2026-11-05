@@ -31,16 +31,12 @@ export function encryptBytes(plain: Buffer, salt: number, key: number[]): Buffer
   return out;
 }
 
-// Literal de cadena Lua con escapes decimales sobre bytes arbitrarios, válido en Lua 5.1.
+// Bytes arbitrarios como cadena base64 (el runtime la decodifica al cargar).
 function luaBytes(bytes: Buffer): string {
-  let out = '"';
-  for (const byte of bytes) {
-    if (byte === 34 || byte === 92) out += "\\" + String.fromCharCode(byte);
-    else if (byte >= 32 && byte < 127) out += String.fromCharCode(byte);
-    else out += "\\" + String(byte).padStart(3, "0");
-  }
-  return out + '"';
+  return `"${bytes.toString("base64")}"`;
 }
+// Número entero como literal hexadecimal (0x..), válido en Lua 5.1 y Luau.
+const H = (n: number): string => (Number.isInteger(n) ? (n < 0 ? "-" : "") + "0x" + Math.abs(n).toString(16) : String(n));
 
 export function luaString(s: string): string {
   return luaBytes(Buffer.from(s, "latin1"));
@@ -73,16 +69,16 @@ export function payloadLiteral(bc: Bytecode, fields: FieldMap = fieldMap(0), kin
     luaBytes(encryptBytes(Buffer.from(s, "latin1"), base + i + 1, key));
 
   const protos = bc.protos.map((p) =>
-    `{${f.code}=${luaList(p.code.map(String))},${f.params}=${p.params},${f.slots}=${p.slots},` +
-    `${f.up}=${luaList(p.upvals.map((u) => `{${u.fromLocal ? 1 : 0},${u.index}}`))},` +
-    `${f.bp}=${luaList(p.boxedParams.map(String))}}`,
+    `{${f.code}=${luaList(p.code.map(H))},${f.params}=${H(p.params)},${f.slots}=${H(p.slots)},` +
+    `${f.up}=${luaList(p.upvals.map((u) => `{${u.fromLocal ? 1 : 0},${H(u.index)}}`))},` +
+    `${f.bp}=${luaList(p.boxedParams.map(H))}}`,
   );
   return (
     `{` +
-    `${f.k}=${luaList(key.map(String))},` +
+    `${f.k}=${luaList(key.map(H))},` +
     // Tipos de instrucción como números (sin cifrar): el runtime los compara con sus propios números.
-    `${f.opnames}=${luaList(bc.opTable.map((s) => String(kinds.ops[s])))},` +
-    `${f.nconsts}=${bc.consts.length},` +
+    `${f.opnames}=${luaList(bc.opTable.map((s) => H(kinds.ops[s])))},` +
+    `${f.nconsts}=${H(bc.consts.length)},` +
     // Solo las cadenas van cifradas; el runtime distingue cadenas por tipo.
     `${f.consts}=${luaList(bc.consts.map((v, i) => (typeof v === "string" ? enc(v, SALT.consts, i) : luaValue(v))))},` +
     `${f.names}=${luaList(bc.names.map((s, i) => enc(s, SALT.names, i)))},` +
