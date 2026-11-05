@@ -15,7 +15,7 @@ import { LuaSyntaxError } from "./lexer";
 import { PRELUDE_LUA } from "./prelude";
 import { kindsFor, runtimeLua } from "./runtime";
 import { fieldMap } from "./fields";
-import { minifyLua } from "./minify";
+import { minifyLua, oneLine } from "./minify";
 import { parse } from "./parser";
 import type { Block, Expr, Stmt } from "./parser";
 import { encode } from "./vm";
@@ -312,7 +312,7 @@ function buildOnce(source: string, seed: number, options: BuildOptions): Built {
 
   return {
     // Cabecera exacta; prelude y runtime sin comentarios, sangría ni líneas vacías (no tienen cadenas largas).
-    code: `--Protect by NextOfuscator\n${minifyLua(compactLua(PRELUDE_LUA))}\n${minifyLua(compactLua(runtimeLua(fields, kinds)))}\n${chunks.join("\n")}\n`,
+    code: `--Protect by NextOfuscator\n${oneLine(`${minifyLua(compactLua(PRELUDE_LUA))}\n${minifyLua(compactLua(runtimeLua(fields, kinds)))}\n${chunks.join("\n")}`)}\n`,
     segments: segments.length,
   };
 }

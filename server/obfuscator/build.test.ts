@@ -87,7 +87,7 @@ describe("macros de optimización y protección", () => {
 
   it("la salida nativa va dentro de do...end para acotar sus locales", () => {
     const { code } = buildLua("--NXT_LPH_OPTIMIZACION\nlocal x = 1\n--NXT_LPH_OPTIMIZACION_END", 1);
-    expect(code).toMatch(/do\nlocal \w+ = 1\nend/);
+    expect(code).toMatch(/do local \w+=1 end/);
   });
 
   it("el bloque previo espera dos Heartbeat en Roblox y usa sintaxis Lua 5.1", () => {

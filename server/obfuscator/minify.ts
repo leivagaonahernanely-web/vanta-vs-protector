@@ -167,3 +167,28 @@ export function minifyLua(src: string): string {
   }
   return out.trim();
 }
+
+// Une todo el código en una sola línea, sin espacios innecesarios. Solo deja espacio donde
+// hace falta para que Lua lea los tokens igual: entre palabras, entre un número y un punto,
+// entre dos menos (sería un comentario) y entre corchetes (sería una cadena larga).
+export function oneLine(src: string): string {
+  const toks = tokenize(src);
+  const wordEnd = /[A-Za-z0-9_]$/;
+  const wordStart = /^[A-Za-z0-9_]/;
+  let out = "";
+  let prev: Tok | undefined;
+  for (const tk of toks) {
+    if (prev) {
+      const need =
+        (wordEnd.test(prev.v) && wordStart.test(tk.v)) ||
+        (prev.t === "num" && tk.v.startsWith(".")) ||
+        (prev.v.endsWith(".") && tk.v.startsWith(".")) ||
+        (prev.v === "-" && tk.v === "-") ||
+        (prev.v === "[" && (tk.v === "[" || tk.v === "="));
+      if (need) out += " ";
+    }
+    out += tk.v;
+    prev = tk;
+  }
+  return out;
+}
