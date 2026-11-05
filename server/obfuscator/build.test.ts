@@ -110,11 +110,12 @@ describe("macros de optimización y protección", () => {
 
   it("el bloque previo espera dos Heartbeat en Roblox y usa sintaxis Lua 5.1", () => {
     const { code } = buildLua("return 1", 1);
-    expect(code).toContain("task.wait()");
-    expect(code).toContain("Heartbeat:Connect");
+    // Los nombres de la API van codificados: no deben aparecer como texto.
+    expect(code).not.toContain("Heartbeat");
+    expect(code).not.toContain("RunService");
     expect(code).not.toContain("+=");
     expect(code).not.toContain("RanTimes");
-    expect(code.indexOf("task.wait()") < code.indexOf("local function nx_run")).toBe(true);
+    expect(code.indexOf("local function N(") < code.indexOf("local function nx_run")).toBe(true);
   });
 });
 
