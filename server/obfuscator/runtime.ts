@@ -53,6 +53,7 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
   -- Constantes numéricas: van cifradas como texto y aquí se convierten de nuevo a número.
   for _, i in ipairs(P.ncs) do consts[i] = tonumber(consts[i]) end
   --@MSG
+  --@JUNK
   -- Globales del script: en Roblox, _G no contiene game, Enum, Color3, task... (solo el entorno
   -- del script los tiene). getfenv() devuelve ese entorno; en Lua 5.1 estándar es _G.
   local env = (type(getfenv) == "function" and getfenv()) or _G
@@ -625,7 +626,7 @@ end
 
 // Identificadores que cambian en cada compilación: nombres de campos del payload, tipos de
 // instrucción (como números aleatorios en vez de palabras como "CALL") y claves internas del runtime.
-export type Kinds = { ops: Record<string, number>; internal: Record<string, number>; msgKey: number[] };
+export type Kinds = { ops: Record<string, number>; internal: Record<string, number>; msgKey: number[]; junk: string };
 
 const OP_LIST = [
   "CONST", "LOCAL_GET", "LOCAL_SET", "DECL", "GLOBAL_GET", "GLOBAL_SET", "UP_GET", "UP_SET",
@@ -652,6 +653,20 @@ function uniqueIds(count: number, seed: number): number[] {
   return out;
 }
 
+// Código inerte que cambia en cada compilación: funciones que nunca se llaman. Así dos salidas
+// no comparten el mismo texto de runtime, aunque hagan lo mismo. Va en una sola tabla local
+// para no gastar locales (Lua 5.1 tiene un límite de 200 por función).
+function junkFor(seed: number): string {
+  const ids = uniqueIds(4 + (seed % 4), seed ^ 0x7e57);
+  const bodies = ids.map((n, i) => {
+    const m = 1000 + (n % 9000);
+    const c = (n * 7 + i) % 9973;
+    const op = i % 2 === 0 ? "+" : "-";
+    return `function(a, b) local t = (a ${op} ${c}) * ${(i % 5) + 2} if b then t = t % ${m} end return t end`;
+  });
+  return `local JUNK = { ${bodies.join(", ")} }`;
+}
+
 export function kindsFor(seed: number): Kinds {
   const internalNames = [...RUNTIME_LUA_TEMPLATE.slice(RUNTIME_LUA_TEMPLATE.indexOf("local K = {"))
     .split("\n  }")[0].matchAll(/\b([A-Z][A-Z_0-9]*) = \d+/g)].map((m) => m[1]);
@@ -661,7 +676,7 @@ export function kindsFor(seed: number): Kinds {
   OP_LIST.forEach((n, i) => { ops[n] = ids[i]; });
   internalNames.forEach((n, i) => { internal[n] = ids[OP_LIST.length + i]; });
   const msgKey = uniqueIds(16, seed ^ 0x3e55).map((n) => n % 256);
-  return { ops, internal, msgKey };
+  return { ops, internal, msgKey, junk: junkFor(seed) };
 }
 
 // Bytes como escapes decimales de Lua (cadena de bytes en un literal).
@@ -699,6 +714,7 @@ export function runtimeLua(fields: FieldMap, kinds: Kinds): string {
     `  MS[i] = table.concat(o)\n` +
     `end`;
   out = out.replace("--@MSG", setup);
+  out = out.replace("--@JUNK", kinds.junk);
   // Nombres de instrucción entre comillas -> su número.
   out = out.replace(/"([A-Z][A-Z_0-9]*)"/g, (m, n: string) => (n in kinds.ops ? String(kinds.ops[n]) : m));
   // Tabla K: claves con número y accesos K.NOMBRE -> K[número].
