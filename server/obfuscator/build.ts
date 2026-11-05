@@ -23,6 +23,36 @@ import { NativePrinter } from "./printer";
 import { tokenize } from "./lexer";
 import { injectDeadCode } from "./deadcode";
 
+// Nombres declarados en un segmento y referenciados en otro.
+function sharedTopLevelNames(info: { declared: Set<string>; referenced: Set<string> }[]): Set<string> {
+  const shared = new Set<string>();
+  info.forEach((own, i) => {
+    own.declared.forEach((name) => {
+      info.forEach((other, j) => {
+        if (i !== j && other.referenced.has(name)) shared.add(name);
+      });
+    });
+  });
+  return shared;
+}
+
+// Convierte en asignaciones a globales las declaraciones locales de nivel principal cuyos
+// nombres están en `names`.
+function localsToGlobals(block: Block, names: Set<string>): Block {
+  return block.map((s) => {
+    if (s.kind === "Local" && s.names.some((n) => names.has(n))) {
+      const targets = s.names.map((n) => ({ kind: "Name", name: n, line: s.line }));
+      const values = s.values.length ? s.values : [{ kind: "Nil", line: s.line }];
+      return { kind: "Assign", targets, values, line: s.line } as unknown as Stmt;
+    }
+    if (s.kind === "LocalFunction" && names.has(s.name)) {
+      const target = { kind: "Name", name: s.name, line: s.line };
+      return { kind: "Assign", targets: [target], values: [s.fn], line: s.line } as unknown as Stmt;
+    }
+    return s;
+  });
+}
+
 export class BuildError extends Error {
   readonly line?: number;
   constructor(message: string, line?: number) {
@@ -266,11 +296,23 @@ function buildOnce(source: string, seed: number, options: BuildOptions): Built {
       return parse(seg.source);
     } catch (error) {
       if (error instanceof LuaSyntaxError) {
-        throw new BuildError(error.message.replace(/^\d+:\d+: /, ""), seg.line + error.line - 1);
+        const detail = error.message.replace(/^\d+:\d+: /, "");
+        // Un segmento que no compila suele ser un macro dentro de una función o bloque.
+        const hint = hasMacros ? " (los macros NXT_LPH_* deben ir a nivel principal, no dentro de una función o bloque)" : "";
+        throw new BuildError(detail + hint, seg.line + error.line - 1);
       }
       throw error;
     }
   });
+
+  // Una variable local de nivel principal declarada en un segmento y usada en otro pasa a ser
+  // global (así un bloque de optimización puede definir funciones que usa el bloque protegido).
+  const shared = sharedTopLevelNames(parsed.map(namesOf));
+  if (shared.size > 0) {
+    parsed.forEach((block, i) => {
+      parsed[i] = localsToGlobals(block, shared);
+    });
+  }
 
   // Variables locales de nivel principal no pueden cruzar entre segmentos.
   const info = parsed.map(namesOf);

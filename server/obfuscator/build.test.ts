@@ -54,14 +54,32 @@ describe("macros de optimización y protección", () => {
     expect(() => splitSegments("--NXT_LPH_OPTIMIZACION\nprint(1)")).toThrow(/sin cerrar/);
   });
 
-  it("no permite que una variable local cruce entre bloques", () => {
+  it("una variable local que cruza entre bloques pasa a global y el resultado es el mismo", () => {
+    if (!luaAvailable()) return;
     const src = [
       "--NXT_LPH_OPTIMIZACION",
       "local cfg = 10",
       "--NXT_LPH_OPTIMIZACION_END",
       "print(cfg)",
     ].join("\n");
-    expect(() => buildLua(src, 1)).toThrow(/'cfg' se declara en un bloque/);
+    const dir = mkdtempSync(join(tmpdir(), "nx-cruce-"));
+    try {
+      const file = join(dir, "cruce.lua");
+      writeFileSync(file, buildLua(src, 1, { printResult: true }).code);
+      expect(execFileSync(LUA, [file], { encoding: "utf8" }).split("\n")[0]).toBe("10");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("no falla al compilar una local que cruza bloques", () => {
+    const src = [
+      "--NXT_LPH_OPTIMIZACION",
+      "local cfg = 10",
+      "--NXT_LPH_OPTIMIZACION_END",
+      "print(cfg)",
+    ].join("\n");
+    expect(() => buildLua(src, 1)).not.toThrow();
   });
 
   it("sí permite compartir globales entre bloques", () => {
