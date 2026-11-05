@@ -51,6 +51,11 @@ function luaValue(v: unknown): string {
   throw new Error("constante no serializable");
 }
 
+// Números finitos: se guardan como texto cifrado. Infinitos y NaN siguen como literal.
+function isEncodableNumber(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v);
+}
+
 function luaList(items: string[]): string {
   return "{" + items.join(",") + "}";
 }
@@ -76,7 +81,8 @@ export function payloadLiteral(bc: Bytecode, fields: FieldMap = fieldMap(0), kin
     `${f.opnames}=${luaList(bc.opTable.map((s) => H(kinds.ops[s])))},` +
     `${f.nconsts}=${H(bc.consts.length)},` +
     // Solo las cadenas van cifradas; el runtime distingue cadenas por tipo.
-    `${f.consts}=${luaList(bc.consts.map((v, i) => (typeof v === "string" ? enc(v, SALT.consts, i) : luaValue(v))))},` +
+    `${f.consts}=${luaList(bc.consts.map((v, i) => (typeof v === "string" || isEncodableNumber(v) ? enc(String(v), SALT.consts, i) : luaValue(v))))},` +
+    `${f.ncs}=${luaList(bc.consts.flatMap((v, i) => (isEncodableNumber(v) ? [H(i + 1)] : [])))},` +
     `${f.names}=${luaList(bc.names.map((s, i) => enc(s, SALT.names, i)))},` +
     `${f.ops}=${luaList(bc.ops.map((s, i) => enc(s, SALT.ops, i)))},` +
     `${f.protos}=${luaList(protos)}` +

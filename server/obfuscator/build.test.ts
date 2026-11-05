@@ -115,7 +115,7 @@ describe("macros de optimización y protección", () => {
     expect(code).not.toContain("RunService");
     expect(code).not.toContain("+=");
     expect(code).not.toContain("RanTimes");
-    expect(code.indexOf("local function N(") < code.indexOf("local function nx_run")).toBe(true);
+    expect(code.indexOf("game") < code.indexOf("local function nx_run")).toBe(true);
   });
 });
 

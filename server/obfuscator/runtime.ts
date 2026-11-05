@@ -50,6 +50,8 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
   for i = 1, P.nconsts do
     if type(consts[i]) == "string" then consts[i] = decstr(consts[i], 3000000 + i) end
   end
+  -- Constantes numéricas: van cifradas como texto y aquí se convierten de nuevo a número.
+  for _, i in ipairs(P.ncs) do consts[i] = tonumber(consts[i]) end
   --@MSG
   -- Globales del script: en Roblox, _G no contiene game, Enum, Color3, task... (solo el entorno
   -- del script los tiene). getfenv() devuelve ese entorno; en Lua 5.1 estándar es _G.
@@ -707,7 +709,7 @@ export function runtimeLua(fields: FieldMap, kinds: Kinds): string {
   out = out.slice(0, start) + kDef + out.slice(end);
   out = out.replace(/\bK\.([A-Z][A-Z_0-9]*)\b/g, (m, n: string) => (n in kinds.internal ? `K[${kinds.internal[n]}]` : m));
   // Campos del payload.
-  out = out.replace(/\.(protos|consts|names|ops|opnames|k|nconsts|slots|code|params|bp|up)\b/g,
+  out = out.replace(/\.(protos|consts|names|ops|opnames|k|nconsts|slots|code|params|bp|up|ncs)\b/g,
     (_, name: string) => "." + fields[name as keyof FieldMap]);
   return out;
 }
