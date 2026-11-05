@@ -502,7 +502,8 @@ class Parser {
     }
     flush();
     if (parts.length === 0) return { kind: "String", value: "" };
-    return parts.reduce<Expr>((left, right) => ({ kind: "Binary", op: "..", left, right, line: t.line }));
+    const [first, ...rest] = parts;
+    return rest.reduce<Expr>((left, right) => ({ kind: "Binary", op: "..", left, right, line: t.line }), first);
   }
 
   private parsePrimaryExpr(): Expr {

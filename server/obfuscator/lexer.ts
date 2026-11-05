@@ -58,7 +58,8 @@ export function tokenize(utf8Source: string): Token[] {
 
   const col = () => pos - lineStart + 1;
   const peek = (offset = 0) => source[pos + offset] ?? "";
-  const fail = (message: string): never => {
+  // Tipo explícito: TypeScript solo trata la llamada como `never` (corta el flujo) si el tipo está anotado
+  const fail: (message: string) => never = (message: string): never => {
     throw new LuaSyntaxError(message, line, col());
   };
 
