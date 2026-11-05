@@ -1,7 +1,7 @@
 // Uso:
 //   npx tsx scripts/ofuscar.ts                       ofusca todo Inputs/*.lua en Output/
 //   npx tsx scripts/ofuscar.ts entrada.lua [salida.lua]
-// Opciones: --semilla N  --pasadas N  --codigo-muerto R (0 a 1, por defecto 0.3)
+// Opciones: --semilla N  --pasadas N  --codigo-muerto R (0 a 1, por defecto 0.5)  --auto-nativo
 // Usa el mismo motor que la web, sin login ni API key.
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { randomInt } from "node:crypto";
@@ -21,7 +21,9 @@ for (let i = 0; i < args.length; i++) {
 
 const seed = flags["semilla"] ? Number(flags["semilla"]) : randomInt(1, 2 ** 31);
 const passes = flags["pasadas"] ? Number(flags["pasadas"]) : 1;
-const deadCodeRate = flags["codigo-muerto"] ? Number(flags["codigo-muerto"]) : 0.3;
+const deadCodeRate = flags["codigo-muerto"] ? Number(flags["codigo-muerto"]) : 0.5;
+// Sin macros: bucles y callbacks van nativos (más rápido, menos protegido).
+const autoNative = "auto-nativo" in flags;
 if (!Number.isInteger(passes) || passes < 1) {
   console.error("--pasadas debe ser un entero mayor o igual a 1");
   process.exit(1);
@@ -56,7 +58,7 @@ if (positional.length === 0) {
 let failed = false;
 for (const [input, output] of jobs) {
   try {
-    const { code, segments } = buildLua(readFileSync(input, "utf8"), seed, { passes, deadCodeRate });
+    const { code, segments } = buildLua(readFileSync(input, "utf8"), seed, { passes, deadCodeRate, autoNative });
     mkdirSync(dirnameOf(output), { recursive: true });
     writeFileSync(output, code, "utf8");
     console.log(`OK: ${output} (${segments} segmento(s), ${passes} pasada(s), semilla ${seed})`);
