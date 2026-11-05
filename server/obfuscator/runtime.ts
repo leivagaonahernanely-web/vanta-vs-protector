@@ -1,3 +1,4 @@
+import { encryptBytes } from "./cipher";
 import type { FieldMap } from "./fields";
 // Runtime de la VM en Lua 5.1, incrustado en cada archivo de salida junto con el bytecode.
 // Sin límite de pasos: los scripts del cliente pueden ejecutarse indefinidamente.
@@ -36,9 +37,11 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
   end
   local function decstr(s, salt)
     s = b64dec(s)
-    local out = {}
+    local out, prev = {}, 0
     for i = 1, #s do
-      out[i] = string_char((string_byte(s, i) - KEYB[(i - 1) % KN + 1] - salt) % 256)
+      local c = string_byte(s, i)
+      out[i] = string_char((c - KEYB[(i - 1) % KN + 1] - prev - salt) % 256)
+      prev = c
     end
     return table.concat(out)
   end
@@ -683,13 +686,14 @@ export function runtimeLua(fields: FieldMap, kinds: Kinds): string {
     return `MS[${indexOf.get(lit)}]`;
   });
   const enc = messages.map((text, i) =>
-    luaByteLiteral([...Buffer.from(text, "utf8")].map((b, j) => (b + kinds.msgKey[j % kinds.msgKey.length] + 5000000 + i + 1) % 256)));
+    luaByteLiteral([...encryptBytes(Buffer.from(text, "utf8"), 5000000 + i + 1, kinds.msgKey)]));
   const setup = `local MK = {${kinds.msgKey.join(",")}}\n` +
     `local MSENC = {${enc.join(",")}}\n` +
     `local MS = {}\n` +
     `for i = 1, #MSENC do\n` +
     `  local s, o = b64dec(MSENC[i]), {}\n` +
-    `  for j = 1, #s do o[j] = string.char((string.byte(s, j) - MK[(j - 1) % #MK + 1] - 5000000 - i) % 256) end\n` +
+    `  local prev = 0\n` +
+    `  for j = 1, #s do local c = string.byte(s, j) o[j] = string.char((c - MK[(j - 1) % #MK + 1] - prev - 5000000 - i) % 256) prev = c end\n` +
     `  MS[i] = table.concat(o)\n` +
     `end`;
   out = out.replace("--@MSG", setup);

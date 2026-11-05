@@ -5,6 +5,7 @@
 // de un vistazo (grep, strings) pero no es un secreto frente a quien lea el runtime.
 import { createHash } from "node:crypto";
 import { kindsFor, runtimeLua, type Kinds } from "./runtime";
+import { encryptBytes } from "./cipher";
 import { fieldMap, type FieldMap } from "./fields";
 import type { Bytecode } from "./vm";
 
@@ -24,12 +25,6 @@ export function deriveKey(bc: Bytecode): number[] {
   return [...digest.subarray(0, KEY_LENGTH)];
 }
 
-// Cifrado por posición: c[i] = (p[i] + clave[i mod n] + salt) mod 256.
-export function encryptBytes(plain: Buffer, salt: number, key: number[]): Buffer {
-  const out = Buffer.alloc(plain.length);
-  for (let i = 0; i < plain.length; i++) out[i] = (plain[i] + key[i % key.length] + salt) % 256;
-  return out;
-}
 
 // Bytes arbitrarios como cadena base64 (el runtime la decodifica al cargar).
 function luaBytes(bytes: Buffer): string {
@@ -62,7 +57,8 @@ function luaList(items: string[]): string {
 
 // Literal de tabla Lua con el bytecode de un programa, listo para nx_run.
 export function payloadLiteral(bc: Bytecode, fields: FieldMap = fieldMap(0), kinds: Kinds = kindsFor(0)): string {
-  const key = deriveKey(bc);
+  // Clave aleatoria por compilación (de la semilla), no derivada de nombres públicos.
+  const key = kinds.msgKey;
   const f = fields;
   // Índices base 1, igual que en Lua: el salt de cada cadena es base + índice.
   const enc = (s: string, base: number, i: number) =>
