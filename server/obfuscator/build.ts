@@ -271,6 +271,8 @@ export type BuildOptions = {
   printResult?: boolean;
   // Probabilidad (0 a 1) de insertar una rama muerta antes de cada sentencia protegida.
   deadCodeRate?: number;
+  // Sin macros: si es true, los bucles y callbacks se dejan nativos (más rápido, menos protegido).
+  autoNative?: boolean;
   // Número de pasadas: la salida de una pasada se vuelve a ofuscar. Por defecto, 1.
   passes?: number;
 };
@@ -286,9 +288,15 @@ export function buildLua(source: string, seed: number, options: BuildOptions = {
 }
 
 function buildOnce(source: string, seed: number, options: BuildOptions): Built {
-  const deadCodeRate = options.deadCodeRate ?? 0.3;
+  const deadCodeRate = options.deadCodeRate ?? 0.5;
   const hasMacros = source.split(/\r\n|\n|\r/).some((l) => ANY_MACRO.test(l));
-  const segments = hasMacros ? splitSegments(source) : autoSegments(source);
+  // Sin macros, todo va protegido en la VM. Con autoNative, los bucles y callbacks van nativos
+  // (más rápido, menos protegido). Con macros, el reparto lo marca el usuario.
+  const segments: Segment[] = hasMacros
+    ? splitSegments(source)
+    : options.autoNative
+      ? autoSegments(source)
+      : [{ kind: "protected", source, line: 1 }];
   if (segments.length === 0) throw new BuildError("el script está vacío");
 
   const parsed = segments.map((seg) => {
