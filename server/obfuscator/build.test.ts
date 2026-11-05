@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { autoSegments, BuildError, buildLua, splitSegments } from "./build";
+import { autoSegments, BuildError, buildLua, splitSegments, suggestMacros } from "./build";
 
 const LUA = process.env.NX_LUA_BIN ?? "lua5.1";
 function luaAvailable(): boolean {
@@ -276,5 +276,14 @@ describe("nombres de campos del payload", () => {
     for (const name of ["opnames", "nconsts", "protos", "params", "bp"]) {
       expect(code).not.toContain(name);
     }
+  });
+});
+
+describe("sugerencias de macros", () => {
+  it("señala bucles y funciones de nivel principal", () => {
+    const sugerencias = suggestMacros("print(1)\nfor i = 1, 3 do print(i) end\nbtn:Connect(function() print(2) end)");
+    expect(sugerencias.length).toBe(2);
+    expect(sugerencias[0]).toMatch(/línea 2: bucle/);
+    expect(sugerencias[1]).toMatch(/línea 3: contiene una función/);
   });
 });

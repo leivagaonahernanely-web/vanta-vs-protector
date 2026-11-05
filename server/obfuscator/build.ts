@@ -366,3 +366,25 @@ function buildOnce(source: string, seed: number, options: BuildOptions): Built {
     segments: segments.length,
   };
 }
+
+// Sugerencias de macros para un script sin macros: qué sentencias de nivel principal son bucles
+// o contienen funciones (callbacks). Sirve para decidir dónde poner NXT_LPH_OPTIMIZACION.
+export function suggestMacros(source: string): string[] {
+  const block = parse(source);
+  const LOOPS = new Set(["NumericFor", "GenericFor", "While", "Repeat"]);
+  const containsFunction = (v: unknown): boolean => {
+    if (Array.isArray(v)) return v.some(containsFunction);
+    if (typeof v === "object" && v !== null) {
+      if ((v as { kind?: string }).kind === "Function") return true;
+      return Object.values(v as Record<string, unknown>).some(containsFunction);
+    }
+    return false;
+  };
+  const out: string[] = [];
+  for (const s of block) {
+    const line = (s as { line?: number }).line ?? 1;
+    if (LOOPS.has(s.kind)) out.push(`línea ${line}: bucle; conviene NXT_LPH_OPTIMIZACION para que corra nativo`);
+    else if (containsFunction(s)) out.push(`línea ${line}: contiene una función o callback; conviene NXT_LPH_OPTIMIZACION si se llama con frecuencia`);
+  }
+  return out;
+}
