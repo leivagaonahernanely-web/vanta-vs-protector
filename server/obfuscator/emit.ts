@@ -30,6 +30,19 @@ export function deriveKey(bc: Bytecode): number[] {
 function luaBytes(bytes: Buffer): string {
   return `"${bytes.toString("base64")}"`;
 }
+// Mezcla determinista (Fisher-Yates con un generador congruencial), según la semilla.
+function shuffleInPlace<T>(items: T[], seed: number): void {
+  let s = seed >>> 0;
+  const next = () => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(next() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+}
+
 // Número entero como literal hexadecimal (0x..), válido en Lua 5.1 y Luau.
 const H = (n: number): string => (Number.isInteger(n) ? (n < 0 ? "-" : "") + "0x" + Math.abs(n).toString(16) : String(n));
 
@@ -74,20 +87,22 @@ export function payloadLiteral(bc: Bytecode, fields: FieldMap = fieldMap(0), kin
     `${f.up}=${luaList(p.upvals.map((u) => `{${u.fromLocal ? 1 : 0},${H(u.index)}}`))},` +
     `${f.bp}=${luaList(p.boxedParams.map(H))}}`,
   );
-  return (
-    `{` +
-    `${f.k}=${luaList(key.map(H))},` +
+  // Cada campo es una entrada con nombre: el orden en la tabla no importa para Lua, así que
+  // se mezcla según la semilla y dos salidas no tienen el mismo orden de campos.
+  const parts: string[] = [
+    `${f.k}=${luaList(key.map(H))}`,
     // Tipos de instrucción como números (sin cifrar): el runtime los compara con sus propios números.
-    `${f.opnames}=${luaList(bc.opTable.map((s) => H(kinds.ops[s])))},` +
-    `${f.nconsts}=${H(bc.consts.length)},` +
+    `${f.opnames}=${luaList(bc.opTable.map((s) => H(kinds.ops[s])))}`,
+    `${f.nconsts}=${H(bc.consts.length)}`,
     // Solo las cadenas van cifradas; el runtime distingue cadenas por tipo.
-    `${f.consts}=${luaList(bc.consts.map((v, i) => (typeof v === "string" || isEncodableNumber(v) ? enc(String(v), SALT.consts, i) : luaValue(v))))},` +
-    `${f.ncs}=${luaList(bc.consts.flatMap((v, i) => (isEncodableNumber(v) ? [H(i + 1)] : [])))},` +
-    `${f.names}=${luaList(bc.names.map((s, i) => enc(s, SALT.names, i)))},` +
-    `${f.ops}=${luaList(bc.ops.map((s, i) => enc(s, SALT.ops, i)))},` +
-    `${f.protos}=${luaList(protos)}` +
-    `}`
-  );
+    `${f.consts}=${luaList(bc.consts.map((v, i) => (typeof v === "string" || isEncodableNumber(v) ? enc(String(v), SALT.consts, i) : luaValue(v))))}`,
+    `${f.ncs}=${luaList(bc.consts.flatMap((v, i) => (isEncodableNumber(v) ? [H(i + 1)] : [])))}`,
+    `${f.names}=${luaList(bc.names.map((s, i) => enc(s, SALT.names, i)))}`,
+    `${f.ops}=${luaList(bc.ops.map((s, i) => enc(s, SALT.ops, i)))}`,
+    `${f.protos}=${luaList(protos)}`,
+  ];
+  shuffleInPlace(parts, key.reduce((acc, b) => (acc * 31 + b) >>> 0, 7));
+  return `{${parts.join(",")}}`;
 }
 
 export function emitLua(bc: Bytecode, options: EmitOptions = {}): string {
