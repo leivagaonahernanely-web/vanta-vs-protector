@@ -1,3 +1,4 @@
+import { extractDispatch, generateDispatch } from "./dispatch";
 import { encryptBytes } from "./cipher";
 import type { FieldMap } from "./fields";
 // Runtime de la VM en Lua 5.1, incrustado en cada archivo de salida junto con el bytecode.
@@ -607,7 +608,7 @@ end
 
 // Identificadores que cambian en cada compilación: nombres de campos del payload, tipos de
 // instrucción (como números aleatorios en vez de palabras como "CALL") y claves internas del runtime.
-export type Kinds = { ops: Record<string, number>; internal: Record<string, number>; msgKey: number[]; junk: string; b64: string };
+export type Kinds = { ops: Record<string, number>; internal: Record<string, number>; msgKey: number[]; junk: string; b64: string; dispatch: string };
 
 const OP_LIST = [
   "CONST", "LOCAL_GET", "LOCAL_SET", "DECL", "GLOBAL_GET", "GLOBAL_SET", "UP_GET", "UP_SET",
@@ -648,6 +649,11 @@ function junkFor(seed: number): string {
   return `local JUNK = { ${bodies.join(", ")} }`;
 }
 
+
+// El despacho se extrae una vez de la plantilla; cada compilación lo regenera con su propia forma.
+const DISPATCH_PARTS = extractDispatch(RUNTIME_LUA_TEMPLATE);
+const DISPATCH_LEAVES = DISPATCH_PARTS.leaves;
+const DISPATCH_TEMPLATE = `${DISPATCH_PARTS.before}\n--@DISPATCH\n${DISPATCH_PARTS.after}`;
 
 // Tres decodificadores base64 equivalentes; la semilla elige uno en cada compilación.
 const B64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -720,7 +726,7 @@ export function kindsFor(seed: number): Kinds {
   OP_LIST.forEach((n, i) => { ops[n] = ids[i]; });
   internalNames.forEach((n, i) => { internal[n] = ids[OP_LIST.length + i]; });
   const msgKey = uniqueIds(16, seed ^ 0x3e55).map((n) => n % 256);
-  return { ops, internal, msgKey, junk: junkFor(seed), b64: B64_VARIANTS[seed % B64_VARIANTS.length] };
+  return { ops, internal, msgKey, junk: junkFor(seed), b64: B64_VARIANTS[seed % B64_VARIANTS.length], dispatch: generateDispatch(DISPATCH_LEAVES, seed ^ 0xd15) };
 }
 
 // Bytes como escapes decimales de Lua (cadena de bytes en un literal).
@@ -737,7 +743,7 @@ function isMessage(lit: string): boolean {
 
 // Runtime con los nombres de campos y de instrucciones de esta compilación.
 export function runtimeLua(fields: FieldMap, kinds: Kinds): string {
-  let out = RUNTIME_LUA_TEMPLATE;
+  let out = DISPATCH_TEMPLATE.replace("--@DISPATCH", kinds.dispatch);
   // Mensajes: cada literal legible se sustituye por MS[i], que se descifra al cargar.
   const messages: string[] = [];
   const indexOf = new Map<string, number>();
