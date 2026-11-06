@@ -15,26 +15,7 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
   -- Descifrado de cadenas (ver emit.ts): byte - clave - salt, módulo 256. Mismos salts que SALT.
   local KEYB, KN = P.k, #P.k
   local string_byte, string_char = string.byte, string.char
-  local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-  local B64MAP = {}
-  for i = 1, 64 do B64MAP[string.byte(B64, i)] = i - 1 end
-  local function b64dec(s)
-    local out, n, bits, nb = {}, 0, 0, 0
-    for i = 1, #s do
-      local v = B64MAP[string.byte(s, i)]
-      if v then
-        bits = bits * 64 + v
-        nb = nb + 6
-        if nb >= 8 then
-          nb = nb - 8
-          n = n + 1
-          out[n] = string.char(math.floor(bits / 2 ^ nb) % 256)
-          bits = bits % 2 ^ nb
-        end
-      end
-    end
-    return table.concat(out)
-  end
+  --@B64
   local function decstr(s, salt)
     s = b64dec(s)
     local out, prev = {}, 0
@@ -626,7 +607,7 @@ end
 
 // Identificadores que cambian en cada compilación: nombres de campos del payload, tipos de
 // instrucción (como números aleatorios en vez de palabras como "CALL") y claves internas del runtime.
-export type Kinds = { ops: Record<string, number>; internal: Record<string, number>; msgKey: number[]; junk: string };
+export type Kinds = { ops: Record<string, number>; internal: Record<string, number>; msgKey: number[]; junk: string; b64: string };
 
 const OP_LIST = [
   "CONST", "LOCAL_GET", "LOCAL_SET", "DECL", "GLOBAL_GET", "GLOBAL_SET", "UP_GET", "UP_SET",
@@ -667,6 +648,69 @@ function junkFor(seed: number): string {
   return `local JUNK = { ${bodies.join(", ")} }`;
 }
 
+
+// Tres decodificadores base64 equivalentes; la semilla elige uno en cada compilación.
+const B64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+export const B64_VARIANTS: string[] = [
+  `local B64 = "${B64_ALPHABET}"
+  local B64MAP = {}
+  for i = 1, 64 do B64MAP[string.byte(B64, i)] = i - 1 end
+  local function b64dec(s)
+    local out, n, bits, nb = {}, 0, 0, 0
+    for i = 1, #s do
+      local v = B64MAP[string.byte(s, i)]
+      if v then
+        bits = bits * 64 + v
+        nb = nb + 6
+        if nb >= 8 then
+          nb = nb - 8
+          n = n + 1
+          out[n] = string.char(math.floor(bits / 2 ^ nb) % 256)
+          bits = bits % 2 ^ nb
+        end
+      end
+    end
+    return table.concat(out)
+  end`,
+  `local B64 = "${B64_ALPHABET}"
+  local function b64dec(s)
+    local out, n, acc, bits = {}, 0, 0, 0
+    for i = 1, #s do
+      local v = string.find(B64, string.sub(s, i, i), 1, true)
+      if v then
+        acc = acc * 64 + (v - 1)
+        bits = bits + 6
+        if bits >= 8 then
+          bits = bits - 8
+          n = n + 1
+          out[n] = string.char(math.floor(acc / 2 ^ bits) % 256)
+          acc = acc % 2 ^ bits
+        end
+      end
+    end
+    return table.concat(out)
+  end`,
+  `local B64 = "${B64_ALPHABET}"
+  local function b64dec(s)
+    local map = {}
+    for i = 1, 64 do map[string.byte(B64, i)] = i - 1 end
+    local clean = {}
+    for i = 1, #s do
+      local v = map[string.byte(s, i)]
+      if v then clean[#clean + 1] = v end
+    end
+    local out = {}
+    for g = 1, #clean, 4 do
+      local a, b, c, d = clean[g], clean[g + 1] or 0, clean[g + 2] or 0, clean[g + 3] or 0
+      local n = a * 262144 + b * 4096 + c * 64 + d
+      out[#out + 1] = string.char(math.floor(n / 65536) % 256)
+      if clean[g + 2] then out[#out + 1] = string.char(math.floor(n / 256) % 256) end
+      if clean[g + 3] then out[#out + 1] = string.char(n % 256) end
+    end
+    return table.concat(out)
+  end`,
+];
+
 export function kindsFor(seed: number): Kinds {
   const internalNames = [...RUNTIME_LUA_TEMPLATE.slice(RUNTIME_LUA_TEMPLATE.indexOf("local K = {"))
     .split("\n  }")[0].matchAll(/\b([A-Z][A-Z_0-9]*) = \d+/g)].map((m) => m[1]);
@@ -676,7 +720,7 @@ export function kindsFor(seed: number): Kinds {
   OP_LIST.forEach((n, i) => { ops[n] = ids[i]; });
   internalNames.forEach((n, i) => { internal[n] = ids[OP_LIST.length + i]; });
   const msgKey = uniqueIds(16, seed ^ 0x3e55).map((n) => n % 256);
-  return { ops, internal, msgKey, junk: junkFor(seed) };
+  return { ops, internal, msgKey, junk: junkFor(seed), b64: B64_VARIANTS[seed % B64_VARIANTS.length] };
 }
 
 // Bytes como escapes decimales de Lua (cadena de bytes en un literal).
@@ -715,6 +759,7 @@ export function runtimeLua(fields: FieldMap, kinds: Kinds): string {
     `end`;
   out = out.replace("--@MSG", setup);
   out = out.replace("--@JUNK", kinds.junk);
+  out = out.replace("--@B64", kinds.b64);
   // Nombres de instrucción entre comillas -> su número.
   out = out.replace(/"([A-Z][A-Z_0-9]*)"/g, (m, n: string) => (n in kinds.ops ? String(kinds.ops[n]) : m));
   // Tabla K: claves con número y accesos K.NOMBRE -> K[número].
