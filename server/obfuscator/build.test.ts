@@ -202,9 +202,9 @@ describe("reparto automático sin macros", () => {
     expect(segs.map((s) => s.kind)).toEqual(["protected", "native"]);
   });
 
-  it("un bucle que usa una local del script no se separa del resto", () => {
+  it("un bucle que usa una local del script va nativo; la local pasa a global al compilar", () => {
     const segs = autoSegments("local n = 0\nfor i = 1, 3 do n = n + i end\nprint(n)");
-    expect(segs.every((s) => s.kind === "protected")).toBe(true);
+    expect(segs.map((s) => s.kind)).toEqual(["protected", "native", "protected"]);
   });
 
   it("genera el archivo con el runtime aunque haya bloques nativos", () => {

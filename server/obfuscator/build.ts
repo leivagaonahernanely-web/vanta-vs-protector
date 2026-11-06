@@ -193,8 +193,7 @@ function isNativeCandidate(s: Stmt): boolean {
 }
 
 // Reparto automático (sin macros). Las sentencias que empiezan en la misma línea forman una unidad.
-// Una unidad nativa no puede compartir locales de nivel principal con una protegida: si lo hace,
-// o si dos unidades que comparten locales quedarían en bloques distintos, se vuelve protegida.
+// Una unidad es nativa si es un bucle o un callback; el resto va en la VM.
 export function autoSegments(source: string): Segment[] {
   const lines = source.split(/\r\n|\n|\r/);
   let block: Block;
@@ -220,26 +219,8 @@ export function autoSegments(source: string): Segment[] {
     u.native = u.stmts.every(isNativeCandidate);
   }
 
-  const shares = (a: Set<string>, b: Set<string>) => {
-    for (const n of a) if (b.has(n)) return true;
-    return false;
-  };
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (let j = 0; j < units.length; j++) {
-      for (let k = j + 1; k < units.length; k++) {
-        const a = units[j];
-        const b = units[k];
-        if (!shares(a.declared, b.referenced) && !shares(b.declared, a.referenced)) continue;
-        const flags = units.slice(j, k + 1).map((u) => u.native);
-        if (flags.every((f) => f === flags[0])) continue; // todas nativas o todas protegidas: mismo bloque
-        for (let m = j; m <= k; m++) {
-          if (units[m].native) { units[m].native = false; changed = true; }
-        }
-      }
-    }
-  }
+  // Las locales de nivel principal que cruzan entre bloques se convierten en globales al compilar
+  // (ver buildOnce), así que aquí no hace falta forzar que bloques que las comparten sean iguales.
 
   // Bloques consecutivos del mismo tipo. El primero empieza en la línea 1 para conservar comentarios de cabecera.
   const segments: Segment[] = [];
