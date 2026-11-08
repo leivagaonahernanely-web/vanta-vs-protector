@@ -14,16 +14,42 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
   local protos, consts, names = P.protos, P.consts, P.names
   local opnames, bopnames = P.opnames, P.ops
   -- Descifrado de cadenas (ver emit.ts): byte - clave - salt, módulo 256. Mismos salts que SALT.
-  local KEYB, KN = P.k, #P.k
+  local KEYB = P.k
   local string_byte, string_char = string.byte, string.char
   --@B64
+  -- Flujo tipo RC4 con suma mod 256 (ver cipher.ts). Mismo algoritmo que keystreamInit/nextKeyByte.
+  local function ks_init(salt)
+    local n = #KEYB
+    local kb = {}
+    for t = 1, n do kb[t] = KEYB[t] end
+    kb[n + 1] = salt % 256
+    kb[n + 2] = math.floor(salt / 256) % 256
+    kb[n + 3] = math.floor(salt / 65536) % 256
+    kb[n + 4] = math.floor(salt / 16777216) % 256
+    local m, S, j = n + 4, {}, 0
+    for t = 0, 255 do S[t] = t end
+    for t = 0, 255 do
+      j = (j + S[t] + kb[t % m + 1]) % 256
+      S[t], S[j] = S[j], S[t]
+    end
+    return { S = S, i = 0, j = 0 }
+  end
+  local function ks_next(st)
+    local S = st.S
+    local i = (st.i + 1) % 256
+    st.i = i
+    local j = (st.j + S[i]) % 256
+    st.j = j
+    S[i], S[j] = S[j], S[i]
+    return S[(S[i] + S[j]) % 256]
+  end
   local function decstr(s, salt)
     s = b64dec(s)
-    local out, prev = {}, 0
+    local st, out = ks_init(salt), {}
     for i = 1, #s do
       local c = string_byte(s, i)
-      out[i] = string_char((c - KEYB[(i - 1) % KN + 1] - prev - salt) % 256)
-      prev = c
+      out[i] = string_char((c - ks_next(st)) % 256)
+      st.j = (st.j + c) % 256
     end
     return table.concat(out)
   end
@@ -717,7 +743,7 @@ export const B64_VARIANTS: string[] = [
   end`,
 ];
 
-export function kindsFor(seed: number): Kinds {
+export function kindsFor(seed: number, msgKey?: number[]): Kinds {
   const internalNames = [...RUNTIME_LUA_TEMPLATE.slice(RUNTIME_LUA_TEMPLATE.indexOf("local K = {"))
     .split("\n  }")[0].matchAll(/\b([A-Z][A-Z_0-9]*) = \d+/g)].map((m) => m[1]);
   const ids = uniqueIds(OP_LIST.length + internalNames.length, seed ^ 0xc0de);
@@ -725,8 +751,9 @@ export function kindsFor(seed: number): Kinds {
   const internal: Record<string, number> = {};
   OP_LIST.forEach((n, i) => { ops[n] = ids[i]; });
   internalNames.forEach((n, i) => { internal[n] = ids[OP_LIST.length + i]; });
-  const msgKey = uniqueIds(16, seed ^ 0x3e55).map((n) => n % 256);
-  return { ops, internal, msgKey, junk: junkFor(seed), b64: B64_VARIANTS[seed % B64_VARIANTS.length], dispatch: generateDispatch(DISPATCH_LEAVES, seed ^ 0xd15) };
+  // Por defecto, clave derivada de la semilla (reproducible). build.ts pasa una clave aleatoria.
+  const key = msgKey ?? uniqueIds(16, seed ^ 0x3e55).map((n) => n % 256);
+  return { ops, internal, msgKey: key, junk: junkFor(seed), b64: B64_VARIANTS[seed % B64_VARIANTS.length], dispatch: generateDispatch(DISPATCH_LEAVES, seed ^ 0xd15) };
 }
 
 // Bytes como escapes decimales de Lua (cadena de bytes en un literal).
@@ -754,15 +781,10 @@ export function runtimeLua(fields: FieldMap, kinds: Kinds): string {
   });
   const enc = messages.map((text, i) =>
     luaByteLiteral([...encryptBytes(Buffer.from(text, "utf8"), 5000000 + i + 1, kinds.msgKey)]));
-  const setup = `local MK = {${kinds.msgKey.join(",")}}\n` +
-    `local MSENC = {${enc.join(",")}}\n` +
+  // Mismo descifrado que las cadenas del payload (decstr), con la clave de la compilación.
+  const setup = `local MSENC = {${enc.join(",")}}\n` +
     `local MS = {}\n` +
-    `for i = 1, #MSENC do\n` +
-    `  local s, o = b64dec(MSENC[i]), {}\n` +
-    `  local prev = 0\n` +
-    `  for j = 1, #s do local c = string.byte(s, j) o[j] = string.char((c - MK[(j - 1) % #MK + 1] - prev - 5000000 - i) % 256) prev = c end\n` +
-    `  MS[i] = table.concat(o)\n` +
-    `end`;
+    `for i = 1, #MSENC do MS[i] = decstr(MSENC[i], 5000000 + i) end`;
   out = out.replace("--@MSG", setup);
   out = out.replace("--@JUNK", kinds.junk);
   out = out.replace("--@B64", kinds.b64);

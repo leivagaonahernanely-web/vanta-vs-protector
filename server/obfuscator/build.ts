@@ -8,6 +8,7 @@
 // - Los macros deben estar a nivel principal y no pueden anidarse.
 // - Un bloque nativo y uno protegido no pueden compartir variables "local" a nivel principal
 //   (cada uno vive en un contexto distinto). Las globales sí se comparten.
+import { randomBytes } from "node:crypto";
 import { compile } from "./compiler";
 import { stripComments } from "./comments";
 import { payloadLiteral } from "./emit";
@@ -256,6 +257,9 @@ export type BuildOptions = {
   autoNative?: boolean;
   // Número de pasadas: la salida de una pasada se vuelve a ofuscar. Por defecto, 1.
   passes?: number;
+  // Clave de 16 a 64 bytes para cifrar cadenas. Si no se pasa, cada compilación usa 32 bytes
+  // aleatorios (criptográficos). Pasar la misma clave y semilla reproduce la salida.
+  key?: number[];
 };
 
 export function buildLua(source: string, seed: number, options: BuildOptions = {}): Built {
@@ -319,7 +323,11 @@ function buildOnce(source: string, seed: number, options: BuildOptions): Built {
   });
 
   const fields = fieldMap(seed);
-  const kinds = kindsFor(seed);
+  const key = options.key ?? [...randomBytes(32)];
+  if (key.length < 16 || key.length > 64 || key.some((b) => !Number.isInteger(b) || b < 0 || b > 255)) {
+    throw new BuildError("la clave debe tener entre 16 y 64 bytes (0 a 255)");
+  }
+  const kinds = kindsFor(seed, key);
   const chunks: string[] = [];
   segments.forEach((seg, i) => {
     const last = i === segments.length - 1;

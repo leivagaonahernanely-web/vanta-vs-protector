@@ -1,8 +1,9 @@
 // Genera el archivo Lua de salida: runtime de la VM + bytecode como literal de tabla.
-// Las cadenas (nombres de opcodes, operadores, globales y constantes de texto) van cifradas:
-// cada byte se suma a una clave y a un salt por lista y posición, módulo 256. El runtime las
-// descifra al cargar. OJO: la clave viaja en el mismo archivo, así que esto oculta las cadenas
-// de un vistazo (grep, strings) pero no es un secreto frente a quien lea el runtime.
+// Las cadenas (nombres de opcodes, operadores, globales y constantes de texto) van cifradas con
+// un flujo tipo RC4 (ver cipher.ts). La clave es aleatoria por compilación y el salt depende de la
+// lista y la posición. El runtime las descifra al cargar. OJO: la clave viaja en el mismo archivo,
+// así que esto oculta las cadenas de un vistazo (grep, strings) y encarece la lectura, pero no es
+// un secreto frente a quien lea el runtime.
 import { createHash } from "node:crypto";
 import { kindsFor, runtimeLua, type Kinds } from "./runtime";
 import { encryptBytes } from "./cipher";
