@@ -1,5 +1,5 @@
 import { extractDispatch, generateDispatch } from "./dispatch";
-import { encryptBytes } from "./cipher";
+import { encryptBytes, NXDEC_LUA } from "./cipher";
 import type { FieldMap } from "./fields";
 // Runtime de la VM en Lua 5.1, incrustado en cada archivo de salida junto con el bytecode.
 // Sin límite de pasos: los scripts del cliente pueden ejecutarse indefinidamente.
@@ -18,16 +18,8 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
   local type = type
   local string_byte, string_char = string.byte, string.char
   --@B64
-  local function decstr(s, salt)
-    s = b64dec(s)
-    local out, prev = {}, 0
-    for i = 1, #s do
-      local c = string_byte(s, i)
-      out[i] = string_char((c - KEYB[(i - 1) % KN + 1] - prev - salt) % 256)
-      prev = c
-    end
-    return table.concat(out)
-  end
+  ${NXDEC_LUA}
+  local function decstr(s, salt) return nxdec(s, salt, KEYB) end
   for i = 1, #bopnames do bopnames[i] = decstr(bopnames[i], 1000000 + i) end
   for i = 1, #names do names[i] = decstr(names[i], 2000000 + i) end
   for i = 1, P.nconsts do
@@ -617,6 +609,7 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
     end
   end
 
+  --@PILA
   -- Integridad: suma ponderada del bytecode tal como viene en el archivo, antes de resolverlo.
   -- Si alguien cambia un número del payload, la ejecución se detiene.
   local ck = 0
@@ -767,7 +760,18 @@ function isMessage(lit: string): boolean {
 }
 
 // Runtime con los nombres de campos y de instrucciones de esta compilación.
-export function runtimeLua(fields: FieldMap, kinds: Kinds): string {
+const PILA_LUA = `  -- Chequeo de pila: nx_run solo puede invocarlo el cuerpo del archivo (o una llamada final). Si una
+  -- función Lua ajena lo llama, es un envoltorio o un intento de interponerse: se detiene. La llamada
+  -- a getinfo es directa a propósito: con pcall el nivel cambiaría. Sin biblioteca debug (Luau) no se hace.
+  if type(debug) == "table" and type(debug.getinfo) == "function" then
+    local caller = debug.getinfo(2, "S")
+    if caller and caller.what == "Lua" then fail("pila: el archivo fue invocado desde una función ajena") end
+  end
+`;
+
+// Chequeo de pila opcional (ver --@PILA en la plantilla). Apagado por defecto: un archivo embebido
+// dentro de una función es un uso válido y este chequeo lo detiene.
+export function runtimeLua(fields: FieldMap, kinds: Kinds, options: { stackCheck?: boolean } = {}): string {
   let out = DISPATCH_TEMPLATE.replace("--@DISPATCH", kinds.dispatch);
   // Mensajes: cada literal legible se sustituye por MS[i], que se descifra al cargar.
   const messages: string[] = [];
@@ -783,13 +787,11 @@ export function runtimeLua(fields: FieldMap, kinds: Kinds): string {
     `local MSENC = {${enc.join(",")}}\n` +
     `local MS = {}\n` +
     `for i = 1, #MSENC do\n` +
-    `  local s, o = b64dec(MSENC[i]), {}\n` +
-    `  local prev = 0\n` +
-    `  for j = 1, #s do local c = string.byte(s, j) o[j] = string.char((c - MK[(j - 1) % #MK + 1] - prev - 5000000 - i) % 256) prev = c end\n` +
-    `  MS[i] = table.concat(o)\n` +
+    `  MS[i] = nxdec(MSENC[i], 5000000 + i, MK)\n` +
     `end`;
   out = out.replace("--@MSG", setup);
   out = out.replace("--@JUNK", kinds.junk);
+  out = out.replace("--@PILA", options.stackCheck ? PILA_LUA : "");
   out = out.replace("--@B64", kinds.b64);
   // Nombres de instrucción entre comillas -> su número.
   out = out.replace(/"([A-Z][A-Z_0-9]*)"/g, (m, n: string) => (n in kinds.ops ? String(kinds.ops[n]) : m));

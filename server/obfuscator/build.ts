@@ -283,6 +283,8 @@ function compactLua(src: string): string {
 // Construye el archivo Lua final a partir del código fuente.
 // Con macros, el reparto lo marca el usuario; sin macros, lo decide autoSegments.
 export type BuildOptions = {
+  // Chequeo de pila del runtime (ver runtime.ts). Apagado por defecto; las pasadas internas lo desactivan.
+  stackCheck?: boolean;
   printResult?: boolean;
   // Probabilidad (0 a 1) de insertar una rama muerta antes de cada sentencia protegida.
   deadCodeRate?: number;
@@ -297,7 +299,8 @@ export function buildLua(source: string, seed: number, options: BuildOptions = {
   let current = buildOnce(source, seed, options);
   for (let p = 1; p < passes; p++) {
     // La pasada siguiente no vuelve a imprimir el resultado; usa otra semilla derivada.
-    current = buildOnce(current.code, seed + 7919 * p, { ...options, printResult: false });
+    // Las pasadas internas quedan dentro de la VM: el chequeo de pila solo tiene sentido en la más externa.
+    current = buildOnce(current.code, seed + 7919 * p, { ...options, printResult: false, stackCheck: false });
   }
   return current;
 }
@@ -377,7 +380,7 @@ function buildOnce(source: string, seed: number, options: BuildOptions): Built {
 
   return {
     // Cabecera exacta; prelude y runtime sin comentarios, sangría ni líneas vacías (no tienen cadenas largas).
-    code: `--Protect by NextOfuscator\n${oneLine(`${minifyLua(compactLua(preludeLua(seed)))}\n${minifyLua(compactLua(runtimeLua(fields, kinds)))}\n${chunks.join("\n")}`)}\n`,
+    code: `--Protect by NextOfuscator\n${oneLine(`${minifyLua(compactLua(preludeLua(seed)))}\n${minifyLua(compactLua(runtimeLua(fields, kinds, { stackCheck: options.stackCheck })))}\n${chunks.join("\n")}`)}\n`,
     segments: segments.length,
   };
 }

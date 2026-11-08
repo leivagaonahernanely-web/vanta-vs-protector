@@ -10,6 +10,8 @@ import { fieldMap, type FieldMap } from "./fields";
 import type { Bytecode } from "./vm";
 
 export type EmitOptions = {
+  // Chequeo de pila del runtime (ver runtime.ts). Apagado por defecto.
+  stackCheck?: boolean;
   // Si es true, el script devuelve el resultado; si no, lo imprime (usado en pruebas).
   printResult?: boolean;
 };
@@ -124,5 +126,5 @@ export function emitLua(bc: Bytecode, options: EmitOptions = {}): string {
   const run = options.printResult ? "print(nx_run(P))" : "return nx_run(P)";
   const fields = fieldMap(0);
   const kinds = kindsFor(0);
-  return `-- NextOfuscator\n${runtimeLua(fields, kinds)}\nlocal P=${payloadLiteral(bc, fields, kinds)}\n${run}\n`;
+  return `-- NextOfuscator\n${runtimeLua(fields, kinds, { stackCheck: options.stackCheck })}\nlocal P=${payloadLiteral(bc, fields, kinds)}\n${run}\n`;
 }

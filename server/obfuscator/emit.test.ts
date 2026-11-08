@@ -123,6 +123,54 @@ describe("emisión Lua: cadenas cifradas", () => {
   });
 });
 
+describe("emisión Lua: chequeo de pila", () => {
+  it("detiene la ejecución si el runtime lo llama una función Lua ajena", () => {
+    if (!luaAvailable()) return;
+    const bc = encode(compile(parse("local x = 4 return x * 2")), 9);
+    const code = emitLua(bc, { printResult: true, stackCheck: true });
+    // Envuelve la llamada final en una función Lua: el runtime debe detectarlo.
+    // Sin "local r" sería una llamada de cola: Lua reemplaza el marco del envoltorio y el chequeo no lo ve.
+    const wrapped = code.replace("print(nx_run(P))", "print((function() local r = nx_run(P) return r end)())");
+    expect(wrapped).not.toBe(code);
+    const dir = mkdtempSync(join(tmpdir(), "nx-stack-"));
+    try {
+      const file = join(dir, "wrapped.lua");
+      writeFileSync(file, wrapped);
+      let output = "";
+      try {
+        execFileSync(LUA, [file], { encoding: "utf8", stdio: "pipe" });
+      } catch (error) {
+        const e = error as { stdout?: string; stderr?: string };
+        output = `${e.stdout ?? ""}${e.stderr ?? ""}`;
+      }
+      expect(output).toMatch(/pila/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("no altera una ejecución normal", () => {
+    if (!luaAvailable()) return;
+    const bc = encode(compile(parse("local x = 4 return x * 2")), 9);
+    const file = join(mkdtempSync(join(tmpdir(), "nx-stack-ok-")), "ok.lua");
+    writeFileSync(file, emitLua(bc, { printResult: true }));
+    expect(execFileSync(LUA, [file], { encoding: "utf8" }).trim()).toBe("8");
+  });
+});
+
+describe("emisión Lua: chequeo de pila apagado por defecto", () => {
+  it("un archivo embebido en una función sigue ejecutándose", () => {
+    if (!luaAvailable()) return;
+    const bc = encode(compile(parse("local x = 4 return x * 2")), 9);
+    const code = emitLua(bc, { printResult: true });
+    const wrapped = code.replace("print(nx_run(P))", "print((function() local r = nx_run(P) return r end)())");
+    expect(wrapped).not.toBe(code);
+    const file = join(mkdtempSync(join(tmpdir(), "nx-stack-def-")), "def.lua");
+    writeFileSync(file, wrapped);
+    expect(execFileSync(LUA, [file], { encoding: "utf8" }).trim()).toBe("8");
+  });
+});
+
 describe("emisión Lua: integridad del payload", () => {
   it("detiene la ejecución si el checksum del bytecode no coincide", () => {
     if (!luaAvailable()) return;
