@@ -107,7 +107,10 @@ export function payloadLiteral(bc: Bytecode, fields: FieldMap = fieldMap(0), kin
 
 export function emitLua(bc: Bytecode, options: EmitOptions = {}): string {
   const run = options.printResult ? "print(nx_run(P))" : "return nx_run(P)";
-  const fields = fieldMap(0);
-  const kinds = kindsFor(0);
+  // Usa la semilla del bytecode: con una semilla fija, todas las salidas compartirían nombres de
+  // campos y clave, y el runtime dejaría de depender de la compilación concreta.
+  const seed = bc.seed ?? 0;
+  const fields = fieldMap(seed);
+  const kinds = kindsFor(seed);
   return `-- NextOfuscator\n${runtimeLua(fields, kinds)}\nlocal P=${payloadLiteral(bc, fields, kinds)}\n${run}\n`;
 }

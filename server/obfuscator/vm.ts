@@ -19,6 +19,9 @@ export type Bytecode = {
   consts: Program["consts"];
   names: string[];
   ops: string[];
+  // Semilla con la que se codificó. El emisor la usa para derivar nombres de campos y la clave,
+  // así la salida queda ligada a la misma semilla que la tabla de opcodes.
+  seed?: number;
 };
 
 export type Env = Record<string, unknown>;
@@ -77,7 +80,7 @@ export function encode(program: Program, seed: number): Bytecode {
     }
     return { code, params: p.params, slots: p.slots, upvals: p.upvals, boxedParams: p.boxedParams };
   });
-  return { protos, opTable, consts: program.consts, names: program.names, ops: program.ops };
+  return { protos, opTable, consts: program.consts, names: program.names, ops: program.ops, seed };
 }
 
 type Ctx = { steps: number; maxSteps: number; env: Env; depth: number; bc: Bytecode };

@@ -38,6 +38,11 @@ function tokenize(src: string): Tok[] {
       ws += "\n";
       continue;
     }
+    // Cadena larga [[...]] o [==[...]==]: este tokenizador no la entiende, y tratar su contenido
+    // como código lo renombraría. Falla en vez de corromper el runtime en silencio.
+    if (c === "[" && /\[=*\[/y.test(src.slice(i, i + 64))) {
+      throw new Error("cadenas largas [[...]] no soportadas por el minificador");
+    }
     if (c === '"' || c === "'") {
       let j = i + 1;
       while (j < src.length && src[j] !== c) j += src[j] === "\\" ? 2 : 1;
