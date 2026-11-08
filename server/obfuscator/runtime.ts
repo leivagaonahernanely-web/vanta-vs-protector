@@ -43,6 +43,21 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
     S[i], S[j] = S[j], S[i]
     return S[(S[i] + S[j]) % 256]
   end
+  -- Operandos de cada prototipo cifrados (ver encryptWords en cipher.ts): palabra de 32 bits
+  -- del flujo sumada mod 2^32. Se deshacen en su sitio al cargar.
+  local function unpack_code(code, salt)
+    local st = ks_init(salt)
+    for j = 1, #code do
+      local b1 = ks_next(st)
+      local b2 = ks_next(st)
+      local b3 = ks_next(st)
+      local b4 = ks_next(st)
+      local k = b1 + 256 * b2 + 65536 * b3 + 16777216 * b4
+      local x = (code[j] - k) % 4294967296
+      if x >= 2147483648 then x = x - 4294967296 end
+      code[j] = x
+    end
+  end
   local function decstr(s, salt)
     s = b64dec(s)
     local st, out = ks_init(salt), {}
@@ -626,7 +641,7 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
     end
   end
 
-  for i = 1, #protos do resolve(protos[i].code) end
+  for i = 1, #protos do unpack_code(protos[i].code, @S_CODE + i) resolve(protos[i].code) end
   return run_proto(protos[1], {}, {}, 0)
 end
 `;
@@ -634,7 +649,7 @@ end
 
 // Identificadores que cambian en cada compilación: nombres de campos del payload, tipos de
 // instrucción (como números aleatorios en vez de palabras como "CALL") y claves internas del runtime.
-export type Salts = { ops: number; names: number; consts: number; msgs: number };
+export type Salts = { ops: number; names: number; consts: number; msgs: number; code: number };
 export type Kinds = { ops: Record<string, number>; internal: Record<string, number>; msgKey: number[]; salts: Salts; junk: string; b64: string; dispatch: string };
 
 const OP_LIST = [
@@ -751,7 +766,7 @@ export function saltsFor(seed: number): Salts {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
     return 1 + Math.floor((s / 4294967296) * 0x7f000000);
   };
-  return { ops: next(), names: next(), consts: next(), msgs: next() };
+  return { ops: next(), names: next(), consts: next(), msgs: next(), code: next() };
 }
 
 export function kindsFor(seed: number, msgKey?: number[], salts?: Salts): Kinds {
@@ -784,7 +799,8 @@ export function runtimeLua(fields: FieldMap, kinds: Kinds): string {
   let out = DISPATCH_TEMPLATE.replace("--@DISPATCH", kinds.dispatch)
     .replace(/@S_OPS\b/g, String(kinds.salts.ops))
     .replace(/@S_NAMES\b/g, String(kinds.salts.names))
-    .replace(/@S_CONSTS\b/g, String(kinds.salts.consts));
+    .replace(/@S_CONSTS\b/g, String(kinds.salts.consts))
+    .replace(/@S_CODE\b/g, String(kinds.salts.code));
   // Mensajes: cada literal legible se sustituye por MS[i], que se descifra al cargar.
   const messages: string[] = [];
   const indexOf = new Map<string, number>();

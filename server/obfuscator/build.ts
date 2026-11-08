@@ -14,7 +14,7 @@ import { stripComments } from "./comments";
 import { payloadLiteral } from "./emit";
 import { LuaSyntaxError } from "./lexer";
 import { preludeLua } from "./prelude";
-import { kindsFor, runtimeLua, type Salts } from "./runtime";
+import { kindsFor, runtimeLua, saltsFor, type Salts } from "./runtime";
 import { fieldMap } from "./fields";
 import { minifyLua, oneLine } from "./minify";
 import { parse } from "./parser";
@@ -329,7 +329,13 @@ function buildOnce(source: string, seed: number, options: BuildOptions): Built {
   if (key.length < 16 || key.length > 64 || key.some((b) => !Number.isInteger(b) || b < 0 || b > 255)) {
     throw new BuildError("la clave debe tener entre 16 y 64 bytes (0 a 255)");
   }
-  const salts = options.salts ?? { ops: randomInt(1, 0x7f000000), names: randomInt(1, 0x7f000000), consts: randomInt(1, 0x7f000000), msgs: randomInt(1, 0x7f000000) };
+  // Sin salts explícitos, son aleatorios. Con salts explícitos, los campos que falten se derivan
+  // de la semilla, para que la salida siga siendo reproducible.
+  const randomSalts: Salts = {
+    ops: randomInt(1, 0x7f000000), names: randomInt(1, 0x7f000000), consts: randomInt(1, 0x7f000000),
+    msgs: randomInt(1, 0x7f000000), code: randomInt(1, 0x7f000000),
+  };
+  const salts: Salts = { ...(options.salts ? saltsFor(seed) : randomSalts), ...options.salts };
   const kinds = kindsFor(seed, key, salts);
   const chunks: string[] = [];
   segments.forEach((seg, i) => {

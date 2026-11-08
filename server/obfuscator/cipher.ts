@@ -59,3 +59,22 @@ export function decryptBytes(cipher: Buffer, salt: number, key: number[]): Buffe
   }
   return out;
 }
+
+// Cifra la lista de operandos de un prototipo (pares id/argumento). Cada valor de 32 bits se
+// suma a una palabra del flujo, módulo 2^32. Así no se ve el bytecode en claro en el archivo.
+// Valores admitidos: enteros de 32 bits con signo.
+export function encryptWords(values: number[], salt: number, key: number[]): number[] {
+  const st = keystreamInit(key, salt);
+  const M = 4294967296;
+  return values.map((v) => {
+    if (!Number.isInteger(v) || v < -2147483648 || v > 2147483647) {
+      throw new Error(`operando fuera de rango de 32 bits: ${v}`);
+    }
+    const b1 = nextKeyByte(st);
+    const b2 = nextKeyByte(st);
+    const b3 = nextKeyByte(st);
+    const b4 = nextKeyByte(st);
+    const k = b1 + 256 * b2 + 65536 * b3 + 16777216 * b4;
+    return (((v % M) + M) + k) % M;
+  });
+}

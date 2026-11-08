@@ -6,7 +6,7 @@
 // un secreto frente a quien lea el runtime.
 import { createHash } from "node:crypto";
 import { kindsFor, runtimeLua, type Kinds } from "./runtime";
-import { encryptBytes } from "./cipher";
+import { encryptBytes, encryptWords } from "./cipher";
 import { fieldMap, type FieldMap } from "./fields";
 import type { Bytecode } from "./vm";
 
@@ -82,8 +82,8 @@ export function payloadLiteral(bc: Bytecode, fields: FieldMap = fieldMap(0), kin
   const enc = (s: string, base: number, i: number) =>
     luaBytes(encryptBytes(Buffer.from(s, "latin1"), base + i + 1, key));
 
-  const protos = bc.protos.map((p) =>
-    `{${f.code}=${luaList(p.code.map(H))},${f.params}=${H(p.params)},${f.slots}=${H(p.slots)},` +
+  const protos = bc.protos.map((p, pi) =>
+    `{${f.code}=${luaList(encryptWords(p.code, kinds.salts.code + pi + 1, key).map(H))},${f.params}=${H(p.params)},${f.slots}=${H(p.slots)},` +
     `${f.up}=${luaList(p.upvals.map((u) => `{${u.fromLocal ? 1 : 0},${H(u.index)}}`))},` +
     `${f.bp}=${luaList(p.boxedParams.map(H))}}`,
   );
