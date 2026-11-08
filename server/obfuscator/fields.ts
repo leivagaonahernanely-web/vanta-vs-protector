@@ -2,7 +2,7 @@
 // aleatorios distintos, derivados de la semilla, así que el archivo no revela su estructura
 // con palabras como "opnames" o "params". El runtime y el payload usan el mismo mapa.
 export const PAYLOAD_FIELDS = [
-  "protos", "consts", "names", "ops", "opnames", "k", "nconsts", "slots", "code", "params", "bp", "up", "ncs",
+  "protos", "consts", "names", "ops", "opnames", "k", "nconsts", "slots", "code", "params", "bp", "up", "ncs", "ck",
 ] as const;
 
 export type FieldMap = Record<(typeof PAYLOAD_FIELDS)[number], string>;

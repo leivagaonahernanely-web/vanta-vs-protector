@@ -617,6 +617,14 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
     end
   end
 
+  -- Integridad: suma ponderada del bytecode tal como viene en el archivo, antes de resolverlo.
+  -- Si alguien cambia un número del payload, la ejecución se detiene.
+  local ck = 0
+  for i = 1, #protos do
+    local c = protos[i].code
+    for j = 1, #c do ck = (ck * 31 + c[j] + j) % 2147483647 end
+  end
+  if ck ~= P.ck then fail("integridad: el bytecode del archivo fue modificado") end
   for i = 1, #protos do resolve(protos[i].code) end
   return run_proto(protos[1], {}, {}, 0, 0)
 end
@@ -793,7 +801,7 @@ export function runtimeLua(fields: FieldMap, kinds: Kinds): string {
   out = out.slice(0, start) + kDef + out.slice(end);
   out = out.replace(/\bK\.([A-Z][A-Z_0-9]*)\b/g, (m, n: string) => (n in kinds.internal ? `K[${kinds.internal[n]}]` : m));
   // Campos del payload.
-  out = out.replace(/\.(protos|consts|names|ops|opnames|k|nconsts|slots|code|params|bp|up|ncs)\b/g,
+  out = out.replace(/\.(protos|consts|names|ops|opnames|k|nconsts|slots|code|params|bp|up|ncs|ck)\b/g,
     (_, name: string) => "." + fields[name as keyof FieldMap]);
   return out;
 }

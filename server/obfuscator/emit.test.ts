@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { parse } from "./parser";
 import { compile } from "./compiler";
 import { emitLua } from "./emit";
+import { fieldMap } from "./fields";
 import { encode, execute, LuaTable, tostr, type Env } from "./vm";
 
 // Intérprete Lua 5.1 para la prueba de equivalencia. Configurable con NX_LUA_BIN.
@@ -119,6 +120,33 @@ describe("emisión Lua: cadenas cifradas", () => {
     const a = emitLua(encode(compile(parse(src)), 1));
     const b = emitLua(encode(compile(parse(src)), 2));
     expect(a).not.toBe(b);
+  });
+});
+
+describe("emisión Lua: integridad del payload", () => {
+  it("detiene la ejecución si el checksum del bytecode no coincide", () => {
+    if (!luaAvailable()) return;
+    const bc = encode(compile(parse("local x = 1 + 2 return x")), 5);
+    const code = emitLua(bc, { printResult: true });
+    const field = fieldMap(0).ck;
+    const stored = new RegExp(`${field}=(-?0x[0-9a-f]+|-?\\d+)`).exec(code);
+    expect(stored).not.toBeNull();
+    const tampered = code.replace(stored![0], `${field}=0x1`);
+    const dir = mkdtempSync(join(tmpdir(), "nx-ck-"));
+    try {
+      const file = join(dir, "tampered.lua");
+      writeFileSync(file, tampered);
+      let output = "";
+      try {
+        execFileSync(LUA, [file], { encoding: "utf8", stdio: "pipe" });
+      } catch (error) {
+        const e = error as { stdout?: string; stderr?: string };
+        output = `${e.stdout ?? ""}${e.stderr ?? ""}`;
+      }
+      expect(output).toMatch(/integridad/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

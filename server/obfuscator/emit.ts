@@ -73,6 +73,20 @@ function luaList(items: string[]): string {
   return "{" + items.join(",") + "}";
 }
 
+// Suma ponderada del bytecode, igual que la que recalcula el runtime (índices base 1 y módulo
+// que mantiene el resultado en [0, 2^31-1), como el % de Lua).
+const CK_MOD = 2147483647;
+export function bytecodeChecksum(protos: { code: number[] }[]): number {
+  let ck = 0;
+  for (const p of protos) {
+    for (let j = 0; j < p.code.length; j++) {
+      const v = ck * 31 + p.code[j] + (j + 1);
+      ck = ((v % CK_MOD) + CK_MOD) % CK_MOD;
+    }
+  }
+  return ck;
+}
+
 // Literal de tabla Lua con el bytecode de un programa, listo para nx_run.
 export function payloadLiteral(bc: Bytecode, fields: FieldMap = fieldMap(0), kinds: Kinds = kindsFor(0)): string {
   // Clave aleatoria por compilación (de la semilla), no derivada de nombres públicos.
@@ -100,6 +114,7 @@ export function payloadLiteral(bc: Bytecode, fields: FieldMap = fieldMap(0), kin
     `${f.names}=${luaList(bc.names.map((s, i) => enc(s, SALT.names, i)))}`,
     `${f.ops}=${luaList(bc.ops.map((s, i) => enc(s, SALT.ops, i)))}`,
     `${f.protos}=${luaList(protos)}`,
+    `${f.ck}=${H(bytecodeChecksum(bc.protos))}`,
   ];
   shuffleInPlace(parts, key.reduce((acc, b) => (acc * 31 + b) >>> 0, 7));
   return `{${parts.join(",")}}`;
