@@ -47,6 +47,18 @@ describe("macros de optimización y protección", () => {
     expect(splitSegments(src).map((s) => s.kind)).toEqual(["native", "protected", "native"]);
   });
 
+  it("un macro dentro de una función o bloque se rechaza con su línea exacta", () => {
+    const fn = ["local function f()", "  --NXT_LPH_OPTIMIZACION", "  return 1", "  --NXT_LPH_OPTIMIZACION_END", "end"].join("\n");
+    expect(() => splitSegments(fn)).toThrow(/línea 2: el macro NXT_LPH_\* debe ir a nivel principal/);
+    const loop = ["for i = 1, 2 do", "  --NXT_LPH_PROTECCION", "  x = i", "  --NXT_LPH_PROTECCION_END", "end"].join("\n");
+    expect(() => splitSegments(loop)).toThrow(/línea 2/);
+  });
+
+  it("un macro después de cerrar una función sí es válido", () => {
+    const src = ["local function f() return 1 end", "--NXT_LPH_OPTIMIZACION", "print(f())", "--NXT_LPH_OPTIMIZACION_END"].join("\n");
+    expect(splitSegments(src).map((seg) => seg.kind)).toEqual(["protected", "native"]);
+  });
+
   it("rechaza macros anidados, cierres sin apertura y macros sin cerrar", () => {
     expect(() => splitSegments("--NXT_LPH_OPTIMIZACION\n--NXT_LPH_PROTECCION\n--NXT_LPH_PROTECCION_END\n--NXT_LPH_OPTIMIZACION_END"))
       .toThrow(/no se pueden anidar/);

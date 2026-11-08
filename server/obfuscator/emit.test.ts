@@ -88,6 +88,22 @@ const PROGRAMS: string[] = [
   "local mt = {__tostring = function() return 'custom' end} local t = setmetatable({}, mt) return tostring(t)",
   "local mt = {__len = function() return 7 end} local t = setmetatable({}, mt) return #t",
   "local t = setmetatable({}, {__index = {x = 5}}) return rawget(t, 'x')",
+  // Llamadas directas: argumentos faltantes no deben leer valores viejos de la pila.
+  "local function big(a, b, c) return a + b + c end big(1, 2, 3) local function f(a, b) return b end return f(7)",
+  "local function f(a, b, c) return c end return f(1, nil, 3)",
+  "local function v(...) return select('#', ...) end return v(1, nil, nil)",
+  "local function w(a, ...) return ... end local x, y = w(1, 2, 3) return x + y",
+  "local function cnt(...) local n = 0 for i = 1, select('#', ...) do n = n + 1 end return n end return cnt(4, 5, 6, 7)",
+  // Módulo y división con negativos y flotantes (operandos en variables para no plegarlos).
+  "local a, b = 7, -3 return a % b",
+  "local a, b = -7, 3 return a % b",
+  "local a, b = 7.5, 2 return (a % b) * 10 + a / b",
+  "local a = 7 return a / 2 % 3",
+  // Plegado de constantes: deben dar el mismo resultado que la ejecución real.
+  "return (2 * 3 + 1) + (-2 ^ 2) * 100 + (7 % 3) * 10000",
+  "return (2 == 2) and (3 < 2) == false",
+  "return (1 + 2) * (3 - 1) / 4 + -(5 % 3) * 10",
+  "local x = 2 * 3 return x + 4 - 1 * 2",
 ];
 
 describe("emisión Lua: cadenas cifradas", () => {

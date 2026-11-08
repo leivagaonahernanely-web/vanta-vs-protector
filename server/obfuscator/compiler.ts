@@ -69,6 +69,51 @@ export function compile(block: Block): Program {
 
 const NEG_ZERO_KEY = Symbol("-0");
 
+// Plegado de constantes: operaciones entre literales numéricos se calculan al compilar. Sigue la
+// misma semántica que la VM (módulo con floor, potencia). Solo se pliega cuando el resultado es
+// finito o un booleano: 1/0, 0%0 y similares se dejan para ejecución, como en Lua.
+function finiteOrUndefined(v: number): number | undefined {
+  return Number.isFinite(v) ? v : undefined;
+}
+
+function foldConst(e: Expr): number | boolean | undefined {
+  // Nodos marcados como opacos (predicados de código muerto) nunca se pliegan.
+  if ((e as { opaque?: boolean }).opaque) return undefined;
+  switch (e.kind) {
+    case "Number":
+      return e.value;
+    case "Paren":
+      return foldConst(e.expr);
+    case "Unary": {
+      if (e.op !== "-") return undefined;
+      const v = foldConst(e.operand);
+      return typeof v === "number" ? finiteOrUndefined(-v) : undefined;
+    }
+    case "Binary": {
+      const l = foldConst(e.left);
+      const r = foldConst(e.right);
+      if (typeof l !== "number" || typeof r !== "number") return undefined;
+      switch (e.op) {
+        case "+": return finiteOrUndefined(l + r);
+        case "-": return finiteOrUndefined(l - r);
+        case "*": return finiteOrUndefined(l * r);
+        case "/": return finiteOrUndefined(l / r);
+        case "%": return finiteOrUndefined(l - Math.floor(l / r) * r);
+        case "^": return finiteOrUndefined(Math.pow(l, r));
+        case "==": return l === r;
+        case "~=": return l !== r;
+        case "<": return l < r;
+        case "<=": return l <= r;
+        case ">": return l > r;
+        case ">=": return l >= r;
+        default: return undefined;
+      }
+    }
+    default:
+      return undefined;
+  }
+}
+
 class Compiler {
   private consts: Const[] = [];
   private names: string[] = [];
@@ -578,11 +623,16 @@ class Compiler {
       case "Paren":
         this.expr(e.expr);
         return;
-      case "Unary":
+      case "Unary": {
+        const folded = foldConst(e);
+        if (folded !== undefined) { this.emit("CONST", this.constIndex(folded)); return; }
         this.expr(e.operand);
         this.emit("UN", this.opIndex(e.op));
         return;
-      case "Binary":
+      }
+      case "Binary": {
+        const folded = foldConst(e);
+        if (folded !== undefined) { this.emit("CONST", this.constIndex(folded)); return; }
         if (e.op === "and" || e.op === "or") {
           // Cortocircuito: si el izquierdo decide, se queda en la pila.
           this.expr(e.left);
@@ -597,6 +647,7 @@ class Compiler {
         this.expr(e.right);
         this.emit("BIN", this.opIndex(e.op));
         return;
+      }
       case "Call":
       case "MethodCall":
         // En contexto de un solo valor: la llamada se queda con el primer resultado.

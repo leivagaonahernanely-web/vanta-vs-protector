@@ -69,10 +69,37 @@ const PROT_END = /^\s*--\s*NXT_LPH_PROTECCION_END\s*$/;
 
 export type Segment = { kind: "native" | "protected"; source: string; line: number };
 
+// Profundidad de bloques al inicio de cada línea (1-based; índice 0 sin usar). Lua 5.1: `function`,
+// `if`, `do` y `repeat` abren un bloque; `end` y `until` lo cierran. `while` y `for` no cuentan
+// aparte porque su `do` ya abre el bloque. Comentarios y cadenas no generan tokens, así que los
+// macros no afectan el conteo. Si el código no se puede tokenizar, devuelve null.
+const BLOCK_OPEN = new Set(["function", "if", "do", "repeat"]);
+const BLOCK_CLOSE = new Set(["end", "until"]);
+function blockDepthByLine(source: string, lineCount: number): number[] | null {
+  let tokens;
+  try {
+    tokens = tokenize(source);
+  } catch {
+    return null;
+  }
+  const delta = new Array<number>(lineCount + 2).fill(0);
+  for (const t of tokens) {
+    if (t.type !== "keyword") continue;
+    const v = String(t.value);
+    if (BLOCK_OPEN.has(v)) delta[t.line] += 1;
+    else if (BLOCK_CLOSE.has(v)) delta[t.line] -= 1;
+  }
+  // La profundidad al inicio de la línea L es la suma de los cambios de las líneas anteriores.
+  const depth = new Array<number>(lineCount + 2).fill(0);
+  for (let l = 1; l <= lineCount + 1; l++) depth[l] = depth[l - 1] + delta[l - 1];
+  return depth;
+}
+
 // Divide el código en segmentos según los macros. `line` es la primera línea del segmento (1-based).
 export function splitSegments(source: string): Segment[] {
   const lines = source.split(/\r\n|\n|\r/);
   const hasProtection = lines.some((l) => PROT_START.test(l));
+  const depth = blockDepthByLine(source, lines.length);
 
   type State = "none" | "opt" | "prot";
   let state: State = "none";
@@ -81,6 +108,13 @@ export function splitSegments(source: string): Segment[] {
 
   lines.forEach((line, i) => {
     const lineNo = i + 1;
+    const isMacro = ANY_MACRO.test(line);
+    if (isMacro && depth && depth[lineNo] > 0) {
+      throw new BuildError(
+        "el macro NXT_LPH_* debe ir a nivel principal, no dentro de una función o bloque",
+        lineNo,
+      );
+    }
     if (OPT_START.test(line) || PROT_START.test(line)) {
       if (state !== "none") throw new BuildError("los macros no se pueden anidar", lineNo);
       state = OPT_START.test(line) ? "opt" : "prot";

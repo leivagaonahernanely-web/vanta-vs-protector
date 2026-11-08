@@ -15,6 +15,7 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
   local opnames, bopnames = P.opnames, P.ops
   -- Descifrado de cadenas (ver emit.ts): byte - clave - salt, módulo 256. Mismos salts que SALT.
   local KEYB, KN = P.k, #P.k
+  local type = type
   local string_byte, string_char = string.byte, string.char
   --@B64
   local function decstr(s, salt)
@@ -161,9 +162,7 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
       return num(l, "dividir") / num(r, "dividir")
     end,
     ["%"] = function(l, r)
-      if type(l) == "number" and type(r) == "number" then
-        return l - math.floor(l / r) * r
-      end
+      if type(l) == "number" and type(r) == "number" then return l % r end
       local ok, res = try_meta("%", l, r); if ok then return res end
       local a, b = num(l, "calcular módulo"), num(r, "calcular módulo")
       return a - math.floor(a / b) * b
@@ -248,11 +247,11 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
     POP = 19, RET = 20, BIN = 21, GGET = 22, GSET = 23, DUP = 24, SWAP = 25, UPGET = 26,
     UPSET = 27, UN = 28, JMPT = 29, CLOSURE = 30, NEWTABLE = 31, JMP = 32, INDEX = 33, SETINDEX = 34,
     CALLM = 35, CALLV = 36, CALLVM = 37, ADJ = 38, ADDCOUNT = 39, RETV = 40, VARARG = 41, VARARG1 = 42,
-    SETLIST = 43,
+    SETLIST = 43, MOD = 44, DIV = 45,
   }
   local fast = {
     ["+"] = K.ADD, ["-"] = K.SUB, ["*"] = K.MUL, ["<"] = K.LT, ["<="] = K.LE,
-    [">"] = K.GT, [">="] = K.GE, ["=="] = K.EQ, ["~="] = K.NE,
+    [">"] = K.GT, [">="] = K.GE, ["=="] = K.EQ, ["~="] = K.NE, ["%"] = K.MOD, ["/"] = K.DIV,
   }
 
   -- Reescribe un código plano [tipo, argumento, ...] con argumentos ya resueltos.
@@ -304,10 +303,36 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
     end
   end
 
+  -- Closures creadas por esta VM. El valor es true, así la tabla débil no retiene nada
+  -- (en Lua 5.1 no hay tablas efímeras: un valor que apunte a su clave impediría recolectarla).
+  local OURS = setmetatable({}, { __mode = "k" })
+  -- Centinela de llamada directa: la VM pasa (FASTCALL, pila, base, n) y evita crear una tabla
+  -- de argumentos. Ninguna función de usuario puede recibirlo: es privada. Es una función y no una
+  -- tabla a propósito: comparar tablas con == invoca __eq del argumento, y eso recursaría.
+  local FASTCALL = function() end
+
   local function make_closure(proto, ups)
-    return function(...)
-      return run_proto(proto, ups, { ... }, select("#", ...))
+    local f = function(...)
+      if (...) == FASTCALL then
+        local _, src, base, n = ...
+        return run_proto(proto, ups, src, base, n)
+      end
+      return run_proto(proto, ups, { ... }, 0, select("#", ...))
     end
+    OURS[f] = true
+    return f
+  end
+
+  -- Llamada desde la VM con argumentos en src[base + 1 .. base + n]. Fija la profundidad antes
+  -- de entrar (como antes lo hacía CALL), así un error capturado con pcall no deja la cuenta inflada.
+  -- Devuelve todos los resultados; quien necesita uno toma el primero.
+  local function call_r(callee, src, base, n, d)
+    depth = d
+    if OURS[callee] then return callee(FASTCALL, src, base, n) end
+    if not is_callable(callee) then
+      fail("se intentó llamar a un valor de tipo " .. typename(callee))
+    end
+    return callee(unpack(src, base + 1, base + n))
   end
 
   -- Empaqueta resultados de una llamada con su cantidad (los nil también cuentan).
@@ -317,7 +342,7 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
 
   local NO_VARARGS = { n = 0 }
 
-  run_proto = function(proto, ups, args, nargs)
+  run_proto = function(proto, ups, src, base, nargs)
     -- La profundidad de este marco se deriva de quien llama (CALL la fija antes de llamar),
     -- no de un contador global: así un error capturado con pcall no deja la cuenta inflada.
     local myd = depth + 1
@@ -327,18 +352,20 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
     local code = proto.code
     -- Celdas de locales: valor directo, salvo las capturadas por closures (cajas {v=...}).
     local cells = {}
-    for i = 1, proto.params do cells[i] = args[i] end
+    for i = 1, proto.params do
+      if i <= nargs then cells[i] = src[base + i] end
+    end
     local bp = proto.bp
     for j = 1, #bp do
       local s = bp[j]
       cells[s] = { v = cells[s] }
     end
 
-    -- Argumentos extra ('...'): se leen directamente de args desde vo + j, sin copiarlos.
+    -- Argumentos extra ('...'): se leen directamente de src desde vo + j, sin copiarlos.
     -- Sin extras se usa una tabla vacía y vn = 0.
     local va, vn, vo = NO_VARARGS, 0, 0
     if nargs > proto.params then
-      va, vn, vo = args, nargs - proto.params, proto.params
+      va, vn, vo = src, nargs - proto.params, base + proto.params
     end
 
     local stack, sp = {}, 0
@@ -414,14 +441,19 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
               else stack[sp - 1] = a(l, r) end
               sp = sp - 1
             elseif op == 12 then -- CALL
-              local callee = stack[sp - a]
-              if not is_callable(callee) then
-                fail("se intentó llamar a un valor de tipo " .. typename(callee))
-              end
-              depth = myd
-              local r = callee(unpack(stack, sp - a + 1, sp))
+              local r = call_r(stack[sp - a], stack, sp - a, a, myd)
               sp = sp - a
               stack[sp] = r
+            elseif op == 44 then -- MOD
+              local l, r = stack[sp - 1], stack[sp]
+              if type(l) == "number" and type(r) == "number" then stack[sp - 1] = l % r
+              else stack[sp - 1] = a(l, r) end
+              sp = sp - 1
+            elseif op == 45 then -- DIV
+              local l, r = stack[sp - 1], stack[sp]
+              if type(l) == "number" and type(r) == "number" then stack[sp - 1] = l / r
+              else stack[sp - 1] = a(l, r) end
+              sp = sp - 1
             else -- LSET (13)
               cells[a] = stack[sp]
               sp = sp - 1
@@ -518,12 +550,7 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
               setindex(stack[sp - 2], stack[sp - 1], stack[sp])
               sp = sp - 3
             elseif op == 35 then -- CALLM: args fijos, resultados variables (callee en sp - a)
-              local callee = stack[sp - a]
-              if not is_callable(callee) then
-                fail("se intentó llamar a un valor de tipo " .. typename(callee))
-              end
-              depth = myd
-              local res = pack(callee(unpack(stack, sp - a + 1, sp)))
+              local res = pack(call_r(stack[sp - a], stack, sp - a, a, myd))
               sp = sp - a - 1
               for j = 1, res.n do
                 sp = sp + 1
@@ -534,23 +561,13 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
             elseif op == 36 then -- CALLV: args variables, un resultado
               local k = stack[sp]
               sp = sp - 1
-              local callee = stack[sp - k]
-              if not is_callable(callee) then
-                fail("se intentó llamar a un valor de tipo " .. typename(callee))
-              end
-              depth = myd
-              local r = callee(unpack(stack, sp - k + 1, sp))
+              local r = call_r(stack[sp - k], stack, sp - k, k, myd)
               sp = sp - k
               stack[sp] = r
             elseif op == 37 then -- CALLVM: args variables, resultados variables
               local k = stack[sp]
               sp = sp - 1
-              local callee = stack[sp - k]
-              if not is_callable(callee) then
-                fail("se intentó llamar a un valor de tipo " .. typename(callee))
-              end
-              depth = myd
-              local res = pack(callee(unpack(stack, sp - k + 1, sp)))
+              local res = pack(call_r(stack[sp - k], stack, sp - k, k, myd))
               sp = sp - k - 1
               for j = 1, res.n do
                 sp = sp + 1
@@ -601,7 +618,7 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
   end
 
   for i = 1, #protos do resolve(protos[i].code) end
-  return run_proto(protos[1], {}, {}, 0)
+  return run_proto(protos[1], {}, {}, 0, 0)
 end
 `;
 
