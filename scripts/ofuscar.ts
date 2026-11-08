@@ -1,7 +1,7 @@
 // Uso:
 //   npx tsx scripts/ofuscar.ts                       ofusca todo Inputs/*.lua en Output/
 //   npx tsx scripts/ofuscar.ts entrada.lua [salida.lua]
-// Opciones: --sugerir (solo lista dónde poner macros)  --semilla N  --pasadas N  --codigo-muerto R (0 a 1, por defecto 0.5)  --auto-nativo
+// Opciones: --sugerir (solo lista dónde poner macros)  --semilla N  --pasadas N (por defecto 2)  --codigo-muerto R (0 a 1, por defecto 0.8)  --auto-nativo
 // Usa el mismo motor que la web, sin login ni API key.
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { randomInt } from "node:crypto";
@@ -25,8 +25,8 @@ for (let i = 0; i < args.length; i++) {
 }
 
 const seed = flags["semilla"] ? Number(flags["semilla"]) : randomInt(1, 2 ** 31);
-const passes = flags["pasadas"] ? Number(flags["pasadas"]) : 1;
-const deadCodeRate = flags["codigo-muerto"] ? Number(flags["codigo-muerto"]) : 0.5;
+const passes = flags["pasadas"] ? Number(flags["pasadas"]) : 2;
+const deadCodeRate = flags["codigo-muerto"] ? Number(flags["codigo-muerto"]) : 0.8;
 // Sin macros: bucles y callbacks van nativos (más rápido, menos protegido).
 const autoNative = "auto-nativo" in flags;
 if (!Number.isInteger(passes) || passes < 1) {
