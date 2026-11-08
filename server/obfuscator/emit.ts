@@ -16,7 +16,6 @@ export type EmitOptions = {
 };
 
 // Salts base por lista. Deben coincidir con decstr() en runtime.ts.
-export const SALT = { ops: 1_000_000, names: 2_000_000, consts: 3_000_000, opnames: 4_000_000 } as const;
 
 const KEY_LENGTH = 16;
 
@@ -96,10 +95,10 @@ export function payloadLiteral(bc: Bytecode, fields: FieldMap = fieldMap(0), kin
     `${f.opnames}=${luaList(bc.opTable.map((s) => H(kinds.ops[s])))}`,
     `${f.nconsts}=${H(bc.consts.length)}`,
     // Solo las cadenas van cifradas; el runtime distingue cadenas por tipo.
-    `${f.consts}=${luaList(bc.consts.map((v, i) => (typeof v === "string" || isEncodableNumber(v) ? enc(String(v), SALT.consts, i) : luaValue(v))))}`,
+    `${f.consts}=${luaList(bc.consts.map((v, i) => (typeof v === "string" || isEncodableNumber(v) ? enc(String(v), kinds.salts.consts, i) : luaValue(v))))}`,
     `${f.ncs}=${luaList(bc.consts.flatMap((v, i) => (isEncodableNumber(v) ? [H(i + 1)] : [])))}`,
-    `${f.names}=${luaList(bc.names.map((s, i) => enc(s, SALT.names, i)))}`,
-    `${f.ops}=${luaList(bc.ops.map((s, i) => enc(s, SALT.ops, i)))}`,
+    `${f.names}=${luaList(bc.names.map((s, i) => enc(s, kinds.salts.names, i)))}`,
+    `${f.ops}=${luaList(bc.ops.map((s, i) => enc(s, kinds.salts.ops, i)))}`,
     `${f.protos}=${luaList(protos)}`,
   ];
   shuffleInPlace(parts, key.reduce((acc, b) => (acc * 31 + b) >>> 0, 7));

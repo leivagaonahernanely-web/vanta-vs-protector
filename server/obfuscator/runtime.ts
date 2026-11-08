@@ -13,7 +13,7 @@ import type { FieldMap } from "./fields";
 export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
   local protos, consts, names = P.protos, P.consts, P.names
   local opnames, bopnames = P.opnames, P.ops
-  -- Descifrado de cadenas (ver emit.ts): byte - clave - salt, módulo 256. Mismos salts que SALT.
+  -- Descifrado de cadenas (ver cipher.ts). Los salts son aleatorios por compilación (kinds.salts).
   local KEYB = P.k
   local string_byte, string_char = string.byte, string.char
   --@B64
@@ -53,10 +53,10 @@ export const RUNTIME_LUA_TEMPLATE = `local function nx_run(P)
     end
     return table.concat(out)
   end
-  for i = 1, #bopnames do bopnames[i] = decstr(bopnames[i], 1000000 + i) end
-  for i = 1, #names do names[i] = decstr(names[i], 2000000 + i) end
+  for i = 1, #bopnames do bopnames[i] = decstr(bopnames[i], @S_OPS + i) end
+  for i = 1, #names do names[i] = decstr(names[i], @S_NAMES + i) end
   for i = 1, P.nconsts do
-    if type(consts[i]) == "string" then consts[i] = decstr(consts[i], 3000000 + i) end
+    if type(consts[i]) == "string" then consts[i] = decstr(consts[i], @S_CONSTS + i) end
   end
   -- Constantes numéricas: van cifradas como texto y aquí se convierten de nuevo a número.
   for _, i in ipairs(P.ncs) do consts[i] = tonumber(consts[i]) end
@@ -634,7 +634,8 @@ end
 
 // Identificadores que cambian en cada compilación: nombres de campos del payload, tipos de
 // instrucción (como números aleatorios en vez de palabras como "CALL") y claves internas del runtime.
-export type Kinds = { ops: Record<string, number>; internal: Record<string, number>; msgKey: number[]; junk: string; b64: string; dispatch: string };
+export type Salts = { ops: number; names: number; consts: number; msgs: number };
+export type Kinds = { ops: Record<string, number>; internal: Record<string, number>; msgKey: number[]; salts: Salts; junk: string; b64: string; dispatch: string };
 
 const OP_LIST = [
   "CONST", "LOCAL_GET", "LOCAL_SET", "DECL", "GLOBAL_GET", "GLOBAL_SET", "UP_GET", "UP_SET",
@@ -743,7 +744,17 @@ export const B64_VARIANTS: string[] = [
   end`,
 ];
 
-export function kindsFor(seed: number, msgKey?: number[]): Kinds {
+// Salts por defecto, derivados de la semilla (reproducibles). build.ts pasa salts aleatorios.
+export function saltsFor(seed: number): Salts {
+  let s = (seed ^ 0x5a17) >>> 0;
+  const next = () => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return 1 + Math.floor((s / 4294967296) * 0x7f000000);
+  };
+  return { ops: next(), names: next(), consts: next(), msgs: next() };
+}
+
+export function kindsFor(seed: number, msgKey?: number[], salts?: Salts): Kinds {
   const internalNames = [...RUNTIME_LUA_TEMPLATE.slice(RUNTIME_LUA_TEMPLATE.indexOf("local K = {"))
     .split("\n  }")[0].matchAll(/\b([A-Z][A-Z_0-9]*) = \d+/g)].map((m) => m[1]);
   const ids = uniqueIds(OP_LIST.length + internalNames.length, seed ^ 0xc0de);
@@ -753,7 +764,7 @@ export function kindsFor(seed: number, msgKey?: number[]): Kinds {
   internalNames.forEach((n, i) => { internal[n] = ids[OP_LIST.length + i]; });
   // Por defecto, clave derivada de la semilla (reproducible). build.ts pasa una clave aleatoria.
   const key = msgKey ?? uniqueIds(16, seed ^ 0x3e55).map((n) => n % 256);
-  return { ops, internal, msgKey: key, junk: junkFor(seed), b64: B64_VARIANTS[seed % B64_VARIANTS.length], dispatch: generateDispatch(DISPATCH_LEAVES, seed ^ 0xd15) };
+  return { ops, internal, msgKey: key, salts: salts ?? saltsFor(seed), junk: junkFor(seed), b64: B64_VARIANTS[seed % B64_VARIANTS.length], dispatch: generateDispatch(DISPATCH_LEAVES, seed ^ 0xd15) };
 }
 
 // Bytes como escapes decimales de Lua (cadena de bytes en un literal).
@@ -770,7 +781,10 @@ function isMessage(lit: string): boolean {
 
 // Runtime con los nombres de campos y de instrucciones de esta compilación.
 export function runtimeLua(fields: FieldMap, kinds: Kinds): string {
-  let out = DISPATCH_TEMPLATE.replace("--@DISPATCH", kinds.dispatch);
+  let out = DISPATCH_TEMPLATE.replace("--@DISPATCH", kinds.dispatch)
+    .replace(/@S_OPS\b/g, String(kinds.salts.ops))
+    .replace(/@S_NAMES\b/g, String(kinds.salts.names))
+    .replace(/@S_CONSTS\b/g, String(kinds.salts.consts));
   // Mensajes: cada literal legible se sustituye por MS[i], que se descifra al cargar.
   const messages: string[] = [];
   const indexOf = new Map<string, number>();
@@ -780,11 +794,11 @@ export function runtimeLua(fields: FieldMap, kinds: Kinds): string {
     return `MS[${indexOf.get(lit)}]`;
   });
   const enc = messages.map((text, i) =>
-    luaByteLiteral([...encryptBytes(Buffer.from(text, "utf8"), 5000000 + i + 1, kinds.msgKey)]));
+    luaByteLiteral([...encryptBytes(Buffer.from(text, "utf8"), kinds.salts.msgs + i + 1, kinds.msgKey)]));
   // Mismo descifrado que las cadenas del payload (decstr), con la clave de la compilación.
   const setup = `local MSENC = {${enc.join(",")}}\n` +
     `local MS = {}\n` +
-    `for i = 1, #MSENC do MS[i] = decstr(MSENC[i], 5000000 + i) end`;
+    `for i = 1, #MSENC do MS[i] = decstr(MSENC[i], ${kinds.salts.msgs} + i) end`;
   out = out.replace("--@MSG", setup);
   out = out.replace("--@JUNK", kinds.junk);
   out = out.replace("--@B64", kinds.b64);

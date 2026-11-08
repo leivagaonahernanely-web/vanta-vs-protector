@@ -8,13 +8,13 @@
 // - Los macros deben estar a nivel principal y no pueden anidarse.
 // - Un bloque nativo y uno protegido no pueden compartir variables "local" a nivel principal
 //   (cada uno vive en un contexto distinto). Las globales sí se comparten.
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import { compile } from "./compiler";
 import { stripComments } from "./comments";
 import { payloadLiteral } from "./emit";
 import { LuaSyntaxError } from "./lexer";
 import { preludeLua } from "./prelude";
-import { kindsFor, runtimeLua } from "./runtime";
+import { kindsFor, runtimeLua, type Salts } from "./runtime";
 import { fieldMap } from "./fields";
 import { minifyLua, oneLine } from "./minify";
 import { parse } from "./parser";
@@ -260,6 +260,8 @@ export type BuildOptions = {
   // Clave de 16 a 64 bytes para cifrar cadenas. Si no se pasa, cada compilación usa 32 bytes
   // aleatorios (criptográficos). Pasar la misma clave y semilla reproduce la salida.
   key?: number[];
+  // Salts por lista (ops, names, consts, msgs). Si no se pasan, son aleatorios.
+  salts?: Salts;
 };
 
 export function buildLua(source: string, seed: number, options: BuildOptions = {}): Built {
@@ -327,7 +329,8 @@ function buildOnce(source: string, seed: number, options: BuildOptions): Built {
   if (key.length < 16 || key.length > 64 || key.some((b) => !Number.isInteger(b) || b < 0 || b > 255)) {
     throw new BuildError("la clave debe tener entre 16 y 64 bytes (0 a 255)");
   }
-  const kinds = kindsFor(seed, key);
+  const salts = options.salts ?? { ops: randomInt(1, 0x7f000000), names: randomInt(1, 0x7f000000), consts: randomInt(1, 0x7f000000), msgs: randomInt(1, 0x7f000000) };
+  const kinds = kindsFor(seed, key, salts);
   const chunks: string[] = [];
   segments.forEach((seg, i) => {
     const last = i === segments.length - 1;
